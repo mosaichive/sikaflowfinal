@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/nav/AppShell";
 import { useRequireUser, PageLoader } from "@/lib/use-require-user";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { PageHeader, EmptyState } from "./products";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Sale = { id: string; total: number; payment_method: string; customer_name: string | null; sale_date: string };
 type Item = { id: string; sale_id: string; product_name: string; quantity: number; unit_price: number };
