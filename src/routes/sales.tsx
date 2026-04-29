@@ -37,6 +37,8 @@ function SalesPage() {
   const [recent, setRecent] = useState<RecentSale[]>([]);
   const generate = useServerFn(generateInvoicePdf);
   const { filter: dateFilter, setFilter: setDateFilter, range } = useDateFilter();
+  const [previewSaleId, setPreviewSaleId] = useState<string | null>(null);
+  const [editSaleId, setEditSaleId] = useState<string | null>(null);
 
   // form state
   const [productId, setProductId] = useState("");
