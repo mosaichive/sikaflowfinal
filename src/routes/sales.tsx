@@ -324,6 +324,20 @@ function SalesPage() {
   );
 }
 
+      <InvoicePreviewDialog
+        saleId={previewSaleId}
+        open={!!previewSaleId}
+        onOpenChange={(v) => !v && setPreviewSaleId(null)}
+      />
+      <EditSaleDialog
+        saleId={editSaleId}
+        open={!!editSaleId}
+        onOpenChange={(v) => !v && setEditSaleId(null)}
+      />
+    </AppShell>
+  );
+}
+
 function Row({ label, value, bold, muted, accent }: { label: string; value: string; bold?: boolean; muted?: boolean; accent?: "ok" | "warn" }) {
   const valColor = accent === "ok" ? "text-emerald-500" : accent === "warn" ? "text-amber-500" : bold ? "text-foreground" : "text-foreground";
   return (
