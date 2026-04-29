@@ -19,6 +19,7 @@ type Profile = {
   business_name: string | null; phone: string | null; email: string | null;
   business_type: string | null; num_employees: string | null; location: string | null;
   role: string | null; trial_end_date: string; currency: string; logo_url: string | null;
+  avatar_url: string | null;
 };
 
 export const Route = createFileRoute("/settings")({
