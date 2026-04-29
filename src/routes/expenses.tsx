@@ -65,6 +65,7 @@ function ExpensesPage() {
           description={`${filtered.length} entries · Total ${formatCurrency(total)}`}
           action={<Button onClick={() => setOpen(true)} className="bg-primary hover:bg-primary/90"><Plus className="mr-1 h-4 w-4" />Add expense</Button>}
         />
+        <DateFilterBar filter={dateFilter} onChange={setDateFilter} allowAll />
         <div className="mb-4 flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
             <button key={c} onClick={() => setFilter(c)} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${filter === c ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}>
