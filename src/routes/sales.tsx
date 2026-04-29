@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Receipt, Download, AlertTriangle, History } from "lucide-react";
+import { Receipt, Eye, AlertTriangle, History, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import { PageHeader } from "./products";
@@ -18,6 +18,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { downloadBase64Pdf } from "@/lib/download";
 import { DateFilterBar } from "@/components/DateFilterBar";
 import { useDateFilter, inRange } from "@/lib/date-filter";
+import { InvoicePreviewDialog } from "@/components/InvoicePreview";
+import { EditSaleDialog } from "@/components/EditDialogs";
 
 type Product = { id: string; name: string; price: number; cost: number; stock: number };
 type Customer = { id: string; name: string; phone: string | null };
