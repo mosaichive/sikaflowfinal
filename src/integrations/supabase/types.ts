@@ -23,6 +23,8 @@ export type Database = {
           message: string
           priority: Database["public"]["Enums"]["announcement_priority"]
           publish_at: string
+          target_plan: Database["public"]["Enums"]["subscription_plan"] | null
+          target_user_id: string | null
           title: string
           updated_at: string
         }
@@ -34,6 +36,8 @@ export type Database = {
           message: string
           priority?: Database["public"]["Enums"]["announcement_priority"]
           publish_at?: string
+          target_plan?: Database["public"]["Enums"]["subscription_plan"] | null
+          target_user_id?: string | null
           title: string
           updated_at?: string
         }
@@ -45,6 +49,8 @@ export type Database = {
           message?: string
           priority?: Database["public"]["Enums"]["announcement_priority"]
           publish_at?: string
+          target_plan?: Database["public"]["Enums"]["subscription_plan"] | null
+          target_user_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -149,6 +155,39 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          active: boolean
+          created_at: string
+          details: Json
+          id: string
+          label: string
+          sort_order: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          details?: Json
+          id?: string
+          label: string
+          sort_order?: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          details?: Json
+          id?: string
+          label?: string
+          sort_order?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           cost: number
@@ -200,6 +239,11 @@ export type Database = {
           onboarding_completed: boolean
           phone: string | null
           role: string | null
+          subscription_end_date: string | null
+          subscription_plan: Database["public"]["Enums"]["subscription_plan"]
+          subscription_start_date: string | null
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          suspended: boolean
           trial_end_date: string
           trial_start_date: string
           updated_at: string
@@ -215,6 +259,11 @@ export type Database = {
           onboarding_completed?: boolean
           phone?: string | null
           role?: string | null
+          subscription_end_date?: string | null
+          subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
+          subscription_start_date?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          suspended?: boolean
           trial_end_date?: string
           trial_start_date?: string
           updated_at?: string
@@ -230,6 +279,11 @@ export type Database = {
           onboarding_completed?: boolean
           phone?: string | null
           role?: string | null
+          subscription_end_date?: string | null
+          subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
+          subscription_start_date?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          suspended?: boolean
           trial_end_date?: string
           trial_start_date?: string
           updated_at?: string
@@ -329,6 +383,51 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          note: string | null
+          payment_method: string
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          reference: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          payment_method: string
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          reference?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          payment_method?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          reference?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -355,6 +454,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_platform_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -367,6 +467,8 @@ export type Database = {
       announcement_audience: "all" | "trial" | "active" | "expired"
       announcement_priority: "low" | "normal" | "high"
       app_role: "super_admin" | "business_owner" | "staff"
+      subscription_plan: "trial" | "monthly" | "annual"
+      subscription_status: "trial" | "active" | "expired" | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -497,6 +599,8 @@ export const Constants = {
       announcement_audience: ["all", "trial", "active", "expired"],
       announcement_priority: ["low", "normal", "high"],
       app_role: ["super_admin", "business_owner", "staff"],
+      subscription_plan: ["trial", "monthly", "annual"],
+      subscription_status: ["trial", "active", "expired", "suspended"],
     },
   },
 } as const
