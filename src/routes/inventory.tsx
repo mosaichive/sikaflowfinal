@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Boxes, AlertTriangle, Search, Plus, Minus, History } from "lucide-react";
+import { Boxes, AlertTriangle, Search, Plus, Minus, History, Textarea as TextareaIcon } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Product = { id: string; name: string; price: number; cost: number; stock: number; low_stock_threshold: number };
-type Movement = { id: string; product_id: string; change: number; reason: string; note: string | null; created_at: string };
+type Movement = { id: string; product_id: string; change: number; reason: string; note: string | null; created_at: string; added_by_name: string | null };
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({ meta: [{ title: "Inventory — SikaFlow" }] }),
