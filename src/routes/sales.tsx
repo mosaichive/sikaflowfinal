@@ -299,10 +299,16 @@ function SalesPage() {
                           <p className="truncate text-sm font-medium">{s.invoice_number ?? s.id.slice(0, 8)}</p>
                           <p className="truncate text-xs text-muted-foreground">{s.customer_name || "Walk-in"} · {new Date(s.sale_date).toLocaleDateString()}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(s.id)} title="Download invoice">
-                            <Download className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-1">
+                          <span className="mr-1 text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPreviewSaleId(s.id)} title="Preview invoice">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditSaleId(s.id)} title="Edit sale">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteSale(s.id)} title="Delete sale">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </li>
