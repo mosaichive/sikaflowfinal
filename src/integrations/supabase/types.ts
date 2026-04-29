@@ -583,6 +583,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_staff_invite: { Args: { _token: string }; Returns: Json }
       admin_platform_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
