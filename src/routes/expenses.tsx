@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { AddExpenseDialog } from "@/components/dashboard/Dialogs";
 import { formatCurrency } from "@/lib/format";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Expense = { id: string; amount: number; category: string; note: string | null; expense_date: string };
 const CATEGORIES = ["All", "Supplies", "Rent", "Utilities", "Salary", "Transport", "Marketing", "Other"];
