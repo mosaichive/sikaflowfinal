@@ -320,10 +320,6 @@ function SalesPage() {
           </div>
         </div>
       </div>
-    </AppShell>
-  );
-}
-
       <InvoicePreviewDialog
         saleId={previewSaleId}
         open={!!previewSaleId}
