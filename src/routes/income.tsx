@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Income = { id: string; source: string; amount: number; note: string | null; income_date: string };
 
