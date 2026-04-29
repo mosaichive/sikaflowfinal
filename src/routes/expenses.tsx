@@ -25,6 +25,7 @@ function ExpensesPage() {
   const { ready, user } = useRequireUser();
   const [items, setItems] = useState<Expense[]>([]);
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState("All");
   const { filter: dateFilter, setFilter: setDateFilter, range } = useDateFilter();
 
