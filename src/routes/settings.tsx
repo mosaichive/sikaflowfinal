@@ -75,28 +75,46 @@ function SettingsPage() {
     toast.success("Settings saved");
   }
 
-  async function handleLogo(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pickFile(e: React.ChangeEvent<HTMLInputElement>, mode: CropMode) {
     const file = e.target.files?.[0];
-    if (!file || !user || !profile) return;
-    if (file.size > 2 * 1024 * 1024) return toast.error("Logo must be under 2MB");
-    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
-    setUploading(true);
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image must be under 8MB"); return; }
+    if (!file.type.startsWith("image/")) { toast.error("Please pick an image file"); return; }
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const path = `${user.id}/logo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("business-logos").upload(path, file, { upsert: true, contentType: file.type });
+      const dataUrl = await readFileAsDataUrl(file);
+      setEditorMode(mode);
+      setEditorSrc(dataUrl);
+    } catch {
+      toast.error("Could not read file");
+    } finally {
+      if (mode === "logo" && fileRef.current) fileRef.current.value = "";
+      if (mode === "circle" && avatarRef.current) avatarRef.current.value = "";
+    }
+  }
+
+  async function uploadAdjusted(blob: Blob) {
+    if (!user || !profile) return;
+    const isAvatar = editorMode === "circle";
+    const bucket = isAvatar ? "avatars" : "business-logos";
+    const ext = isAvatar ? "jpg" : "png";
+    const contentType = isAvatar ? "image/jpeg" : "image/png";
+    const setBusy = isAvatar ? setUploadingAvatar : setUploading;
+    setBusy(true);
+    try {
+      const path = `${user.id}/${isAvatar ? "avatar" : "logo"}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, blob, { upsert: true, contentType });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("business-logos").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
       const url = pub.publicUrl;
-      const { error: updErr } = await supabase.from("profiles").update({ logo_url: url }).eq("id", user.id);
+      const field = isAvatar ? "avatar_url" : "logo_url";
+      const { error: updErr } = await supabase.from("profiles").update({ [field]: url }).eq("id", user.id);
       if (updErr) throw updErr;
-      setProfile({ ...profile, logo_url: url });
-      toast.success("Logo updated");
+      setProfile({ ...profile, [field]: url } as Profile);
+      toast.success(isAvatar ? "Profile photo updated" : "Logo updated");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setBusy(false);
     }
   }
 
@@ -108,29 +126,12 @@ function SettingsPage() {
     toast.success("Logo removed");
   }
 
-  async function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !user || !profile) return;
-    if (file.size > 2 * 1024 * 1024) return toast.error("Photo must be under 2MB");
-    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
-    setUploadingAvatar(true);
-    try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      const url = pub.publicUrl;
-      const { error: updErr } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
-      if (updErr) throw updErr;
-      setProfile({ ...profile, avatar_url: url });
-      toast.success("Profile photo updated");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploadingAvatar(false);
-      if (avatarRef.current) avatarRef.current.value = "";
-    }
+  async function removeAvatar() {
+    if (!user || !profile) return;
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.id);
+    if (error) return toast.error(error.message);
+    setProfile({ ...profile, avatar_url: null });
+    toast.success("Photo removed");
   }
 
   async function removeAvatar() {
