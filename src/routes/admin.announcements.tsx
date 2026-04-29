@@ -65,8 +65,10 @@ function AdminAnnouncementsPage() {
       target_plan = plan;
     }
     const { error } = await supabase.from("announcements").insert({
-      title: title.trim(), message: message.trim(), audience, priority,
-      target_user_id, target_plan, created_by: user?.id, publish_at: new Date().toISOString(),
+      title: title.trim(), message: message.trim(),
+      audience: audience as any, priority: priority as any,
+      target_user_id, target_plan: target_plan as any,
+      created_by: user?.id, publish_at: new Date().toISOString(),
     });
     setSaving(false);
     if (error) return toast.error(error.message);

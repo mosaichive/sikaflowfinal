@@ -142,8 +142,8 @@ function ManageUserDialog({ user, onClose, onSaved }: { user: Profile | null; on
     if (!user) return;
     setSaving(true);
     const { error } = await supabase.from("profiles").update({
-      subscription_plan: plan,
-      subscription_status: suspended ? "suspended" : status,
+      subscription_plan: plan as any,
+      subscription_status: (suspended ? "suspended" : status) as any,
       subscription_end_date: endDate ? new Date(endDate).toISOString() : null,
       subscription_start_date: status === "active" ? new Date().toISOString() : user.subscription_start_date,
       suspended,

@@ -60,8 +60,8 @@ function AdminPaymentsPage() {
       const end = new Date(start);
       end.setDate(end.getDate() + days);
       await supabase.from("profiles").update({
-        subscription_plan: p.plan,
-        subscription_status: "active",
+        subscription_plan: p.plan as any,
+        subscription_status: "active" as any,
         subscription_start_date: start.toISOString(),
         subscription_end_date: end.toISOString(),
         suspended: false,
