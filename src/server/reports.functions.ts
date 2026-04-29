@@ -268,6 +268,35 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       sy -= 14;
     }
 
+    // ----- Stock movement per product -----
+    sy -= 10;
+    if (sy < 160) sy = addPage();
+    page.drawText("STOCK MOVEMENT BY PRODUCT", { x: 40, y: sy, size: 10, font: bold, color: muted }); sy -= 12;
+    page.drawRectangle({ x: 40, y: sy - 4, width: 515, height: 20, color: rgb(0.96, 0.97, 0.99) });
+    page.drawText("PRODUCT", { x: 50, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("OPEN", { x: 260, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("ADDED", { x: 310, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("SOLD", { x: 365, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("CLOSE", { x: 415, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("LAST RESTOCK", { x: 470, y: sy + 3, size: 9, font: bold, color: muted });
+    sy -= 18;
+    if (stockRows.length === 0) {
+      page.drawText("No stock movements in this period.", { x: 50, y: sy, size: 9, font, color: muted });
+      sy -= 14;
+    } else {
+      for (const r of stockRows) {
+        if (sy < 80) sy = addPage();
+        page.drawText(r.name.slice(0, 32), { x: 50, y: sy, size: 9, font, color: ink });
+        page.drawText(String(r.opening), { x: 260, y: sy, size: 9, font, color: ink });
+        page.drawText(`+${r.added}`, { x: 310, y: sy, size: 9, font, color: success });
+        page.drawText(`-${r.sold}`, { x: 365, y: sy, size: 9, font, color: danger });
+        page.drawText(String(r.closing), { x: 415, y: sy, size: 9, font: bold, color: primary });
+        page.drawText(r.lastRestock ? new Date(r.lastRestock).toLocaleDateString() : "—", { x: 470, y: sy, size: 9, font, color: muted });
+        sy -= 14;
+        page.drawLine({ start: { x: 40, y: sy + 6 }, end: { x: 555, y: sy + 6 }, thickness: 0.4, color: line });
+      }
+    }
+
     // Footer on every page
     const pages = pdf.getPages();
     pages.forEach((p, i) => {
