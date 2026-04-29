@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { trialDaysLeft, isTrialActive } from "@/lib/trial";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import {
-  Plus, Package, Receipt, TrendingUp, Boxes, Wallet, ShoppingBag,
+  Plus, TrendingUp, Boxes, Wallet, ShoppingBag,
   Sparkles, AlertTriangle, ArrowUpRight, ArrowDownRight,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AddProductDialog, AddSaleDialog, AddExpenseDialog } from "@/components/dashboard/Dialogs";
+import { AddProductDialog } from "@/components/dashboard/Dialogs";
 import { SalesChart, type Point } from "@/components/dashboard/SalesChart";
 import { AppShell } from "@/components/nav/AppShell";
 import { DateFilterBar } from "@/components/DateFilterBar";
