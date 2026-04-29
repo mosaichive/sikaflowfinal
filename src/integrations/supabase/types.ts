@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          audience: Database["public"]["Enums"]["announcement_audience"]
+          created_at: string
+          created_by: string | null
+          id: string
+          message: string
+          priority: Database["public"]["Enums"]["announcement_priority"]
+          publish_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: Database["public"]["Enums"]["announcement_audience"]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
+          publish_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["announcement_audience"]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
+          publish_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          note: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          note?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          note?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -42,6 +111,39 @@ export type Database = {
           expense_date?: string
           id?: string
           note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      other_income: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          income_date: string
+          note: string | null
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          income_date?: string
+          note?: string | null
+          source: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          income_date?: string
+          note?: string | null
+          source?: string
           updated_at?: string
           user_id?: string
         }
@@ -189,6 +291,7 @@ export type Database = {
         Row: {
           cost_total: number
           created_at: string
+          customer_id: string | null
           customer_name: string | null
           id: string
           note: string | null
@@ -201,6 +304,7 @@ export type Database = {
         Insert: {
           cost_total?: number
           created_at?: string
+          customer_id?: string | null
           customer_name?: string | null
           id?: string
           note?: string | null
@@ -213,6 +317,7 @@ export type Database = {
         Update: {
           cost_total?: number
           created_at?: string
+          customer_id?: string | null
           customer_name?: string | null
           id?: string
           note?: string | null
@@ -224,15 +329,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      announcement_audience: "all" | "trial" | "active" | "expired"
+      announcement_priority: "low" | "normal" | "high"
+      app_role: "super_admin" | "business_owner" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -359,6 +493,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      announcement_audience: ["all", "trial", "active", "expired"],
+      announcement_priority: ["low", "normal", "high"],
+      app_role: ["super_admin", "business_owner", "staff"],
+    },
   },
 } as const
