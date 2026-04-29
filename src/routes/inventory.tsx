@@ -33,7 +33,9 @@ function InventoryPage() {
   const [adjust, setAdjust] = useState<{ product: Product; mode: "add" | "remove" } | null>(null);
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("received");
+  const [adjustNote, setAdjustNote] = useState("");
   const [historyFor, setHistoryFor] = useState<Product | null>(null);
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
