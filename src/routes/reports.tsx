@@ -52,33 +52,48 @@ function rangeFor(preset: string, from: string, to: string): { from: Date; to: D
   return { from: f, to: t, label: "Custom report" };
 }
 
+type StockMove = { product_id: string; change: number; reason: string; created_at: string };
+
 function ReportsPage() {
   const { ready, user } = useRequireUser();
-  const [preset, setPreset] = useState("30");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const { filter: dateFilter, setFilter: setDateFilter } = useDateFilter();
   const [sales, setSales] = useState<Sale[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
+  const [movesAll, setMovesAll] = useState<StockMove[]>([]);
   const [downloading, setDownloading] = useState(false);
   const generate = useServerFn(generateReportPdf);
 
-  const range = useMemo(() => rangeFor(preset, customFrom, customTo), [preset, customFrom, customTo]);
+  const range = useMemo(() => {
+    const r = getRange(dateFilter);
+    const now = new Date();
+    const from = r.start ?? new Date(now.getFullYear(), 0, 1);
+    const to = r.end ?? new Date(now.getFullYear() + 1, 0, 1);
+    let label = "Report";
+    if (dateFilter.granularity === "day") label = "Daily report";
+    else if (dateFilter.granularity === "month") label = "Monthly report";
+    else if (dateFilter.granularity === "year") label = "Yearly report";
+    else if (dateFilter.granularity === "custom") label = "Custom report";
+    else label = "All-time report";
+    return { from, to, label };
+  }, [dateFilter]);
 
   async function load() {
     if (!user) return;
     const fromISO = range.from.toISOString();
     const toISO = range.to.toISOString();
-    const [{ data: ss }, { data: ee }, { data: oo }] = await Promise.all([
+    const [{ data: ss }, { data: ee }, { data: oo }, { data: mm }] = await Promise.all([
       supabase.from("sales").select("id,total,cost_total,discount,payment_method,sale_date").eq("user_id", user.id).gte("sale_date", fromISO).lte("sale_date", toISO).order("sale_date", { ascending: false }),
       supabase.from("expenses").select("amount,category,expense_date").eq("user_id", user.id).gte("expense_date", fromISO).lte("expense_date", toISO),
       supabase.from("other_income").select("amount,source,income_date").eq("user_id", user.id).gte("income_date", fromISO).lte("income_date", toISO),
+      supabase.from("stock_movements").select("product_id,change,reason,created_at").eq("user_id", user.id).order("created_at", { ascending: true }),
     ]);
     const salesArr = (ss as Sale[]) ?? [];
     setSales(salesArr);
     setExpenses((ee as Expense[]) ?? []);
     setIncome((oo as Income[]) ?? []);
+    setMovesAll((mm as StockMove[]) ?? []);
     if (salesArr.length > 0) {
       const ids = salesArr.map((s) => s.id);
       const { data: ii } = await supabase.from("sale_items").select("product_name,quantity,unit_price,unit_cost,sale_id").in("sale_id", ids);
@@ -88,7 +103,7 @@ function ReportsPage() {
     }
   }
 
-  useEffect(() => { if (ready) load(); /* eslint-disable-next-line */ }, [ready, preset, customFrom, customTo, user?.id]);
+  useEffect(() => { if (ready) load(); /* eslint-disable-next-line */ }, [ready, dateFilter, user?.id]);
 
   // Realtime
   useEffect(() => {
@@ -97,10 +112,11 @@ function ReportsPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${user.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "other_income", filter: `user_id=eq.${user.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements", filter: `user_id=eq.${user.id}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
-  }, [user?.id, preset, customFrom, customTo]);
+  }, [user?.id, dateFilter]);
 
   const stats = useMemo(() => {
     const revenue = sales.reduce((s, x) => s + Number(x.total), 0);
