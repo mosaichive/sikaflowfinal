@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Boxes, AlertTriangle, Search, Plus, Minus, History, Textarea as TextareaIcon } from "lucide-react";
+import { Boxes, AlertTriangle, Search, Plus, Minus, History } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
