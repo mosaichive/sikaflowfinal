@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { trialDaysLeft, isTrialActive } from "@/lib/trial";
 import { formatCurrency, formatNumber } from "@/lib/format";
@@ -136,6 +137,7 @@ function DashboardPage() {
                 <AlertTriangle className="h-3.5 w-3.5" /> Trial ended
               </span>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate({ to: "/" }); }}>
               <LogOut className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Log out</span>
             </Button>
