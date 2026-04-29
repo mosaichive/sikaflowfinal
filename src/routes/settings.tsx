@@ -134,13 +134,8 @@ function SettingsPage() {
     toast.success("Photo removed");
   }
 
-  async function removeAvatar() {
-    if (!user || !profile) return;
-    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.id);
-    if (error) return toast.error(error.message);
-    setProfile({ ...profile, avatar_url: null });
-    toast.success("Photo removed");
-  }
+
+
 
   async function changeEmail(e: React.FormEvent) {
     e.preventDefault();
