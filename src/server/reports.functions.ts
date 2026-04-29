@@ -19,7 +19,7 @@ export const generateReportPdf = createServerFn({ method: "POST" })
 
     const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }] =
       await Promise.all([
-        supabase.from("profiles").select("business_name,email,phone,location,currency").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("business_name,email,phone,location,currency,logo_url").eq("id", userId).maybeSingle(),
         supabase.from("sales").select("id,total,cost_total,discount,amount_paid,payment_method,sale_date,customer_name")
           .eq("user_id", userId).gte("sale_date", fromISO).lte("sale_date", toISO).order("sale_date", { ascending: false }),
         supabase.from("sale_items").select("product_name,quantity,unit_price,unit_cost,sale_id")
