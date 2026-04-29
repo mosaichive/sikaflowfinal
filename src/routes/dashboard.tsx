@@ -214,12 +214,12 @@ function DashboardPage() {
         <section className="mt-6">
           <ProductsTable products={products} onAdd={() => setOpenProduct(true)} onChange={() => user && loadAll(user.id)} />
         </section>
-      </main>
+      </div>
 
       <AddSaleDialog open={openSale} onOpenChange={setOpenSale} />
       <AddProductDialog open={openProduct} onOpenChange={setOpenProduct} />
       <AddExpenseDialog open={openExpense} onOpenChange={setOpenExpense} />
-    </div>
+    </AppShell>
   );
 }
 
