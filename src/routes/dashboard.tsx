@@ -192,7 +192,7 @@ function DashboardPage() {
             icon={Wallet}
             label="Available Money"
             value={formatCurrency(stats.cashAvailable, currency)}
-            hint="Sales + Other Income − Expenses"
+            hint="Sales + Other Income − Expenses − Savings"
             tone="primary"
           />
           <StatCard
