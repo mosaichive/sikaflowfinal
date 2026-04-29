@@ -26,7 +26,7 @@ type Sale = { id: string; total: number; cost_total: number; payment_method: str
 type Expense = { id: string; amount: number; category: string; note: string | null; expense_date: string };
 
 function DashboardPage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
