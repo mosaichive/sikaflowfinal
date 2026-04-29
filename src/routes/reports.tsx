@@ -153,8 +153,20 @@ function ReportsPage() {
     const payMap = new Map<string, number>();
     for (const s of sales) payMap.set(s.payment_method, (payMap.get(s.payment_method) || 0) + Number(s.total));
 
-    return { revenue, cost, exp, inc, grossProfit, netProfit, tx, avg, series, best, pays: [...payMap.entries()] };
-  }, [sales, items, expenses, income, range]);
+    // Stock summary across the period
+    let opening = 0, added = 0, sold = 0;
+    for (const m of movesAll) {
+      const t = new Date(m.created_at).getTime();
+      const ch = Number(m.change);
+      if (t < range.from.getTime()) opening += ch;
+      else if (t <= range.to.getTime()) {
+        if (ch >= 0) added += ch; else sold += -ch;
+      }
+    }
+    const closing = opening + added - sold;
+
+    return { revenue, cost, exp, inc, grossProfit, netProfit, tx, avg, series, best, pays: [...payMap.entries()], opening, added, sold, closing };
+  }, [sales, items, expenses, income, range, movesAll]);
 
   async function downloadPdf() {
     setDownloading(true);
