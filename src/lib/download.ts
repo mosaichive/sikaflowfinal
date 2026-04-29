@@ -2,7 +2,7 @@
 export function downloadBase64Pdf(base64: string, filename: string) {
   try {
     const bytes = base64ToBytes(base64);
-    const blob = new Blob([bytes], { type: "application/pdf" });
+    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
