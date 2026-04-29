@@ -16,6 +16,8 @@ import { PageHeader } from "./products";
 import { generateInvoicePdf } from "@/server/invoices.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { downloadBase64Pdf } from "@/lib/download";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Product = { id: string; name: string; price: number; cost: number; stock: number };
 type Customer = { id: string; name: string; phone: string | null };
