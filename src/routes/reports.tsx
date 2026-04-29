@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { generateReportPdf } from "@/server/reports.functions";
-import { downloadBase64Pdf } from "@/lib/download";
+import { downloadPdfFromServerResult, defaultPdfName } from "@/lib/download";
 import { toast } from "sonner";
 import { Download, Loader2 } from "lucide-react";
 
@@ -141,11 +141,15 @@ function ReportsPage() {
   async function downloadPdf() {
     setDownloading(true);
     try {
-      const res = await generate({ data: { fromISO: range.from.toISOString(), toISO: range.to.toISOString(), rangeLabel: range.label } });
-      downloadBase64Pdf(res.base64, res.filename);
+      const res = await generate({
+        data: { fromISO: range.from.toISOString(), toISO: range.to.toISOString(), rangeLabel: range.label },
+      });
+      console.log("[reports] server response keys:", res ? Object.keys(res) : null);
+      downloadPdfFromServerResult(res, defaultPdfName("SikaFlow_Report"));
       toast.success("Report downloaded");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to generate report";
+      console.error("[reports] download failed:", e);
+      const msg = e instanceof Error ? e.message : "Failed to generate report. Please try again.";
       toast.error(msg);
     } finally {
       setDownloading(false);

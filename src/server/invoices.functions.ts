@@ -137,8 +137,12 @@ export const generateInvoicePdf = createServerFn({ method: "POST" })
     });
 
     const bytes = await pdf.save();
+    if (!bytes || bytes.length === 0) {
+      throw new Error("Failed to generate invoice PDF");
+    }
+    const invoiceNumber = (sale.invoice_number && String(sale.invoice_number).trim()) || sale.id.slice(0, 8);
     return {
-      filename: `${sale.invoice_number || "invoice"}.pdf`,
+      filename: `Invoice_${invoiceNumber}.pdf`,
       base64: Buffer.from(bytes).toString("base64"),
     };
   });

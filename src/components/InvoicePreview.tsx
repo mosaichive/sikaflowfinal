@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { useServerFn } from "@tanstack/react-start";
 import { generateInvoicePdf } from "@/server/invoices.functions";
-import { downloadBase64Pdf } from "@/lib/download";
+import { downloadPdfFromServerResult } from "@/lib/download";
 import { toast } from "sonner";
 
 type Sale = {
@@ -53,9 +53,13 @@ export function InvoicePreviewDialog({
     setDownloading(true);
     try {
       const res = await generate({ data: { saleId } });
-      downloadBase64Pdf(res.base64, res.filename);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not generate invoice");
+      console.log("[invoice] server response keys:", res ? Object.keys(res) : null);
+      const fallback = `Invoice_${sale?.invoice_number ?? saleId.slice(0, 8)}.pdf`;
+      downloadPdfFromServerResult(res, fallback);
+    } catch (e: unknown) {
+      console.error("[invoice] download failed:", e);
+      const msg = e instanceof Error ? e.message : "Failed to generate PDF. Please try again.";
+      toast.error(msg);
     } finally {
       setDownloading(false);
     }

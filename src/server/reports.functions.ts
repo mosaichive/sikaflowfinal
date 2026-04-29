@@ -243,9 +243,12 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     });
 
     const bytes = await pdf.save();
-    const safeName = (profile?.business_name || "report").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    if (!bytes || bytes.length === 0) {
+      throw new Error("Failed to generate report PDF");
+    }
+    const dateStr = new Date().toISOString().slice(0, 10);
     return {
-      filename: `${safeName}-${rangeLabel.toLowerCase().replace(/\s+/g, "-")}.pdf`,
+      filename: `SikaFlow_Report_${dateStr}.pdf`,
       base64: Buffer.from(bytes).toString("base64"),
       stats: { revenue, cost, totalExp, otherInc, totalSavings, availableMoney, grossProfit, netProfit, txCount, avgSale, totalDiscount },
     };
