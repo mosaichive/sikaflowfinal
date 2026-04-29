@@ -52,14 +52,10 @@ function InvitePage() {
   async function accept() {
     if (!invite || !user) return;
     setAccepting(true);
-    const { error: upErr } = await supabase.from("staff_invites").update({
-      status: "accepted",
-      accepted_user_id: user.id,
-      accepted_at: new Date().toISOString(),
-    }).eq("id", invite.id);
+    const { error: rpcErr } = await supabase.rpc("accept_staff_invite", { _token: token });
     setAccepting(false);
-    if (upErr) return toast.error(upErr.message);
-    toast.success("Invite accepted! The business owner will activate your access shortly.");
+    if (rpcErr) return toast.error(rpcErr.message);
+    toast.success("Invite accepted! You're now part of the team.");
     navigate({ to: "/dashboard" });
   }
 
