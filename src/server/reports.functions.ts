@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { z } from "zod";
+import { safeEmbedLogo } from "./embed-logo.server";
 
 const Input = z.object({
   fromISO: z.string(),
@@ -18,7 +19,7 @@ export const generateReportPdf = createServerFn({ method: "POST" })
 
     const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }] =
       await Promise.all([
-        supabase.from("profiles").select("business_name,email,phone,location,currency").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("business_name,email,phone,location,currency,logo_url").eq("id", userId).maybeSingle(),
         supabase.from("sales").select("id,total,cost_total,discount,amount_paid,payment_method,sale_date,customer_name")
           .eq("user_id", userId).gte("sale_date", fromISO).lte("sale_date", toISO).order("sale_date", { ascending: false }),
         supabase.from("sale_items").select("product_name,quantity,unit_price,unit_cost,sale_id")
@@ -96,8 +97,20 @@ export const generateReportPdf = createServerFn({ method: "POST" })
 
     // Header band
     page.drawRectangle({ x: 0, y: 782, width: W, height: 60, color: primary });
+
+    // Optional logo (never blocks PDF generation)
+    let titleX = 40;
+    const logoImg = await safeEmbedLogo(pdf, (profile as { logo_url?: string } | null)?.logo_url);
+    if (logoImg) {
+      const targetH = 40;
+      const ratio = logoImg.width / logoImg.height;
+      const targetW = Math.min(120, targetH * ratio);
+      page.drawImage(logoImg, { x: 30, y: 791, width: targetW, height: targetH });
+      titleX = 30 + targetW + 12;
+    }
+
     page.drawText(profile?.business_name || "SikaFlow Business", {
-      x: 40, y: 805, size: 18, font: bold, color: rgb(1, 1, 1),
+      x: titleX, y: 805, size: 18, font: bold, color: rgb(1, 1, 1),
     });
     page.drawText("REPORT", { x: 490, y: 805, size: 18, font: bold, color: rgb(1, 1, 1) });
 
