@@ -17,7 +17,7 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { fromISO, toISO, rangeLabel } = data;
 
-    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }] =
+    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }, { data: savings }] =
       await Promise.all([
         supabase.from("profiles").select("business_name,email,phone,location,currency,logo_url").eq("id", userId).maybeSingle(),
         supabase.from("sales").select("id,total,cost_total,discount,amount_paid,payment_method,sale_date,customer_name")
@@ -28,6 +28,8 @@ export const generateReportPdf = createServerFn({ method: "POST" })
           .eq("user_id", userId).gte("expense_date", fromISO).lte("expense_date", toISO),
         supabase.from("other_income").select("amount,source,note,income_date")
           .eq("user_id", userId).gte("income_date", fromISO).lte("income_date", toISO),
+        supabase.from("savings").select("amount,type,institution,savings_date")
+          .eq("user_id", userId).gte("savings_date", fromISO).lte("savings_date", toISO),
       ]);
 
     const currency = profile?.currency || "GHS";
@@ -42,10 +44,20 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     const totalDiscount = (sales ?? []).reduce((s, x) => s + Number(x.discount || 0), 0);
     const totalExp = (expenses ?? []).reduce((s, x) => s + Number(x.amount), 0);
     const otherInc = (income ?? []).reduce((s, x) => s + Number(x.amount), 0);
+    const totalSavings = (savings ?? []).reduce((s, x) => s + Number(x.amount), 0);
     const grossProfit = revenue - cost;
     const netProfit = grossProfit - totalExp + otherInc;
+    const availableMoney = revenue + otherInc - totalExp - totalSavings;
     const txCount = (sales ?? []).length;
     const avgSale = txCount > 0 ? revenue / txCount : 0;
+
+    // Savings by type
+    const savingsMap = new Map<string, number>();
+    for (const s of savings ?? []) {
+      const k = String(s.type || "other");
+      savingsMap.set(k, (savingsMap.get(k) || 0) + Number(s.amount));
+    }
+    const savingsLabel: Record<string, string> = { bank: "Bank", mobile_money: "Mobile Money", susu: "Susu" };
 
     // Best sellers
     const productMap = new Map<string, { qty: number; revenue: number; profit: number }>();
@@ -143,6 +155,8 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     sumRow("Average sale", fmt(avgSale));
     sumRow("Discounts given", fmt(totalDiscount));
     sumRow("Other income", fmt(otherInc));
+    sumRow("Total savings", fmt(totalSavings), primary);
+    sumRow("Available money (Sales + Income − Expenses − Savings)", fmt(availableMoney), availableMoney >= 0 ? success : danger);
     sumRow("Gross profit (Revenue − COGS)", fmt(grossProfit), grossProfit >= 0 ? success : danger);
     sumRow("Net profit (Gross − Expenses + Other)", fmt(netProfit), netProfit >= 0 ? success : danger);
 
@@ -200,6 +214,26 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       }
     }
 
+    // Savings breakdown
+    sy -= 10;
+    if (sy < 140) sy = addPage();
+    page.drawText("SAVINGS BY TYPE", { x: 40, y: sy, size: 10, font: bold, color: muted }); sy -= 14;
+    if (savingsMap.size === 0) {
+      page.drawText("No savings recorded in this period.", { x: 40, y: sy, size: 9, font, color: muted }); sy -= 12;
+    } else {
+      for (const [k, v] of savingsMap) {
+        if (sy < 80) sy = addPage();
+        page.drawText(savingsLabel[k] || k, { x: 40, y: sy, size: 10, font, color: ink });
+        page.drawText(fmt(v), { x: 490, y: sy, size: 10, font: bold, color: ink });
+        sy -= 14;
+      }
+      page.drawLine({ start: { x: 40, y: sy + 4 }, end: { x: 555, y: sy + 4 }, thickness: 0.4, color: line });
+      sy -= 6;
+      page.drawText("Total savings", { x: 40, y: sy, size: 10, font: bold, color: ink });
+      page.drawText(fmt(totalSavings), { x: 490, y: sy, size: 10, font: bold, color: primary });
+      sy -= 14;
+    }
+
     // Footer on every page
     const pages = pdf.getPages();
     pages.forEach((p, i) => {
@@ -213,6 +247,6 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     return {
       filename: `${safeName}-${rangeLabel.toLowerCase().replace(/\s+/g, "-")}.pdf`,
       base64: Buffer.from(bytes).toString("base64"),
-      stats: { revenue, cost, totalExp, otherInc, grossProfit, netProfit, txCount, avgSale, totalDiscount },
+      stats: { revenue, cost, totalExp, otherInc, totalSavings, availableMoney, grossProfit, netProfit, txCount, avgSale, totalDiscount },
     };
   });

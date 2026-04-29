@@ -401,6 +401,45 @@ export type Database = {
         }
         Relationships: []
       }
+      savings: {
+        Row: {
+          account_name: string | null
+          amount: number
+          created_at: string
+          id: string
+          institution: string | null
+          note: string | null
+          savings_date: string
+          type: Database["public"]["Enums"]["savings_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          institution?: string | null
+          note?: string | null
+          savings_date?: string
+          type?: Database["public"]["Enums"]["savings_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          institution?: string | null
+          note?: string | null
+          savings_date?: string
+          type?: Database["public"]["Enums"]["savings_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       staff_invites: {
         Row: {
           accepted_at: string | null
@@ -600,6 +639,7 @@ export type Database = {
       announcement_audience: "all" | "trial" | "active" | "expired"
       announcement_priority: "low" | "normal" | "high"
       app_role: "super_admin" | "business_owner" | "staff"
+      savings_type: "bank" | "mobile_money" | "susu"
       subscription_plan: "trial" | "monthly" | "annual"
       subscription_status: "trial" | "active" | "expired" | "suspended"
     }
@@ -732,6 +772,7 @@ export const Constants = {
       announcement_audience: ["all", "trial", "active", "expired"],
       announcement_priority: ["low", "normal", "high"],
       app_role: ["super_admin", "business_owner", "staff"],
+      savings_type: ["bank", "mobile_money", "susu"],
       subscription_plan: ["trial", "monthly", "annual"],
       subscription_status: ["trial", "active", "expired", "suspended"],
     },
