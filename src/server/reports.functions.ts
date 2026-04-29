@@ -17,7 +17,7 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { fromISO, toISO, rangeLabel } = data;
 
-    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }] =
+    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }, { data: savings }] =
       await Promise.all([
         supabase.from("profiles").select("business_name,email,phone,location,currency,logo_url").eq("id", userId).maybeSingle(),
         supabase.from("sales").select("id,total,cost_total,discount,amount_paid,payment_method,sale_date,customer_name")
@@ -28,6 +28,8 @@ export const generateReportPdf = createServerFn({ method: "POST" })
           .eq("user_id", userId).gte("expense_date", fromISO).lte("expense_date", toISO),
         supabase.from("other_income").select("amount,source,note,income_date")
           .eq("user_id", userId).gte("income_date", fromISO).lte("income_date", toISO),
+        supabase.from("savings").select("amount,type,institution,savings_date")
+          .eq("user_id", userId).gte("savings_date", fromISO).lte("savings_date", toISO),
       ]);
 
     const currency = profile?.currency || "GHS";
