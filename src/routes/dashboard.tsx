@@ -2,19 +2,18 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { Logo } from "@/components/Logo";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { trialDaysLeft, isTrialActive } from "@/lib/trial";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import {
   Plus, Package, Receipt, TrendingUp, Boxes, Wallet, ShoppingBag,
-  LogOut, Sparkles, AlertTriangle, ArrowUpRight, ArrowDownRight,
+  Sparkles, AlertTriangle, ArrowUpRight, ArrowDownRight,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddProductDialog, AddSaleDialog, AddExpenseDialog } from "@/components/dashboard/Dialogs";
 import { SalesChart, type Point } from "@/components/dashboard/SalesChart";
+import { AppShell } from "@/components/nav/AppShell";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SikaFlow" }] }),
@@ -112,9 +111,11 @@ function DashboardPage() {
 
   if (loading || !loaded || !profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-      </div>
+      <AppShell>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+        </div>
+      </AppShell>
     );
   }
 
@@ -122,30 +123,18 @@ function DashboardPage() {
   const daysLeft = trialDaysLeft(profile.trial_end_date);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Logo />
-          <div className="flex items-center gap-2">
-            {trialActive ? (
-              <span className="hidden items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary sm:inline-flex">
-                <Sparkles className="h-3.5 w-3.5" />
-                Trial · {daysLeft} {daysLeft === 1 ? "day" : "days"} left
-              </span>
-            ) : (
-              <span className="hidden items-center gap-1.5 rounded-full bg-warning/20 px-3 py-1 text-xs font-medium text-warning-foreground sm:inline-flex">
-                <AlertTriangle className="h-3.5 w-3.5" /> Trial ended
-              </span>
-            )}
-            <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate({ to: "/" }); }}>
-              <LogOut className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Log out</span>
-            </Button>
+    <AppShell>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        {trialActive ? (
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
+            <Sparkles className="h-3.5 w-3.5" />
+            Trial · {daysLeft} {daysLeft === 1 ? "day" : "days"} left
           </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        ) : (
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-warning/20 px-3 py-1 text-xs font-medium text-warning-foreground">
+            <AlertTriangle className="h-3.5 w-3.5" /> Trial ended
+          </div>
+        )}
         <section className="animate-fade-up">
           <p className="text-sm text-muted-foreground">{getGreeting()},</p>
           <div className="flex flex-wrap items-end justify-between gap-3">
