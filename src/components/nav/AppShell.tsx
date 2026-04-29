@@ -158,9 +158,10 @@ function SidebarFooter({ profile, onSignOut }: { profile: Profile | null; onSign
         </Button>
       </div>
       <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-          {initials}
-        </span>
+        <Avatar className="h-9 w-9 shrink-0">
+          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+          <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">{initials}</AvatarFallback>
+        </Avatar>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{profile?.business_name || "Your business"}</p>
           <p className="truncate text-xs text-muted-foreground">{profile?.email}</p>
