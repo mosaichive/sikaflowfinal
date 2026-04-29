@@ -155,17 +155,6 @@ function DashboardPage() {
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {profile.business_name || "Your business"}
             </h1>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setOpenSale(true)} className="bg-primary hover:bg-primary/90">
-                <Plus className="mr-1 h-4 w-4" /> Add Sale
-              </Button>
-              <Button onClick={() => setOpenProduct(true)} variant="outline">
-                <Package className="mr-1 h-4 w-4" /> Add Product
-              </Button>
-              <Button onClick={() => setOpenExpense(true)} variant="outline">
-                <Receipt className="mr-1 h-4 w-4" /> Expense
-              </Button>
-            </div>
           </div>
         </section>
 
