@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Users, ClipboardList,
-  PiggyBank, Receipt, BarChart3, UserCog, Megaphone, Settings,
+  PiggyBank, Receipt, BarChart3, UserCog, Megaphone, Settings, Landmark,
 } from "lucide-react";
 
 export type NavItem = {
@@ -18,9 +18,11 @@ export const navItems: NavItem[] = [
   { to: "/customers",     label: "Customers",     short: "People",  icon: Users },
   { to: "/orders",        label: "Orders",        short: "Orders",  icon: ClipboardList },
   { to: "/income",        label: "Other Income",  short: "Income",  icon: PiggyBank },
+  { to: "/savings",       label: "Savings",       short: "Savings", icon: Landmark },
   { to: "/expenses",      label: "Expenses",      short: "Costs",   icon: Receipt },
   { to: "/reports",       label: "Reports",       short: "Reports", icon: BarChart3 },
   { to: "/staff",         label: "Staff / Users", short: "Staff",   icon: UserCog },
   { to: "/announcements", label: "Announcements", short: "News",    icon: Megaphone },
   { to: "/settings",      label: "Settings",      short: "More",    icon: Settings },
 ];
+
