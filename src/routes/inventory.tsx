@@ -81,12 +81,26 @@ function InventoryPage() {
     if (error) return toast.error(error.message);
 
     await supabase.from("stock_movements").insert({
-      user_id: user.id, product_id: adjust.product.id, change, reason, note: null,
+      user_id: user.id,
+      product_id: adjust.product.id,
+      change,
+      reason,
+      note: adjustNote.trim() || null,
+      added_by_name: user.email ?? null,
     });
 
     toast.success(`Stock updated · ${adjust.product.name} → ${newStock}`);
-    setAdjust(null); setDelta(""); setReason("received");
+    setAdjust(null); setDelta(""); setReason("received"); setAdjustNote("");
   }
+
+  const productName = (id: string) => items.find((p) => p.id === id)?.name ?? "—";
+  const restocks = useMemo(
+    () =>
+      movements
+        .filter((m) => Number(m.change) > 0 && inRange(m.created_at, range))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [movements, range],
+  );
 
   if (!ready) return <AppShell><PageLoader /></AppShell>;
 
