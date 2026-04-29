@@ -13,9 +13,6 @@ import { Receipt, Eye, AlertTriangle, History, Pencil, Trash2 } from "lucide-rea
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import { PageHeader } from "./products";
-import { generateInvoicePdf } from "@/server/invoices.functions";
-import { useServerFn } from "@tanstack/react-start";
-import { downloadBase64Pdf } from "@/lib/download";
 import { DateFilterBar } from "@/components/DateFilterBar";
 import { useDateFilter, inRange } from "@/lib/date-filter";
 import { InvoicePreviewDialog } from "@/components/InvoicePreview";
