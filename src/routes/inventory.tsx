@@ -178,6 +178,50 @@ function InventoryPage() {
             </div>
           </Card>
         )}
+
+        {/* Restock history */}
+        <div className="mt-8">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Restock history</h2>
+              <p className="text-xs text-muted-foreground">Every stock-in event with date, quantity, who added it, and notes.</p>
+            </div>
+          </div>
+          <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">Current stock</th>
+                    <th className="px-4 py-3">Restock qty</th>
+                    <th className="px-4 py-3">Added by</th>
+                    <th className="px-4 py-3">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {restocks.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No restocks in this period.</td></tr>
+                  ) : restocks.map((m) => {
+                    const cur = items.find((p) => p.id === m.product_id);
+                    return (
+                      <tr key={m.id} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-4 py-3 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 font-medium">{productName(m.product_id)}</td>
+                        <td className="px-4 py-3">{cur ? formatNumber(Number(cur.stock)) : "—"}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-500">+{formatNumber(Number(m.change))}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.added_by_name || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.note || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Add / Remove dialog */}
