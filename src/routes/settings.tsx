@@ -297,6 +297,15 @@ function SettingsPage() {
           </Button>
         </div>
       </div>
+      <ImageEditorDialog
+        open={!!editorSrc}
+        onOpenChange={(v) => { if (!v) setEditorSrc(null); }}
+        imageSrc={editorSrc}
+        mode={editorMode}
+        outputSize={editorMode === "circle" ? 512 : 1024}
+        title={editorMode === "circle" ? "Adjust profile photo" : "Adjust business logo"}
+        onSave={uploadAdjusted}
+      />
     </AppShell>
   );
 }
