@@ -45,18 +45,18 @@ function OrdersPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
+  const filtered = useMemo(() => sales.filter((s) => inRange(s.sale_date, range)), [sales, range]);
+
   if (!ready) return <AppShell><PageLoader /></AppShell>;
 
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <PageHeader title="Orders" description={`${sales.length} recent orders`} />
+        <PageHeader title="Orders" description={`${filtered.length} orders`} />
         <DateFilterBar filter={filter} onChange={setFilter} allowAll />
-        {(() => { /* nothing */ return null; })()}
-        {(function renderList() {
-          const filtered = sales.filter((s) => inRange(s.sale_date, range));
-          if (filtered.length === 0) return <EmptyState message="No orders in this date range." />;
-          return (
+        {filtered.length === 0 ? (
+          <EmptyState message="No orders in this date range." />
+        ) : (
           <div className="space-y-2">
             {filtered.map((s) => {
               const items = itemsBySale[s.id] ?? [];
@@ -100,3 +100,4 @@ function OrdersPage() {
     </AppShell>
   );
 }
+
