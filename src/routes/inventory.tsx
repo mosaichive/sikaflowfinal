@@ -281,9 +281,10 @@ function InventoryPage() {
             <ul className="divide-y divide-border">
               {movements.filter((m) => m.product_id === historyFor?.id).slice(0, 50).map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium capitalize">{m.reason}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString()}{m.added_by_name ? ` · ${m.added_by_name}` : ""}</p>
+                    {m.note && <p className="text-xs text-muted-foreground italic">{m.note}</p>}
                   </div>
                   <span className={`font-semibold ${Number(m.change) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                     {Number(m.change) >= 0 ? "+" : ""}{Number(m.change)}
