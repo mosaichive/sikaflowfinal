@@ -223,9 +223,7 @@ function DashboardPage() {
         </section>
       </div>
 
-      <AddSaleDialog open={openSale} onOpenChange={setOpenSale} />
       <AddProductDialog open={openProduct} onOpenChange={setOpenProduct} />
-      <AddExpenseDialog open={openExpense} onOpenChange={setOpenExpense} />
     </AppShell>
   );
 }
