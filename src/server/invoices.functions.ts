@@ -137,7 +137,6 @@ export const generateInvoicePdf = createServerFn({ method: "POST" })
     });
 
     const bytes = await pdf.save();
-    const bytes = await pdf.save();
     if (!bytes || bytes.length === 0) {
       throw new Error("Failed to generate invoice PDF");
     }
