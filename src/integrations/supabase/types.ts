@@ -523,6 +523,7 @@ export type Database = {
       }
       stock_movements: {
         Row: {
+          added_by_name: string | null
           change: number
           created_at: string
           id: string
@@ -533,6 +534,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          added_by_name?: string | null
           change: number
           created_at?: string
           id?: string
@@ -543,6 +545,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          added_by_name?: string | null
           change?: number
           created_at?: string
           id?: string
