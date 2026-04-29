@@ -104,6 +104,39 @@ function SettingsPage() {
     toast.success("Logo removed");
   }
 
+  async function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user || !profile) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error("Photo must be under 2MB");
+    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: updErr } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
+      if (updErr) throw updErr;
+      setProfile({ ...profile, avatar_url: url });
+      toast.success("Profile photo updated");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarRef.current) avatarRef.current.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    if (!user || !profile) return;
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.id);
+    if (error) return toast.error(error.message);
+    setProfile({ ...profile, avatar_url: null });
+    toast.success("Photo removed");
+  }
+
   async function changeEmail(e: React.FormEvent) {
     e.preventDefault();
     if (!newEmail.trim()) return;
