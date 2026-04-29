@@ -53,7 +53,7 @@ function SalesPage() {
     const [{ data: p }, { data: c }, { data: r }] = await Promise.all([
       supabase.from("products").select("id,name,price,cost,stock").eq("user_id", user.id).order("name"),
       supabase.from("customers").select("id,name,phone").eq("user_id", user.id).order("name"),
-      supabase.from("sales").select("id,invoice_number,total,customer_name,sale_date").eq("user_id", user.id).order("sale_date", { ascending: false }).limit(8),
+      supabase.from("sales").select("id,invoice_number,total,customer_name,sale_date").eq("user_id", user.id).order("sale_date", { ascending: false }).limit(200),
     ]);
     setProducts((p as Product[]) ?? []);
     setCustomers((c as Customer[]) ?? []);
