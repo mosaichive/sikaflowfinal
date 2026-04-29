@@ -232,6 +232,7 @@ export type Database = {
           business_name: string | null
           business_type: string | null
           created_at: string
+          currency: string
           email: string | null
           id: string
           location: string | null
@@ -252,6 +253,7 @@ export type Database = {
           business_name?: string | null
           business_type?: string | null
           created_at?: string
+          currency?: string
           email?: string | null
           id: string
           location?: string | null
@@ -272,6 +274,7 @@ export type Database = {
           business_name?: string | null
           business_type?: string | null
           created_at?: string
+          currency?: string
           email?: string | null
           id?: string
           location?: string | null
@@ -343,11 +346,14 @@ export type Database = {
       }
       sales: {
         Row: {
+          amount_paid: number
           cost_total: number
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          discount: number
           id: string
+          invoice_number: string | null
           note: string | null
           payment_method: string
           sale_date: string
@@ -356,11 +362,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          amount_paid?: number
           cost_total?: number
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          discount?: number
           id?: string
+          invoice_number?: string | null
           note?: string | null
           payment_method?: string
           sale_date?: string
@@ -369,16 +378,52 @@ export type Database = {
           user_id: string
         }
         Update: {
+          amount_paid?: number
           cost_total?: number
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          discount?: number
           id?: string
+          invoice_number?: string | null
           note?: string | null
           payment_method?: string
           sale_date?: string
           total?: number
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stock_movements: {
+        Row: {
+          change: number
+          created_at: string
+          id: string
+          note: string | null
+          product_id: string
+          reason: string
+          reference_id: string | null
+          user_id: string
+        }
+        Insert: {
+          change: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id: string
+          reason?: string
+          reference_id?: string | null
+          user_id: string
+        }
+        Update: {
+          change?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id?: string
+          reason?: string
+          reference_id?: string | null
           user_id?: string
         }
         Relationships: []
