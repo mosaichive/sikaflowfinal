@@ -8,8 +8,6 @@ import { SalesChart } from "@/components/dashboard/SalesChart";
 import { formatCurrency } from "@/lib/format";
 import { PageHeader } from "./products";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { generateReportPdf } from "@/server/reports.functions";
 import { downloadPdfFromServerResult, defaultPdfName } from "@/lib/download";
 import { toast } from "sonner";
