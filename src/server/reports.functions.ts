@@ -155,6 +155,8 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     sumRow("Average sale", fmt(avgSale));
     sumRow("Discounts given", fmt(totalDiscount));
     sumRow("Other income", fmt(otherInc));
+    sumRow("Total savings", fmt(totalSavings), primary);
+    sumRow("Available money (Sales + Income − Expenses − Savings)", fmt(availableMoney), availableMoney >= 0 ? success : danger);
     sumRow("Gross profit (Revenue − COGS)", fmt(grossProfit), grossProfit >= 0 ? success : danger);
     sumRow("Net profit (Gross − Expenses + Other)", fmt(netProfit), netProfit >= 0 ? success : danger);
 
