@@ -142,8 +142,8 @@ function SalesPage() {
 
     toast.success(`Sale ${sale.invoice_number ?? ""} recorded · ${formatCurrency(total)}`, {
       action: {
-        label: "Download invoice",
-        onClick: () => downloadInvoice(sale.id),
+        label: "Preview invoice",
+        onClick: () => setPreviewSaleId(sale.id),
       },
     });
 
