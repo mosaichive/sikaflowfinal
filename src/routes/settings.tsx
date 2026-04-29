@@ -198,7 +198,7 @@ function SettingsPage() {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogo} />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e, "logo")} />
               <Button type="button" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
                 {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 {profile.logo_url ? "Change logo" : "Upload logo"}
