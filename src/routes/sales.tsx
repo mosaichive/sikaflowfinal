@@ -280,23 +280,31 @@ function SalesPage() {
               <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                 <History className="h-4 w-4" /> Recent sales
               </h3>
-              <ul className="mt-3 divide-y divide-border">
-                {recent.length === 0 && <p className="py-3 text-xs text-muted-foreground">No sales yet</p>}
-                {recent.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-2 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{s.invoice_number ?? s.id.slice(0, 8)}</p>
-                      <p className="truncate text-xs text-muted-foreground">{s.customer_name || "Walk-in"} · {new Date(s.sale_date).toLocaleDateString()}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(s.id)} title="Download invoice">
-                        <Download className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-3">
+                <DateFilterBar filter={dateFilter} onChange={setDateFilter} allowAll />
+              </div>
+              {(() => {
+                const filteredRecent = recent.filter((s) => inRange(s.sale_date, range)).slice(0, 12);
+                return (
+                  <ul className="mt-1 divide-y divide-border">
+                    {filteredRecent.length === 0 && <p className="py-3 text-xs text-muted-foreground">No sales in this range</p>}
+                    {filteredRecent.map((s) => (
+                      <li key={s.id} className="flex items-center justify-between gap-2 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{s.invoice_number ?? s.id.slice(0, 8)}</p>
+                          <p className="truncate text-xs text-muted-foreground">{s.customer_name || "Walk-in"} · {new Date(s.sale_date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(s.id)} title="Download invoice">
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
             </Card>
           </div>
         </div>
