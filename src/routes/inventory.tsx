@@ -261,6 +261,10 @@ function InventoryPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder="e.g. Supplier batch #3, returned by customer…" rows={2} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAdjust(null)}>Cancel</Button>
