@@ -104,6 +104,7 @@ function ExpensesPage() {
         )}
       </div>
       <AddExpenseDialog open={open} onOpenChange={setOpen} />
+      <EditExpenseDialog expenseId={editId} open={!!editId} onOpenChange={(v) => !v && setEditId(null)} />
     </AppShell>
   );
 }
