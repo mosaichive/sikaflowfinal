@@ -76,8 +76,9 @@ function IncomePage() {
           description={`Total: ${formatCurrency(total)}`}
           action={<Button onClick={() => setOpen(true)} className="bg-primary hover:bg-primary/90"><Plus className="mr-1 h-4 w-4" />Add income</Button>}
         />
-        {items.length === 0 ? (
-          <EmptyState message="No other income recorded. Add income that's not from your regular sales." />
+        <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+        {filtered.length === 0 ? (
+          <EmptyState message="No income in this date range." />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <table className="w-full text-sm">
@@ -85,7 +86,7 @@ function IncomePage() {
                 <tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3 text-right">Actions</th></tr>
               </thead>
               <tbody>
-                {items.map((i) => (
+                {filtered.map((i) => (
                   <tr key={i.id} className="border-t border-border">
                     <td className="px-4 py-3"><p className="font-medium">{i.source}</p>{i.note && <p className="text-xs text-muted-foreground">{i.note}</p>}</td>
                     <td className="px-4 py-3 text-muted-foreground">{new Date(i.income_date).toLocaleDateString()}</td>
