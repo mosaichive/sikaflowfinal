@@ -189,6 +189,10 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     sumRow("Available money (Sales + Income − Expenses − Savings)", fmt(availableMoney), availableMoney >= 0 ? success : danger);
     sumRow("Gross profit (Revenue − COGS)", fmt(grossProfit), grossProfit >= 0 ? success : danger);
     sumRow("Net profit (Gross − Expenses + Other)", fmt(netProfit), netProfit >= 0 ? success : danger);
+    sumRow("Opening stock (units)", String(openingTot));
+    sumRow("Stock added (units)", `+${addedTot}`, success);
+    sumRow("Stock sold (units)", `-${soldTot}`, danger);
+    sumRow("Closing stock (units)", String(closingTot), primary);
 
     // Best sellers table
     sy -= 10;
