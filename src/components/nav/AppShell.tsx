@@ -231,9 +231,10 @@ function MobileBottomNav({ onSignOut, profile }: { onSignOut: () => void; profil
           </div>
           <div className="border-t border-border p-4">
             <div className="mb-3 flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                {(profile?.business_name || profile?.email || "U").slice(0, 2).toUpperCase()}
-              </span>
+              <Avatar className="h-9 w-9 shrink-0">
+                {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+                <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">{getInitials(profile?.business_name || profile?.email || "U")}</AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{profile?.business_name || "Your business"}</p>
                 <p className="truncate text-xs text-muted-foreground">{profile?.email}</p>
