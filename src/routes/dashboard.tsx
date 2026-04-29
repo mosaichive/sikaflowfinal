@@ -14,16 +14,19 @@ import { toast } from "sonner";
 import { AddProductDialog, AddSaleDialog, AddExpenseDialog } from "@/components/dashboard/Dialogs";
 import { SalesChart, type Point } from "@/components/dashboard/SalesChart";
 import { AppShell } from "@/components/nav/AppShell";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SikaFlow" }] }),
   component: DashboardPage,
 });
 
-type Profile = { business_name: string | null; trial_end_date: string; onboarding_completed: boolean };
+type Profile = { business_name: string | null; trial_end_date: string; onboarding_completed: boolean; currency: string };
 type Product = { id: string; name: string; price: number; cost: number; stock: number; low_stock_threshold: number; created_at: string };
 type Sale = { id: string; total: number; cost_total: number; payment_method: string; customer_name: string | null; sale_date: string };
 type Expense = { id: string; amount: number; category: string; note: string | null; expense_date: string };
+type Income = { id: string; amount: number; source: string; income_date: string };
 
 function DashboardPage() {
   const { user, loading } = useAuth();
@@ -32,20 +35,24 @@ function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [income, setIncome] = useState<Income[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [openSale, setOpenSale] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const [openExpense, setOpenExpense] = useState(false);
+  const { filter, setFilter, range } = useDateFilter();
 
   const loadAll = useCallback(async (uid: string) => {
-    const [{ data: prods }, { data: sls }, { data: exps }] = await Promise.all([
+    const [{ data: prods }, { data: sls }, { data: exps }, { data: inc }] = await Promise.all([
       supabase.from("products").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
-      supabase.from("sales").select("*").eq("user_id", uid).order("sale_date", { ascending: false }).limit(200),
-      supabase.from("expenses").select("*").eq("user_id", uid).order("expense_date", { ascending: false }).limit(200),
+      supabase.from("sales").select("*").eq("user_id", uid).order("sale_date", { ascending: false }).limit(500),
+      supabase.from("expenses").select("*").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
+      supabase.from("other_income").select("*").eq("user_id", uid).order("income_date", { ascending: false }).limit(500),
     ]);
     setProducts((prods as Product[]) ?? []);
     setSales((sls as Sale[]) ?? []);
     setExpenses((exps as Expense[]) ?? []);
+    setIncome((inc as Income[]) ?? []);
     setLoaded(true);
   }, []);
 
@@ -55,11 +62,10 @@ function DashboardPage() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("business_name, trial_end_date, onboarding_completed")
+        .select("business_name, trial_end_date, onboarding_completed, currency")
         .eq("id", user.id)
         .maybeSingle();
       if (!data) {
-        // Defensive: profile didn't auto-create — make a minimal one and send to onboarding
         await supabase.from("profiles").upsert({ id: user.id, email: user.email }, { onConflict: "id" });
         navigate({ to: "/onboarding" });
         return;
@@ -70,7 +76,7 @@ function DashboardPage() {
     })();
   }, [user, loading, navigate, loadAll]);
 
-  // Realtime subscriptions
+  // Realtime subscriptions (sales, expenses, income, products)
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -78,20 +84,30 @@ function DashboardPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "products", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "other_income", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user, loadAll]);
+
+  const currency = profile?.currency ?? "GHS";
+
+  // Filtered data
+  const fSales = useMemo(() => sales.filter((s) => inRange(s.sale_date, range)), [sales, range]);
+  const fExpenses = useMemo(() => expenses.filter((e) => inRange(e.expense_date, range)), [expenses, range]);
+  const fIncome = useMemo(() => income.filter((i) => inRange(i.income_date, range)), [income, range]);
 
   // Derived stats
   const stats = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const todaysSales = sales.filter((s) => new Date(s.sale_date) >= today);
     const dailySales = todaysSales.reduce((sum, s) => sum + Number(s.total), 0);
-    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
-    const totalCost = sales.reduce((sum, s) => sum + Number(s.cost_total), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-    const profit = totalRevenue - totalCost - totalExpenses;
-    const cashAvailable = totalRevenue - totalExpenses;
+    const totalRevenue = fSales.reduce((sum, s) => sum + Number(s.total), 0);
+    const totalCost = fSales.reduce((sum, s) => sum + Number(s.cost_total), 0);
+    const totalExpenses = fExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalIncome = fIncome.reduce((sum, i) => sum + Number(i.amount), 0);
+    const profit = totalRevenue - totalCost - totalExpenses + totalIncome;
+    // Available Money = Sales + Other Income - Expenses
+    const cashAvailable = totalRevenue + totalIncome - totalExpenses;
     const stockValue = products.reduce((sum, p) => sum + Number(p.price) * Number(p.stock), 0);
     const stockUnits = products.reduce((sum, p) => sum + Number(p.stock), 0);
 
@@ -106,8 +122,8 @@ function DashboardPage() {
       series.push({ label: d.toLocaleDateString(undefined, { weekday: "short" }), value: Number(value.toFixed(2)) });
     }
 
-    return { dailySales, totalRevenue, profit, cashAvailable, stockValue, stockUnits, totalExpenses, series, todaysCount: todaysSales.length };
-  }, [sales, products, expenses]);
+    return { dailySales, totalRevenue, profit, cashAvailable, stockValue, stockUnits, totalExpenses, totalIncome, series, todaysCount: todaysSales.length };
+  }, [sales, products, fSales, fExpenses, fIncome]);
 
   if (loading || !loaded || !profile) {
     return (
@@ -172,33 +188,37 @@ function DashboardPage() {
           </div>
         )}
 
+        <div className="mt-6">
+          <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+        </div>
+
         {/* Stat cards */}
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={Wallet}
             label="Available Money"
-            value={formatCurrency(stats.cashAvailable)}
-            hint="Revenue − Expenses"
+            value={formatCurrency(stats.cashAvailable, currency)}
+            hint="Sales + Other Income − Expenses"
             tone="primary"
           />
           <StatCard
             icon={ShoppingBag}
             label="Daily Sales"
-            value={formatCurrency(stats.dailySales)}
+            value={formatCurrency(stats.dailySales, currency)}
             hint={`${stats.todaysCount} ${stats.todaysCount === 1 ? "sale" : "sales"} today`}
           />
           <StatCard
             icon={TrendingUp}
             label="Total Profit"
-            value={formatCurrency(stats.profit)}
-            hint="Revenue − Cost − Expenses"
+            value={formatCurrency(stats.profit, currency)}
+            hint="Revenue − Cost − Expenses + Income"
             trend={stats.profit >= 0 ? "up" : "down"}
           />
           <StatCard
             icon={Boxes}
             label="Stock Left"
             value={`${formatNumber(stats.stockUnits)} units`}
-            hint={`Worth ${formatCurrency(stats.stockValue)}`}
+            hint={`Worth ${formatCurrency(stats.stockValue, currency)}`}
           />
         </section>
 
@@ -207,12 +227,12 @@ function DashboardPage() {
           <div className="lg:col-span-2">
             <SalesChart data={stats.series} />
           </div>
-          <RecentTransactions sales={sales} expenses={expenses} />
+          <RecentTransactions sales={fSales} expenses={fExpenses} income={fIncome} currency={currency} />
         </section>
 
         {/* Products section */}
         <section className="mt-6">
-          <ProductsTable products={products} onAdd={() => setOpenProduct(true)} onChange={() => user && loadAll(user.id)} />
+          <ProductsTable products={products} currency={currency} onAdd={() => setOpenProduct(true)} onChange={() => user && loadAll(user.id)} />
         </section>
       </div>
 
@@ -253,50 +273,54 @@ function StatCard({
   );
 }
 
-function RecentTransactions({ sales, expenses }: { sales: Sale[]; expenses: Expense[] }) {
+function RecentTransactions({ sales, expenses, income, currency }: { sales: Sale[]; expenses: Expense[]; income: Income[]; currency: string }) {
   const items = useMemo(() => {
     const sIt = sales.map((s) => ({ kind: "sale" as const, id: s.id, amount: Number(s.total), label: s.customer_name || s.payment_method.replace("_", " "), date: s.sale_date }));
     const eIt = expenses.map((e) => ({ kind: "expense" as const, id: e.id, amount: Number(e.amount), label: e.category, date: e.expense_date }));
-    return [...sIt, ...eIt].sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 8);
-  }, [sales, expenses]);
+    const iIt = income.map((i) => ({ kind: "income" as const, id: i.id, amount: Number(i.amount), label: i.source, date: i.income_date }));
+    return [...sIt, ...eIt, ...iIt].sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 8);
+  }, [sales, expenses, income]);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h3 className="text-sm font-semibold">Recent transactions</h3>
-      <p className="text-xs text-muted-foreground">Latest sales and expenses</p>
+      <p className="text-xs text-muted-foreground">Latest sales, income and expenses</p>
       {items.length === 0 ? (
         <p className="mt-6 rounded-xl bg-muted p-4 text-center text-sm text-muted-foreground">
-          No transactions yet. Record your first sale to see it here.
+          Nothing in this date range yet.
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-border">
-          {items.map((it) => (
-            <li key={`${it.kind}-${it.id}`} className="flex items-center justify-between gap-3 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                  it.kind === "sale" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
-                }`}>
-                  {it.kind === "sale" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium capitalize">{it.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(it.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {new Date(it.date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                  </p>
+          {items.map((it) => {
+            const positive = it.kind !== "expense";
+            return (
+              <li key={`${it.kind}-${it.id}`} className="flex items-center justify-between gap-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    positive ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+                  }`}>
+                    {positive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium capitalize">{it.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {it.kind} · {new Date(it.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <span className={`text-sm font-semibold ${it.kind === "sale" ? "text-success" : "text-destructive"}`}>
-                {it.kind === "sale" ? "+" : "−"}{formatCurrency(it.amount)}
-              </span>
-            </li>
-          ))}
+                <span className={`text-sm font-semibold ${positive ? "text-success" : "text-destructive"}`}>
+                  {positive ? "+" : "−"}{formatCurrency(it.amount, currency)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
   );
 }
 
-function ProductsTable({ products, onAdd, onChange }: { products: Product[]; onAdd: () => void; onChange: () => void }) {
+function ProductsTable({ products, currency, onAdd, onChange }: { products: Product[]; currency: string; onAdd: () => void; onChange: () => void }) {
   async function remove(id: string) {
     if (!confirm("Delete this product?")) return;
     const { error } = await supabase.from("products").delete().eq("id", id);
@@ -338,8 +362,8 @@ function ProductsTable({ products, onAdd, onChange }: { products: Product[]; onA
                 return (
                   <tr key={p.id} className="border-b border-border/60 last:border-0">
                     <td className="px-2 py-3 font-medium">{p.name}</td>
-                    <td className="px-2 py-3">{formatCurrency(Number(p.price))}</td>
-                    <td className="px-2 py-3 text-muted-foreground">{formatCurrency(Number(p.cost))}</td>
+                    <td className="px-2 py-3">{formatCurrency(Number(p.price), currency)}</td>
+                    <td className="px-2 py-3 text-muted-foreground">{formatCurrency(Number(p.cost), currency)}</td>
                     <td className="px-2 py-3">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                         low ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"
