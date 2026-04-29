@@ -19,6 +19,7 @@ type Profile = {
   business_name: string | null; phone: string | null; email: string | null;
   business_type: string | null; num_employees: string | null; location: string | null;
   role: string | null; trial_end_date: string; currency: string; logo_url: string | null;
+  avatar_url: string | null;
 };
 
 export const Route = createFileRoute("/settings")({
@@ -33,7 +34,9 @@ function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const avatarRef = useRef<HTMLInputElement>(null);
 
   // Email & password forms
   const [newEmail, setNewEmail] = useState("");
@@ -45,7 +48,7 @@ function SettingsPage() {
   useEffect(() => {
     if (!ready || !user) return;
     supabase.from("profiles")
-      .select("business_name,phone,email,business_type,num_employees,location,role,trial_end_date,currency,logo_url")
+      .select("business_name,phone,email,business_type,num_employees,location,role,trial_end_date,currency,logo_url,avatar_url")
       .eq("id", user.id).maybeSingle()
       .then(({ data }) => setProfile(data as Profile));
   }, [ready, user]);
@@ -99,6 +102,39 @@ function SettingsPage() {
     if (error) return toast.error(error.message);
     setProfile({ ...profile, logo_url: null });
     toast.success("Logo removed");
+  }
+
+  async function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user || !profile) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error("Photo must be under 2MB");
+    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: updErr } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
+      if (updErr) throw updErr;
+      setProfile({ ...profile, avatar_url: url });
+      toast.success("Profile photo updated");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarRef.current) avatarRef.current.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    if (!user || !profile) return;
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.id);
+    if (error) return toast.error(error.message);
+    setProfile({ ...profile, avatar_url: null });
+    toast.success("Photo removed");
   }
 
   async function changeEmail(e: React.FormEvent) {
@@ -174,7 +210,31 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Business profile */}
+        {/* Profile photo */}
+        <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="text-sm font-semibold">Profile photo</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Your personal avatar shown in the dashboard. PNG or JPG, under 2MB.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border bg-background">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <ImageIcon className="h-7 w-7 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+              <Button type="button" variant="outline" disabled={uploadingAvatar} onClick={() => avatarRef.current?.click()}>
+                {uploadingAvatar ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {profile.avatar_url ? "Change photo" : "Upload photo"}
+              </Button>
+              {profile.avatar_url && (
+                <Button type="button" variant="ghost" onClick={removeAvatar}>Remove</Button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={save} className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h3 className="text-sm font-semibold">Business profile</h3>
           <div className="grid gap-3 sm:grid-cols-2">

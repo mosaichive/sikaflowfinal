@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/nav/AppShell";
 import { useRequireUser, PageLoader } from "@/lib/use-require-user";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { PageHeader, EmptyState } from "./products";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Sale = { id: string; total: number; payment_method: string; customer_name: string | null; sale_date: string };
 type Item = { id: string; sale_id: string; product_name: string; quantity: number; unit_price: number };
@@ -20,6 +22,7 @@ function OrdersPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [itemsBySale, setItemsBySale] = useState<Record<string, Item[]>>({});
   const [open, setOpen] = useState<string | null>(null);
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
@@ -42,17 +45,20 @@ function OrdersPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
+  const filtered = useMemo(() => sales.filter((s) => inRange(s.sale_date, range)), [sales, range]);
+
   if (!ready) return <AppShell><PageLoader /></AppShell>;
 
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <PageHeader title="Orders" description={`${sales.length} recent orders`} />
-        {sales.length === 0 ? (
-          <EmptyState message="No orders yet. Record sales from the Sales / POS page." />
+        <PageHeader title="Orders" description={`${filtered.length} orders`} />
+        <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+        {filtered.length === 0 ? (
+          <EmptyState message="No orders in this date range." />
         ) : (
           <div className="space-y-2">
-            {sales.map((s) => {
+            {filtered.map((s) => {
               const items = itemsBySale[s.id] ?? [];
               const isOpen = open === s.id;
               return (
@@ -94,3 +100,4 @@ function OrdersPage() {
     </AppShell>
   );
 }
+

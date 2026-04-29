@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { AddExpenseDialog } from "@/components/dashboard/Dialogs";
 import { formatCurrency } from "@/lib/format";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Expense = { id: string; amount: number; category: string; note: string | null; expense_date: string };
 const CATEGORIES = ["All", "Supplies", "Rent", "Utilities", "Salary", "Transport", "Marketing", "Other"];
@@ -23,6 +25,7 @@ function ExpensesPage() {
   const [items, setItems] = useState<Expense[]>([]);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("All");
+  const { filter: dateFilter, setFilter: setDateFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
@@ -38,7 +41,11 @@ function ExpensesPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
-  const filtered = filter === "All" ? items : items.filter((i) => i.category === filter);
+  const filtered = useMemo(() => {
+    return items
+      .filter((i) => filter === "All" || i.category === filter)
+      .filter((i) => inRange(i.expense_date, range));
+  }, [items, filter, range]);
   const total = useMemo(() => filtered.reduce((s, i) => s + Number(i.amount), 0), [filtered]);
 
   async function remove(id: string) {
@@ -58,6 +65,7 @@ function ExpensesPage() {
           description={`${filtered.length} entries · Total ${formatCurrency(total)}`}
           action={<Button onClick={() => setOpen(true)} className="bg-primary hover:bg-primary/90"><Plus className="mr-1 h-4 w-4" />Add expense</Button>}
         />
+        <DateFilterBar filter={dateFilter} onChange={setDateFilter} allowAll />
         <div className="mb-4 flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
             <button key={c} onClick={() => setFilter(c)} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${filter === c ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}>

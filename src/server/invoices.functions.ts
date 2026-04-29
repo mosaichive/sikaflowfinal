@@ -26,7 +26,7 @@ export const generateInvoicePdf = createServerFn({ method: "POST" })
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("business_name,email,phone,location,currency")
+      .select("business_name,email,phone,location,currency,logo_url")
       .eq("id", userId)
       .maybeSingle();
 
@@ -45,8 +45,31 @@ export const generateInvoicePdf = createServerFn({ method: "POST" })
 
     // Header band
     page.drawRectangle({ x: 0, y: 782, width: 595, height: 60, color: primary });
+
+    // Try to embed the logo at the left of the header
+    let textStartX = 40;
+    if (profile?.logo_url) {
+      try {
+        const res = await fetch(profile.logo_url);
+        if (res.ok) {
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          const buf = new Uint8Array(await res.arrayBuffer());
+          const img = ct.includes("jpeg") || ct.includes("jpg")
+            ? await pdf.embedJpg(buf)
+            : await pdf.embedPng(buf);
+          const targetH = 40;
+          const ratio = img.width / img.height;
+          const targetW = Math.min(120, targetH * ratio);
+          page.drawImage(img, { x: 30, y: 791, width: targetW, height: targetH });
+          textStartX = 30 + targetW + 12;
+        }
+      } catch {
+        // ignore — fall back to text-only header
+      }
+    }
+
     page.drawText(profile?.business_name || "SikaFlow Business", {
-      x: 40, y: 805, size: 18, font: bold, color: rgb(1, 1, 1),
+      x: textStartX, y: 805, size: 18, font: bold, color: rgb(1, 1, 1),
     });
     page.drawText("INVOICE", { x: 480, y: 805, size: 18, font: bold, color: rgb(1, 1, 1) });
 

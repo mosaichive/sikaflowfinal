@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Income = { id: string; source: string; amount: number; note: string | null; income_date: string };
 
@@ -24,6 +26,7 @@ function IncomePage() {
   const [items, setItems] = useState<Income[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ source: "", amount: "", note: "" });
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
@@ -39,7 +42,8 @@ function IncomePage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
-  const total = useMemo(() => items.reduce((s, i) => s + Number(i.amount), 0), [items]);
+  const filtered = useMemo(() => items.filter((i) => inRange(i.income_date, range)), [items, range]);
+  const total = useMemo(() => filtered.reduce((s, i) => s + Number(i.amount), 0), [filtered]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -72,8 +76,9 @@ function IncomePage() {
           description={`Total: ${formatCurrency(total)}`}
           action={<Button onClick={() => setOpen(true)} className="bg-primary hover:bg-primary/90"><Plus className="mr-1 h-4 w-4" />Add income</Button>}
         />
-        {items.length === 0 ? (
-          <EmptyState message="No other income recorded. Add income that's not from your regular sales." />
+        <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+        {filtered.length === 0 ? (
+          <EmptyState message="No income in this date range." />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <table className="w-full text-sm">
@@ -81,7 +86,7 @@ function IncomePage() {
                 <tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3 text-right">Actions</th></tr>
               </thead>
               <tbody>
-                {items.map((i) => (
+                {filtered.map((i) => (
                   <tr key={i.id} className="border-t border-border">
                     <td className="px-4 py-3"><p className="font-medium">{i.source}</p>{i.note && <p className="text-xs text-muted-foreground">{i.note}</p>}</td>
                     <td className="px-4 py-3 text-muted-foreground">{new Date(i.income_date).toLocaleDateString()}</td>

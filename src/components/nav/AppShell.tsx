@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { LogOut, Menu, MoreHorizontal } from "lucide-react";
 import { navItems, type NavItem } from "./nav-items";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-type Profile = { business_name: string | null; email?: string | null };
+type Profile = { business_name: string | null; email?: string | null; logo_url?: string | null; avatar_url?: string | null };
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
@@ -18,12 +19,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    const load = () => supabase
       .from("profiles")
-      .select("business_name")
+      .select("business_name, logo_url, avatar_url")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => setProfile({ business_name: data?.business_name ?? null, email: user.email }));
+      .then(({ data }) => setProfile({
+        business_name: data?.business_name ?? null,
+        logo_url: data?.logo_url ?? null,
+        avatar_url: data?.avatar_url ?? null,
+        email: user.email,
+      }));
+    load();
+    const ch = supabase.channel(`profile-${user.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [user]);
 
   async function handleSignOut() {
@@ -43,6 +54,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <SidebarFooter profile={profile} onSignOut={handleSignOut} />
       </aside>
+
+      {/* Desktop top bar (with profile pill) */}
+      <header className="sticky top-0 z-20 hidden h-14 items-center justify-end gap-3 border-b border-border bg-card/80 px-6 backdrop-blur md:flex md:pl-64">
+        <ThemeToggle />
+        <ProfilePill profile={profile} />
+      </header>
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-card/90 px-4 backdrop-blur md:hidden">
@@ -64,18 +81,42 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SheetContent>
         </Sheet>
         <Logo />
-        <ThemeToggle />
+        <ProfilePill profile={profile} compact />
       </header>
 
       {/* Main content */}
       <div className="md:pl-64">
-        <main className="min-h-[calc(100vh-3.5rem)] pb-24 md:min-h-screen md:pb-8">{children}</main>
+        <main className="min-h-[calc(100vh-3.5rem)] pb-24 md:min-h-[calc(100vh-3.5rem)] md:pb-8">{children}</main>
       </div>
 
       {/* Mobile bottom nav */}
       <MobileBottomNav onSignOut={handleSignOut} profile={profile} />
     </div>
   );
+}
+
+function ProfilePill({ profile, compact = false }: { profile: Profile | null; compact?: boolean }) {
+  const initials = getInitials(profile?.business_name || profile?.email || "U");
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-background px-2 py-1">
+      {profile?.logo_url && (
+        <img src={profile.logo_url} alt="Business logo" className="h-7 w-7 rounded-md object-contain" />
+      )}
+      {!compact && (
+        <span className="hidden max-w-[140px] truncate text-sm font-medium sm:inline">
+          {profile?.business_name || "Your business"}
+        </span>
+      )}
+      <Avatar className="h-7 w-7">
+        {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+        <AvatarFallback className="bg-primary text-[10px] font-semibold text-primary-foreground">{initials}</AvatarFallback>
+      </Avatar>
+    </div>
+  );
+}
+
+function getInitials(s: string) {
+  return s.split(/[\s@.]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
 
 function SidebarLinks({ items }: { items: NavItem[] }) {
@@ -117,9 +158,10 @@ function SidebarFooter({ profile, onSignOut }: { profile: Profile | null; onSign
         </Button>
       </div>
       <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-          {initials}
-        </span>
+        <Avatar className="h-9 w-9 shrink-0">
+          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+          <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">{initials}</AvatarFallback>
+        </Avatar>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{profile?.business_name || "Your business"}</p>
           <p className="truncate text-xs text-muted-foreground">{profile?.email}</p>
@@ -189,9 +231,10 @@ function MobileBottomNav({ onSignOut, profile }: { onSignOut: () => void; profil
           </div>
           <div className="border-t border-border p-4">
             <div className="mb-3 flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                {(profile?.business_name || profile?.email || "U").slice(0, 2).toUpperCase()}
-              </span>
+              <Avatar className="h-9 w-9 shrink-0">
+                {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+                <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">{getInitials(profile?.business_name || profile?.email || "U")}</AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{profile?.business_name || "Your business"}</p>
                 <p className="truncate text-xs text-muted-foreground">{profile?.email}</p>
