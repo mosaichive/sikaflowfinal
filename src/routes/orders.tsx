@@ -51,11 +51,14 @@ function OrdersPage() {
     <AppShell>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         <PageHeader title="Orders" description={`${sales.length} recent orders`} />
-        {sales.length === 0 ? (
-          <EmptyState message="No orders yet. Record sales from the Sales / POS page." />
-        ) : (
+        <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+        {(() => { /* nothing */ return null; })()}
+        {(function renderList() {
+          const filtered = sales.filter((s) => inRange(s.sale_date, range));
+          if (filtered.length === 0) return <EmptyState message="No orders in this date range." />;
+          return (
           <div className="space-y-2">
-            {sales.map((s) => {
+            {filtered.map((s) => {
               const items = itemsBySale[s.id] ?? [];
               const isOpen = open === s.id;
               return (
