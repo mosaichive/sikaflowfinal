@@ -106,10 +106,10 @@ function SettingsPage() {
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
       const url = pub.publicUrl;
-      const field = isAvatar ? "avatar_url" : "logo_url";
-      const { error: updErr } = await supabase.from("profiles").update({ [field]: url }).eq("id", user.id);
+      const updates = isAvatar ? { avatar_url: url } : { logo_url: url };
+      const { error: updErr } = await supabase.from("profiles").update(updates).eq("id", user.id);
       if (updErr) throw updErr;
-      setProfile({ ...profile, [field]: url } as Profile);
+      setProfile({ ...profile, ...updates });
       toast.success(isAvatar ? "Profile photo updated" : "Logo updated");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
