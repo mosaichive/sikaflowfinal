@@ -22,6 +22,7 @@ function OrdersPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [itemsBySale, setItemsBySale] = useState<Record<string, Item[]>>({});
   const [open, setOpen] = useState<string | null>(null);
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
