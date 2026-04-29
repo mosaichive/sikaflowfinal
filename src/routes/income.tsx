@@ -42,7 +42,8 @@ function IncomePage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
-  const total = useMemo(() => items.reduce((s, i) => s + Number(i.amount), 0), [items]);
+  const filtered = useMemo(() => items.filter((i) => inRange(i.income_date, range)), [items, range]);
+  const total = useMemo(() => filtered.reduce((s, i) => s + Number(i.amount), 0), [filtered]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
