@@ -223,7 +223,7 @@ function SettingsPage() {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e, "circle")} />
               <Button type="button" variant="outline" disabled={uploadingAvatar} onClick={() => avatarRef.current?.click()}>
                 {uploadingAvatar ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 {profile.avatar_url ? "Change photo" : "Upload photo"}
