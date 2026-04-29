@@ -199,33 +199,20 @@ function ReportsPage() {
           </Button>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {PRESETS.map((r) => (
-            <button key={r.key} onClick={() => setPreset(r.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${preset === r.key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}>
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {preset === "custom" && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:max-w-xl">
-            <div>
-              <Label htmlFor="from">From</Label>
-              <Input id="from" type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="to">To</Label>
-              <Input id="to" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-            </div>
-          </div>
-        )}
+        <DateFilterBar filter={dateFilter} onChange={setDateFilter} allowAll />
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Revenue" value={formatCurrency(stats.revenue)} tone="primary" />
           <Stat label="Cost of goods" value={formatCurrency(stats.cost)} />
           <Stat label="Expenses" value={formatCurrency(stats.exp)} />
           <Stat label="Net profit" value={formatCurrency(stats.netProfit)} tone={stats.netProfit >= 0 ? "success" : "danger"} />
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Opening stock" value={String(stats.opening)} />
+          <Stat label="Stock added" value={`+${stats.added}`} tone="success" />
+          <Stat label="Stock sold" value={`-${stats.sold}`} tone="danger" />
+          <Stat label="Closing stock" value={String(stats.closing)} tone="primary" />
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
