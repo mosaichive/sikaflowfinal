@@ -25,28 +25,6 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-type Preset = { key: string; label: string };
-const PRESETS: Preset[] = [
-  { key: "today", label: "Today" },
-  { key: "7", label: "Last 7 days" },
-  { key: "30", label: "Last 30 days" },
-  { key: "month", label: "This month" },
-  { key: "year", label: "This year" },
-  { key: "custom", label: "Custom" },
-];
-
-function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
-function endOfDay(d: Date) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
-
-function rangeFor(preset: string, from: string, to: string): { from: Date; to: Date; label: string } {
-  const now = new Date();
-  if (preset === "today") return { from: startOfDay(now), to: endOfDay(now), label: "Daily report" };
-  if (preset === "7") { const f = startOfDay(new Date()); f.setDate(f.getDate() - 6); return { from: f, to: endOfDay(now), label: "Weekly report" }; }
-  if (preset === "30") { const f = startOfDay(new Date()); f.setDate(f.getDate() - 29); return { from: f, to: endOfDay(now), label: "Monthly report" }; }
-  if (preset === "month") { const f = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1)); return { from: f, to: endOfDay(now), label: "This-month report" }; }
-  if (preset === "year") { const f = startOfDay(new Date(now.getFullYear(), 0, 1)); return { from: f, to: endOfDay(now), label: "Yearly report" }; }
-  const f = from ? startOfDay(new Date(from)) : startOfDay(now);
-  const t = to ? endOfDay(new Date(to)) : endOfDay(now);
   return { from: f, to: t, label: "Custom report" };
 }
 
