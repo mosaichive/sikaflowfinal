@@ -91,6 +91,33 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       expMap.set(k, (expMap.get(k) || 0) + Number(e.amount));
     }
 
+    // ----- Stock summary -----
+    const fromTs = new Date(fromISO).getTime();
+    const toTs = new Date(toISO).getTime();
+    const productNames = new Map<string, string>();
+    for (const p of products ?? []) productNames.set(p.id as string, String(p.name));
+    type Bucket = { opening: number; added: number; sold: number; lastRestock: string | null };
+    const stockByProduct = new Map<string, Bucket>();
+    let openingTot = 0, addedTot = 0, soldTot = 0;
+    for (const m of moves ?? []) {
+      const t = new Date(m.created_at).getTime();
+      const ch = Number(m.change);
+      const pid = String(m.product_id);
+      const b = stockByProduct.get(pid) || { opening: 0, added: 0, sold: 0, lastRestock: null };
+      if (t < fromTs) {
+        b.opening += ch; openingTot += ch;
+      } else if (t <= toTs) {
+        if (ch >= 0) { b.added += ch; addedTot += ch; b.lastRestock = m.created_at as string; }
+        else { b.sold += -ch; soldTot += -ch; }
+      }
+      stockByProduct.set(pid, b);
+    }
+    const closingTot = openingTot + addedTot - soldTot;
+    const stockRows = [...stockByProduct.entries()]
+      .map(([pid, b]) => ({ name: productNames.get(pid) || "Unknown", ...b, closing: b.opening + b.added - b.sold }))
+      .filter((r) => r.opening !== 0 || r.added !== 0 || r.sold !== 0)
+      .sort((a, b) => (b.added + b.sold) - (a.added + a.sold));
+
     // ----- PDF -----
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
