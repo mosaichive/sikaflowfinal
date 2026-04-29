@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { trialDaysLeft, isTrialActive } from "@/lib/trial";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import {
-  Plus, Package, Receipt, TrendingUp, Boxes, Wallet, ShoppingBag,
+  Plus, TrendingUp, Boxes, Wallet, ShoppingBag,
   Sparkles, AlertTriangle, ArrowUpRight, ArrowDownRight,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AddProductDialog, AddSaleDialog, AddExpenseDialog } from "@/components/dashboard/Dialogs";
+import { AddProductDialog } from "@/components/dashboard/Dialogs";
 import { SalesChart, type Point } from "@/components/dashboard/SalesChart";
 import { AppShell } from "@/components/nav/AppShell";
 import { DateFilterBar } from "@/components/DateFilterBar";
@@ -37,9 +37,7 @@ function DashboardPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [openSale, setOpenSale] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
-  const [openExpense, setOpenExpense] = useState(false);
   const { filter, setFilter, range } = useDateFilter();
 
   const loadAll = useCallback(async (uid: string) => {
@@ -157,17 +155,6 @@ function DashboardPage() {
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {profile.business_name || "Your business"}
             </h1>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setOpenSale(true)} className="bg-primary hover:bg-primary/90">
-                <Plus className="mr-1 h-4 w-4" /> Add Sale
-              </Button>
-              <Button onClick={() => setOpenProduct(true)} variant="outline">
-                <Package className="mr-1 h-4 w-4" /> Add Product
-              </Button>
-              <Button onClick={() => setOpenExpense(true)} variant="outline">
-                <Receipt className="mr-1 h-4 w-4" /> Expense
-              </Button>
-            </div>
           </div>
         </section>
 
@@ -236,9 +223,7 @@ function DashboardPage() {
         </section>
       </div>
 
-      <AddSaleDialog open={openSale} onOpenChange={setOpenSale} />
       <AddProductDialog open={openProduct} onOpenChange={setOpenProduct} />
-      <AddExpenseDialog open={openExpense} onOpenChange={setOpenExpense} />
     </AppShell>
   );
 }

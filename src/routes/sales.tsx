@@ -9,15 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Receipt, Download, AlertTriangle, History } from "lucide-react";
+import { Receipt, Eye, AlertTriangle, History, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import { PageHeader } from "./products";
-import { generateInvoicePdf } from "@/server/invoices.functions";
-import { useServerFn } from "@tanstack/react-start";
-import { downloadBase64Pdf } from "@/lib/download";
 import { DateFilterBar } from "@/components/DateFilterBar";
 import { useDateFilter, inRange } from "@/lib/date-filter";
+import { InvoicePreviewDialog } from "@/components/InvoicePreview";
+import { EditSaleDialog } from "@/components/EditDialogs";
 
 type Product = { id: string; name: string; price: number; cost: number; stock: number };
 type Customer = { id: string; name: string; phone: string | null };
@@ -33,8 +32,9 @@ function SalesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [recent, setRecent] = useState<RecentSale[]>([]);
-  const generate = useServerFn(generateInvoicePdf);
   const { filter: dateFilter, setFilter: setDateFilter, range } = useDateFilter();
+  const [previewSaleId, setPreviewSaleId] = useState<string | null>(null);
+  const [editSaleId, setEditSaleId] = useState<string | null>(null);
 
   // form state
   const [productId, setProductId] = useState("");
@@ -138,8 +138,8 @@ function SalesPage() {
 
     toast.success(`Sale ${sale.invoice_number ?? ""} recorded · ${formatCurrency(total)}`, {
       action: {
-        label: "Download invoice",
-        onClick: () => downloadInvoice(sale.id),
+        label: "Preview invoice",
+        onClick: () => setPreviewSaleId(sale.id),
       },
     });
 
@@ -149,13 +149,14 @@ function SalesPage() {
     setSaving(false);
   }
 
-  async function downloadInvoice(saleId: string) {
-    try {
-      const res = await generate({ data: { saleId } });
-      downloadBase64Pdf(res.base64, res.filename);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not generate invoice");
-    }
+  async function deleteSale(saleId: string) {
+    if (!confirm("Delete this sale? Stock will be restored.")) return;
+    // Delete sale_items first so the trigger restores stock, then delete the sale.
+    const { error: itemErr } = await supabase.from("sale_items").delete().eq("sale_id", saleId);
+    if (itemErr) return toast.error(itemErr.message);
+    const { error } = await supabase.from("sales").delete().eq("id", saleId);
+    if (error) return toast.error(error.message);
+    toast.success("Sale deleted · stock restored");
   }
 
   if (!ready) return <AppShell><PageLoader /></AppShell>;
@@ -294,10 +295,16 @@ function SalesPage() {
                           <p className="truncate text-sm font-medium">{s.invoice_number ?? s.id.slice(0, 8)}</p>
                           <p className="truncate text-xs text-muted-foreground">{s.customer_name || "Walk-in"} · {new Date(s.sale_date).toLocaleDateString()}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(s.id)} title="Download invoice">
-                            <Download className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-1">
+                          <span className="mr-1 text-sm font-semibold">{formatCurrency(Number(s.total))}</span>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPreviewSaleId(s.id)} title="Preview invoice">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditSaleId(s.id)} title="Edit sale">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteSale(s.id)} title="Delete sale">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </li>
@@ -309,6 +316,16 @@ function SalesPage() {
           </div>
         </div>
       </div>
+      <InvoicePreviewDialog
+        saleId={previewSaleId}
+        open={!!previewSaleId}
+        onOpenChange={(v) => !v && setPreviewSaleId(null)}
+      />
+      <EditSaleDialog
+        saleId={editSaleId}
+        open={!!editSaleId}
+        onOpenChange={(v) => !v && setEditSaleId(null)}
+      />
     </AppShell>
   );
 }
