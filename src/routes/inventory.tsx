@@ -13,9 +13,12 @@ import { toast } from "sonner";
 import { PageHeader, EmptyState } from "./products";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, inRange } from "@/lib/date-filter";
 
 type Product = { id: string; name: string; price: number; cost: number; stock: number; low_stock_threshold: number };
-type Movement = { id: string; product_id: string; change: number; reason: string; note: string | null; created_at: string };
+type Movement = { id: string; product_id: string; change: number; reason: string; note: string | null; created_at: string; added_by_name: string | null };
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({ meta: [{ title: "Inventory — SikaFlow" }] }),
@@ -30,13 +33,15 @@ function InventoryPage() {
   const [adjust, setAdjust] = useState<{ product: Product; mode: "add" | "remove" } | null>(null);
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("received");
+  const [adjustNote, setAdjustNote] = useState("");
   const [historyFor, setHistoryFor] = useState<Product | null>(null);
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
     const [{ data: prods }, { data: moves }] = await Promise.all([
       supabase.from("products").select("*").eq("user_id", user.id).order("name"),
-      supabase.from("stock_movements").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
+      supabase.from("stock_movements").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(500),
     ]);
     setItems((prods as Product[]) ?? []);
     setMovements((moves as Movement[]) ?? []);
@@ -76,12 +81,26 @@ function InventoryPage() {
     if (error) return toast.error(error.message);
 
     await supabase.from("stock_movements").insert({
-      user_id: user.id, product_id: adjust.product.id, change, reason, note: null,
+      user_id: user.id,
+      product_id: adjust.product.id,
+      change,
+      reason,
+      note: adjustNote.trim() || null,
+      added_by_name: user.email ?? null,
     });
 
     toast.success(`Stock updated · ${adjust.product.name} → ${newStock}`);
-    setAdjust(null); setDelta(""); setReason("received");
+    setAdjust(null); setDelta(""); setReason("received"); setAdjustNote("");
   }
+
+  const productName = (id: string) => items.find((p) => p.id === id)?.name ?? "—";
+  const restocks = useMemo(
+    () =>
+      movements
+        .filter((m) => Number(m.change) > 0 && inRange(m.created_at, range))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [movements, range],
+  );
 
   if (!ready) return <AppShell><PageLoader /></AppShell>;
 
@@ -159,6 +178,50 @@ function InventoryPage() {
             </div>
           </Card>
         )}
+
+        {/* Restock history */}
+        <div className="mt-8">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Restock history</h2>
+              <p className="text-xs text-muted-foreground">Every stock-in event with date, quantity, who added it, and notes.</p>
+            </div>
+          </div>
+          <DateFilterBar filter={filter} onChange={setFilter} allowAll />
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">Current stock</th>
+                    <th className="px-4 py-3">Restock qty</th>
+                    <th className="px-4 py-3">Added by</th>
+                    <th className="px-4 py-3">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {restocks.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No restocks in this period.</td></tr>
+                  ) : restocks.map((m) => {
+                    const cur = items.find((p) => p.id === m.product_id);
+                    return (
+                      <tr key={m.id} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-4 py-3 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 font-medium">{productName(m.product_id)}</td>
+                        <td className="px-4 py-3">{cur ? formatNumber(Number(cur.stock)) : "—"}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-500">+{formatNumber(Number(m.change))}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.added_by_name || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.note || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Add / Remove dialog */}
@@ -198,6 +261,10 @@ function InventoryPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder="e.g. Supplier batch #3, returned by customer…" rows={2} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAdjust(null)}>Cancel</Button>
@@ -214,9 +281,10 @@ function InventoryPage() {
             <ul className="divide-y divide-border">
               {movements.filter((m) => m.product_id === historyFor?.id).slice(0, 50).map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium capitalize">{m.reason}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString()}{m.added_by_name ? ` · ${m.added_by_name}` : ""}</p>
+                    {m.note && <p className="text-xs text-muted-foreground italic">{m.note}</p>}
                   </div>
                   <span className={`font-semibold ${Number(m.change) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                     {Number(m.change) >= 0 ? "+" : ""}{Number(m.change)}

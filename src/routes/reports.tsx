@@ -8,12 +8,12 @@ import { SalesChart } from "@/components/dashboard/SalesChart";
 import { formatCurrency } from "@/lib/format";
 import { PageHeader } from "./products";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { generateReportPdf } from "@/server/reports.functions";
 import { downloadPdfFromServerResult, defaultPdfName } from "@/lib/download";
 import { toast } from "sonner";
 import { Download, Loader2 } from "lucide-react";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, getRange } from "@/lib/date-filter";
 
 type Sale = { id: string; total: number; cost_total: number; discount: number; payment_method: string; sale_date: string };
 type SaleItem = { product_name: string; quantity: number; unit_price: number; unit_cost: number; sale_id: string };
@@ -25,58 +25,49 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-type Preset = { key: string; label: string };
-const PRESETS: Preset[] = [
-  { key: "today", label: "Today" },
-  { key: "7", label: "Last 7 days" },
-  { key: "30", label: "Last 30 days" },
-  { key: "month", label: "This month" },
-  { key: "year", label: "This year" },
-  { key: "custom", label: "Custom" },
-];
 
-function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
-function endOfDay(d: Date) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
-
-function rangeFor(preset: string, from: string, to: string): { from: Date; to: Date; label: string } {
-  const now = new Date();
-  if (preset === "today") return { from: startOfDay(now), to: endOfDay(now), label: "Daily report" };
-  if (preset === "7") { const f = startOfDay(new Date()); f.setDate(f.getDate() - 6); return { from: f, to: endOfDay(now), label: "Weekly report" }; }
-  if (preset === "30") { const f = startOfDay(new Date()); f.setDate(f.getDate() - 29); return { from: f, to: endOfDay(now), label: "Monthly report" }; }
-  if (preset === "month") { const f = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1)); return { from: f, to: endOfDay(now), label: "This-month report" }; }
-  if (preset === "year") { const f = startOfDay(new Date(now.getFullYear(), 0, 1)); return { from: f, to: endOfDay(now), label: "Yearly report" }; }
-  const f = from ? startOfDay(new Date(from)) : startOfDay(now);
-  const t = to ? endOfDay(new Date(to)) : endOfDay(now);
-  return { from: f, to: t, label: "Custom report" };
-}
+type StockMove = { product_id: string; change: number; reason: string; created_at: string };
 
 function ReportsPage() {
   const { ready, user } = useRequireUser();
-  const [preset, setPreset] = useState("30");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const { filter: dateFilter, setFilter: setDateFilter } = useDateFilter();
   const [sales, setSales] = useState<Sale[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
+  const [movesAll, setMovesAll] = useState<StockMove[]>([]);
   const [downloading, setDownloading] = useState(false);
   const generate = useServerFn(generateReportPdf);
 
-  const range = useMemo(() => rangeFor(preset, customFrom, customTo), [preset, customFrom, customTo]);
+  const range = useMemo(() => {
+    const r = getRange(dateFilter);
+    const now = new Date();
+    const from = r.start ?? new Date(now.getFullYear(), 0, 1);
+    const to = r.end ?? new Date(now.getFullYear() + 1, 0, 1);
+    let label = "Report";
+    if (dateFilter.granularity === "day") label = "Daily report";
+    else if (dateFilter.granularity === "month") label = "Monthly report";
+    else if (dateFilter.granularity === "year") label = "Yearly report";
+    else if (dateFilter.granularity === "custom") label = "Custom report";
+    else label = "All-time report";
+    return { from, to, label };
+  }, [dateFilter]);
 
   async function load() {
     if (!user) return;
     const fromISO = range.from.toISOString();
     const toISO = range.to.toISOString();
-    const [{ data: ss }, { data: ee }, { data: oo }] = await Promise.all([
+    const [{ data: ss }, { data: ee }, { data: oo }, { data: mm }] = await Promise.all([
       supabase.from("sales").select("id,total,cost_total,discount,payment_method,sale_date").eq("user_id", user.id).gte("sale_date", fromISO).lte("sale_date", toISO).order("sale_date", { ascending: false }),
       supabase.from("expenses").select("amount,category,expense_date").eq("user_id", user.id).gte("expense_date", fromISO).lte("expense_date", toISO),
       supabase.from("other_income").select("amount,source,income_date").eq("user_id", user.id).gte("income_date", fromISO).lte("income_date", toISO),
+      supabase.from("stock_movements").select("product_id,change,reason,created_at").eq("user_id", user.id).order("created_at", { ascending: true }),
     ]);
     const salesArr = (ss as Sale[]) ?? [];
     setSales(salesArr);
     setExpenses((ee as Expense[]) ?? []);
     setIncome((oo as Income[]) ?? []);
+    setMovesAll((mm as StockMove[]) ?? []);
     if (salesArr.length > 0) {
       const ids = salesArr.map((s) => s.id);
       const { data: ii } = await supabase.from("sale_items").select("product_name,quantity,unit_price,unit_cost,sale_id").in("sale_id", ids);
@@ -86,7 +77,7 @@ function ReportsPage() {
     }
   }
 
-  useEffect(() => { if (ready) load(); /* eslint-disable-next-line */ }, [ready, preset, customFrom, customTo, user?.id]);
+  useEffect(() => { if (ready) load(); /* eslint-disable-next-line */ }, [ready, dateFilter, user?.id]);
 
   // Realtime
   useEffect(() => {
@@ -95,10 +86,11 @@ function ReportsPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${user.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "other_income", filter: `user_id=eq.${user.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements", filter: `user_id=eq.${user.id}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
-  }, [user?.id, preset, customFrom, customTo]);
+  }, [user?.id, dateFilter]);
 
   const stats = useMemo(() => {
     const revenue = sales.reduce((s, x) => s + Number(x.total), 0);
@@ -135,8 +127,20 @@ function ReportsPage() {
     const payMap = new Map<string, number>();
     for (const s of sales) payMap.set(s.payment_method, (payMap.get(s.payment_method) || 0) + Number(s.total));
 
-    return { revenue, cost, exp, inc, grossProfit, netProfit, tx, avg, series, best, pays: [...payMap.entries()] };
-  }, [sales, items, expenses, income, range]);
+    // Stock summary across the period
+    let opening = 0, added = 0, sold = 0;
+    for (const m of movesAll) {
+      const t = new Date(m.created_at).getTime();
+      const ch = Number(m.change);
+      if (t < range.from.getTime()) opening += ch;
+      else if (t <= range.to.getTime()) {
+        if (ch >= 0) added += ch; else sold += -ch;
+      }
+    }
+    const closing = opening + added - sold;
+
+    return { revenue, cost, exp, inc, grossProfit, netProfit, tx, avg, series, best, pays: [...payMap.entries()], opening, added, sold, closing };
+  }, [sales, items, expenses, income, range, movesAll]);
 
   async function downloadPdf() {
     setDownloading(true);
@@ -169,33 +173,20 @@ function ReportsPage() {
           </Button>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {PRESETS.map((r) => (
-            <button key={r.key} onClick={() => setPreset(r.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${preset === r.key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}>
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {preset === "custom" && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:max-w-xl">
-            <div>
-              <Label htmlFor="from">From</Label>
-              <Input id="from" type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="to">To</Label>
-              <Input id="to" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-            </div>
-          </div>
-        )}
+        <DateFilterBar filter={dateFilter} onChange={setDateFilter} allowAll />
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Revenue" value={formatCurrency(stats.revenue)} tone="primary" />
           <Stat label="Cost of goods" value={formatCurrency(stats.cost)} />
           <Stat label="Expenses" value={formatCurrency(stats.exp)} />
           <Stat label="Net profit" value={formatCurrency(stats.netProfit)} tone={stats.netProfit >= 0 ? "success" : "danger"} />
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Opening stock" value={String(stats.opening)} />
+          <Stat label="Stock added" value={`+${stats.added}`} tone="success" />
+          <Stat label="Stock sold" value={`-${stats.sold}`} tone="danger" />
+          <Stat label="Closing stock" value={String(stats.closing)} tone="primary" />
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

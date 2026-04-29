@@ -17,7 +17,7 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { fromISO, toISO, rangeLabel } = data;
 
-    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }, { data: savings }] =
+    const [{ data: profile }, { data: sales }, { data: items }, { data: expenses }, { data: income }, { data: savings }, { data: moves }, { data: products }] =
       await Promise.all([
         supabase.from("profiles").select("business_name,email,phone,location,currency,logo_url").eq("id", userId).maybeSingle(),
         supabase.from("sales").select("id,total,cost_total,discount,amount_paid,payment_method,sale_date,customer_name")
@@ -30,6 +30,9 @@ export const generateReportPdf = createServerFn({ method: "POST" })
           .eq("user_id", userId).gte("income_date", fromISO).lte("income_date", toISO),
         supabase.from("savings").select("amount,type,institution,savings_date")
           .eq("user_id", userId).gte("savings_date", fromISO).lte("savings_date", toISO),
+        supabase.from("stock_movements").select("product_id,change,reason,created_at,added_by_name,note")
+          .eq("user_id", userId).order("created_at", { ascending: true }),
+        supabase.from("products").select("id,name").eq("user_id", userId),
       ]);
 
     const currency = profile?.currency || "GHS";
@@ -87,6 +90,33 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       const k = String(e.category || "Other");
       expMap.set(k, (expMap.get(k) || 0) + Number(e.amount));
     }
+
+    // ----- Stock summary -----
+    const fromTs = new Date(fromISO).getTime();
+    const toTs = new Date(toISO).getTime();
+    const productNames = new Map<string, string>();
+    for (const p of products ?? []) productNames.set(p.id as string, String(p.name));
+    type Bucket = { opening: number; added: number; sold: number; lastRestock: string | null };
+    const stockByProduct = new Map<string, Bucket>();
+    let openingTot = 0, addedTot = 0, soldTot = 0;
+    for (const m of moves ?? []) {
+      const t = new Date(m.created_at).getTime();
+      const ch = Number(m.change);
+      const pid = String(m.product_id);
+      const b = stockByProduct.get(pid) || { opening: 0, added: 0, sold: 0, lastRestock: null };
+      if (t < fromTs) {
+        b.opening += ch; openingTot += ch;
+      } else if (t <= toTs) {
+        if (ch >= 0) { b.added += ch; addedTot += ch; b.lastRestock = m.created_at as string; }
+        else { b.sold += -ch; soldTot += -ch; }
+      }
+      stockByProduct.set(pid, b);
+    }
+    const closingTot = openingTot + addedTot - soldTot;
+    const stockRows = [...stockByProduct.entries()]
+      .map(([pid, b]) => ({ name: productNames.get(pid) || "Unknown", ...b, closing: b.opening + b.added - b.sold }))
+      .filter((r) => r.opening !== 0 || r.added !== 0 || r.sold !== 0)
+      .sort((a, b) => (b.added + b.sold) - (a.added + a.sold));
 
     // ----- PDF -----
     const pdf = await PDFDocument.create();
@@ -159,6 +189,10 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     sumRow("Available money (Sales + Income − Expenses − Savings)", fmt(availableMoney), availableMoney >= 0 ? success : danger);
     sumRow("Gross profit (Revenue − COGS)", fmt(grossProfit), grossProfit >= 0 ? success : danger);
     sumRow("Net profit (Gross − Expenses + Other)", fmt(netProfit), netProfit >= 0 ? success : danger);
+    sumRow("Opening stock (units)", String(openingTot));
+    sumRow("Stock added (units)", `+${addedTot}`, success);
+    sumRow("Stock sold (units)", `-${soldTot}`, danger);
+    sumRow("Closing stock (units)", String(closingTot), primary);
 
     // Best sellers table
     sy -= 10;
@@ -232,6 +266,35 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       page.drawText("Total savings", { x: 40, y: sy, size: 10, font: bold, color: ink });
       page.drawText(fmt(totalSavings), { x: 490, y: sy, size: 10, font: bold, color: primary });
       sy -= 14;
+    }
+
+    // ----- Stock movement per product -----
+    sy -= 10;
+    if (sy < 160) sy = addPage();
+    page.drawText("STOCK MOVEMENT BY PRODUCT", { x: 40, y: sy, size: 10, font: bold, color: muted }); sy -= 12;
+    page.drawRectangle({ x: 40, y: sy - 4, width: 515, height: 20, color: rgb(0.96, 0.97, 0.99) });
+    page.drawText("PRODUCT", { x: 50, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("OPEN", { x: 260, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("ADDED", { x: 310, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("SOLD", { x: 365, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("CLOSE", { x: 415, y: sy + 3, size: 9, font: bold, color: muted });
+    page.drawText("LAST RESTOCK", { x: 470, y: sy + 3, size: 9, font: bold, color: muted });
+    sy -= 18;
+    if (stockRows.length === 0) {
+      page.drawText("No stock movements in this period.", { x: 50, y: sy, size: 9, font, color: muted });
+      sy -= 14;
+    } else {
+      for (const r of stockRows) {
+        if (sy < 80) sy = addPage();
+        page.drawText(r.name.slice(0, 32), { x: 50, y: sy, size: 9, font, color: ink });
+        page.drawText(String(r.opening), { x: 260, y: sy, size: 9, font, color: ink });
+        page.drawText(`+${r.added}`, { x: 310, y: sy, size: 9, font, color: success });
+        page.drawText(`-${r.sold}`, { x: 365, y: sy, size: 9, font, color: danger });
+        page.drawText(String(r.closing), { x: 415, y: sy, size: 9, font: bold, color: primary });
+        page.drawText(r.lastRestock ? new Date(r.lastRestock).toLocaleDateString() : "—", { x: 470, y: sy, size: 9, font, color: muted });
+        sy -= 14;
+        page.drawLine({ start: { x: 40, y: sy + 6 }, end: { x: 555, y: sy + 6 }, thickness: 0.4, color: line });
+      }
     }
 
     // Footer on every page
