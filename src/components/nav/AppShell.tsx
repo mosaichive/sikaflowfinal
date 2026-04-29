@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { LogOut, Menu, MoreHorizontal } from "lucide-react";
 import { navItems, type NavItem } from "./nav-items";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-type Profile = { business_name: string | null; email?: string | null };
+type Profile = { business_name: string | null; email?: string | null; logo_url?: string | null; avatar_url?: string | null };
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
@@ -18,12 +19,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    const load = () => supabase
       .from("profiles")
-      .select("business_name")
+      .select("business_name, logo_url, avatar_url")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => setProfile({ business_name: data?.business_name ?? null, email: user.email }));
+      .then(({ data }) => setProfile({
+        business_name: data?.business_name ?? null,
+        logo_url: data?.logo_url ?? null,
+        avatar_url: data?.avatar_url ?? null,
+        email: user.email,
+      }));
+    load();
+    const ch = supabase.channel(`profile-${user.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [user]);
 
   async function handleSignOut() {
