@@ -41,7 +41,7 @@ function InventoryPage() {
     if (!user) return;
     const [{ data: prods }, { data: moves }] = await Promise.all([
       supabase.from("products").select("*").eq("user_id", user.id).order("name"),
-      supabase.from("stock_movements").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
+      supabase.from("stock_movements").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(500),
     ]);
     setItems((prods as Product[]) ?? []);
     setMovements((moves as Movement[]) ?? []);
