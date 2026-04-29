@@ -1,15 +1,19 @@
 import { Link } from "@tanstack/react-router";
 
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ className = "", showTagline = true }: { className?: string; showTagline?: boolean }) {
   return (
-    <Link to="/" className={`flex items-center gap-2 font-semibold ${className}`}>
-      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-primary-foreground" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 17l6-6 4 4 8-8" />
-          <path d="M14 7h7v7" />
-        </svg>
+    <Link to="/" className={`inline-flex items-center gap-3 ${className}`}>
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
+        <span className="text-lg" aria-hidden>💸</span>
       </span>
-      <span className="text-lg tracking-tight">SikaFlow</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-base font-semibold tracking-tight text-foreground">SikaFlow</span>
+        {showTagline && (
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Sales tally system
+          </span>
+        )}
+      </span>
     </Link>
   );
 }
