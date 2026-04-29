@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { z } from "zod";
+import { safeEmbedLogo } from "./embed-logo.server";
 
 const Input = z.object({
   fromISO: z.string(),
