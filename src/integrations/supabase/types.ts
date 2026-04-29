@@ -236,6 +236,7 @@ export type Database = {
           email: string | null
           id: string
           location: string | null
+          logo_url: string | null
           num_employees: string | null
           onboarding_completed: boolean
           phone: string | null
@@ -257,6 +258,7 @@ export type Database = {
           email?: string | null
           id: string
           location?: string | null
+          logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
           phone?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           email?: string | null
           id?: string
           location?: string | null
+          logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
           phone?: string | null
@@ -392,6 +395,87 @@ export type Database = {
           total?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      staff_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          business_owner_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          expires_at: string
+          id: string
+          permissions: Json
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          business_owner_id: string
+          created_at?: string
+          display_name?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          permissions?: Json
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          business_owner_id?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          permissions?: Json
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_members: {
+        Row: {
+          active: boolean
+          business_owner_id: string
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          permissions: Json
+          staff_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          business_owner_id: string
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          permissions?: Json
+          staff_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          business_owner_id?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          permissions?: Json
+          staff_user_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
