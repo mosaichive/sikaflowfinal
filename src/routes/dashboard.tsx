@@ -136,6 +136,7 @@ function DashboardPage() {
                 <AlertTriangle className="h-3.5 w-3.5" /> Trial ended
               </span>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate({ to: "/" }); }}>
               <LogOut className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Log out</span>
             </Button>
