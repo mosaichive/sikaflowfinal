@@ -210,7 +210,31 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Business profile */}
+        {/* Profile photo */}
+        <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="text-sm font-semibold">Profile photo</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Your personal avatar shown in the dashboard. PNG or JPG, under 2MB.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border bg-background">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <ImageIcon className="h-7 w-7 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+              <Button type="button" variant="outline" disabled={uploadingAvatar} onClick={() => avatarRef.current?.click()}>
+                {uploadingAvatar ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {profile.avatar_url ? "Change photo" : "Upload photo"}
+              </Button>
+              {profile.avatar_url && (
+                <Button type="button" variant="ghost" onClick={removeAvatar}>Remove</Button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={save} className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h3 className="text-sm font-semibold">Business profile</h3>
           <div className="grid gap-3 sm:grid-cols-2">
