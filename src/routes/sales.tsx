@@ -153,13 +153,14 @@ function SalesPage() {
     setSaving(false);
   }
 
-  async function downloadInvoice(saleId: string) {
-    try {
-      const res = await generate({ data: { saleId } });
-      downloadBase64Pdf(res.base64, res.filename);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not generate invoice");
-    }
+  async function deleteSale(saleId: string) {
+    if (!confirm("Delete this sale? Stock will be restored.")) return;
+    // Delete sale_items first so the trigger restores stock, then delete the sale.
+    const { error: itemErr } = await supabase.from("sale_items").delete().eq("sale_id", saleId);
+    if (itemErr) return toast.error(itemErr.message);
+    const { error } = await supabase.from("sales").delete().eq("id", saleId);
+    if (error) return toast.error(error.message);
+    toast.success("Sale deleted · stock restored");
   }
 
   if (!ready) return <AppShell><PageLoader /></AppShell>;
