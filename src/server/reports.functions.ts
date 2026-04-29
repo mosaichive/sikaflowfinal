@@ -214,6 +214,26 @@ export const generateReportPdf = createServerFn({ method: "POST" })
       }
     }
 
+    // Savings breakdown
+    sy -= 10;
+    if (sy < 140) sy = addPage();
+    page.drawText("SAVINGS BY TYPE", { x: 40, y: sy, size: 10, font: bold, color: muted }); sy -= 14;
+    if (savingsMap.size === 0) {
+      page.drawText("No savings recorded in this period.", { x: 40, y: sy, size: 9, font, color: muted }); sy -= 12;
+    } else {
+      for (const [k, v] of savingsMap) {
+        if (sy < 80) sy = addPage();
+        page.drawText(savingsLabel[k] || k, { x: 40, y: sy, size: 10, font, color: ink });
+        page.drawText(fmt(v), { x: 490, y: sy, size: 10, font: bold, color: ink });
+        sy -= 14;
+      }
+      page.drawLine({ start: { x: 40, y: sy + 4 }, end: { x: 555, y: sy + 4 }, thickness: 0.4, color: line });
+      sy -= 6;
+      page.drawText("Total savings", { x: 40, y: sy, size: 10, font: bold, color: ink });
+      page.drawText(fmt(totalSavings), { x: 490, y: sy, size: 10, font: bold, color: primary });
+      sy -= 14;
+    }
+
     // Footer on every page
     const pages = pdf.getPages();
     pages.forEach((p, i) => {
@@ -227,6 +247,6 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     return {
       filename: `${safeName}-${rangeLabel.toLowerCase().replace(/\s+/g, "-")}.pdf`,
       base64: Buffer.from(bytes).toString("base64"),
-      stats: { revenue, cost, totalExp, otherInc, grossProfit, netProfit, txCount, avgSale, totalDiscount },
+      stats: { revenue, cost, totalExp, otherInc, totalSavings, availableMoney, grossProfit, netProfit, txCount, avgSale, totalDiscount },
     };
   });
