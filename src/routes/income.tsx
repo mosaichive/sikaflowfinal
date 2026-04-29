@@ -26,6 +26,7 @@ function IncomePage() {
   const [items, setItems] = useState<Income[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ source: "", amount: "", note: "" });
+  const { filter, setFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
