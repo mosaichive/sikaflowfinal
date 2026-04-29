@@ -90,7 +90,12 @@ function ExpensesPage() {
                     <td className="px-4 py-3 text-muted-foreground">{i.note ?? "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground">{new Date(i.expense_date).toLocaleDateString()}</td>
                     <td className="px-4 py-3 font-semibold text-destructive">{formatCurrency(Number(i.amount))}</td>
-                    <td className="px-4 py-3 text-right"><Button size="icon" variant="ghost" onClick={() => remove(i.id)}><Trash2 className="h-4 w-4" /></Button></td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => setEditId(i.id)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(i.id)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
