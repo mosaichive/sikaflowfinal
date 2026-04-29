@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SavingsRouteImport } from './routes/savings'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -40,6 +41,11 @@ const StaffRoute = StaffRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SavingsRoute = SavingsRouteImport.update({
+  id: '/savings',
+  path: '/savings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SalesRoute = SalesRouteImport.update({
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
+  '/savings': typeof SavingsRoute
   '/settings': typeof SettingsRoute
   '/staff': typeof StaffRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
+  '/savings': typeof SavingsRoute
   '/settings': typeof SettingsRoute
   '/staff': typeof StaffRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
+  '/savings': typeof SavingsRoute
   '/settings': typeof SettingsRoute
   '/staff': typeof StaffRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
@@ -234,6 +243,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reports'
     | '/sales'
+    | '/savings'
     | '/settings'
     | '/staff'
     | '/admin/announcements'
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reports'
     | '/sales'
+    | '/savings'
     | '/settings'
     | '/staff'
     | '/admin/announcements'
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reports'
     | '/sales'
+    | '/savings'
     | '/settings'
     | '/staff'
     | '/admin/announcements'
@@ -307,6 +319,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
   SalesRoute: typeof SalesRoute
+  SavingsRoute: typeof SavingsRoute
   SettingsRoute: typeof SettingsRoute
   StaffRoute: typeof StaffRoute
   InviteTokenRoute: typeof InviteTokenRoute
@@ -326,6 +339,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/savings': {
+      id: '/savings'
+      path: '/savings'
+      fullPath: '/savings'
+      preLoaderRoute: typeof SavingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sales': {
@@ -503,6 +523,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
+  SavingsRoute: SavingsRoute,
   SettingsRoute: SettingsRoute,
   StaffRoute: StaffRoute,
   InviteTokenRoute: InviteTokenRoute,

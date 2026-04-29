@@ -27,6 +27,7 @@ type Product = { id: string; name: string; price: number; cost: number; stock: n
 type Sale = { id: string; total: number; cost_total: number; payment_method: string; customer_name: string | null; sale_date: string };
 type Expense = { id: string; amount: number; category: string; note: string | null; expense_date: string };
 type Income = { id: string; amount: number; source: string; income_date: string };
+type Saving = { id: string; amount: number; savings_date: string };
 
 function DashboardPage() {
   const { user, loading } = useAuth();
@@ -36,21 +37,24 @@ function DashboardPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
+  const [savings, setSavings] = useState<Saving[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const { filter, setFilter, range } = useDateFilter();
 
   const loadAll = useCallback(async (uid: string) => {
-    const [{ data: prods }, { data: sls }, { data: exps }, { data: inc }] = await Promise.all([
+    const [{ data: prods }, { data: sls }, { data: exps }, { data: inc }, { data: sav }] = await Promise.all([
       supabase.from("products").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
       supabase.from("sales").select("*").eq("user_id", uid).order("sale_date", { ascending: false }).limit(500),
       supabase.from("expenses").select("*").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
       supabase.from("other_income").select("*").eq("user_id", uid).order("income_date", { ascending: false }).limit(500),
+      supabase.from("savings").select("id,amount,savings_date").eq("user_id", uid).order("savings_date", { ascending: false }).limit(500),
     ]);
     setProducts((prods as Product[]) ?? []);
     setSales((sls as Sale[]) ?? []);
     setExpenses((exps as Expense[]) ?? []);
     setIncome((inc as Income[]) ?? []);
+    setSavings((sav as Saving[]) ?? []);
     setLoaded(true);
   }, []);
 
@@ -83,6 +87,7 @@ function DashboardPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "other_income", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "savings", filter: `user_id=eq.${user.id}` }, () => loadAll(user.id))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user, loadAll]);
@@ -93,6 +98,7 @@ function DashboardPage() {
   const fSales = useMemo(() => sales.filter((s) => inRange(s.sale_date, range)), [sales, range]);
   const fExpenses = useMemo(() => expenses.filter((e) => inRange(e.expense_date, range)), [expenses, range]);
   const fIncome = useMemo(() => income.filter((i) => inRange(i.income_date, range)), [income, range]);
+  const fSavings = useMemo(() => savings.filter((s) => inRange(s.savings_date, range)), [savings, range]);
 
   // Derived stats
   const stats = useMemo(() => {
@@ -103,9 +109,10 @@ function DashboardPage() {
     const totalCost = fSales.reduce((sum, s) => sum + Number(s.cost_total), 0);
     const totalExpenses = fExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalIncome = fIncome.reduce((sum, i) => sum + Number(i.amount), 0);
+    const totalSavings = fSavings.reduce((sum, s) => sum + Number(s.amount), 0);
     const profit = totalRevenue - totalCost - totalExpenses + totalIncome;
-    // Available Money = Sales + Other Income - Expenses
-    const cashAvailable = totalRevenue + totalIncome - totalExpenses;
+    // Available Money = Sales + Other Income − Expenses − Savings
+    const cashAvailable = totalRevenue + totalIncome - totalExpenses - totalSavings;
     const stockValue = products.reduce((sum, p) => sum + Number(p.price) * Number(p.stock), 0);
     const stockUnits = products.reduce((sum, p) => sum + Number(p.stock), 0);
 
@@ -120,8 +127,8 @@ function DashboardPage() {
       series.push({ label: d.toLocaleDateString(undefined, { weekday: "short" }), value: Number(value.toFixed(2)) });
     }
 
-    return { dailySales, totalRevenue, profit, cashAvailable, stockValue, stockUnits, totalExpenses, totalIncome, series, todaysCount: todaysSales.length };
-  }, [sales, products, fSales, fExpenses, fIncome]);
+    return { dailySales, totalRevenue, profit, cashAvailable, stockValue, stockUnits, totalExpenses, totalIncome, totalSavings, series, todaysCount: todaysSales.length };
+  }, [sales, products, fSales, fExpenses, fIncome, fSavings]);
 
   if (loading || !loaded || !profile) {
     return (
