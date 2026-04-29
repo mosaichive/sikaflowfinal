@@ -25,8 +25,6 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-  return { from: f, to: t, label: "Custom report" };
-}
 
 type StockMove = { product_id: string; change: number; reason: string; created_at: string };
 
