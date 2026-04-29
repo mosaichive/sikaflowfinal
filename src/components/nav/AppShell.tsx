@@ -55,6 +55,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SidebarFooter profile={profile} onSignOut={handleSignOut} />
       </aside>
 
+      {/* Desktop top bar (with profile pill) */}
+      <header className="sticky top-0 z-20 hidden h-14 items-center justify-end gap-3 border-b border-border bg-card/80 px-6 backdrop-blur md:flex md:pl-64">
+        <ThemeToggle />
+        <ProfilePill profile={profile} />
+      </header>
+
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-card/90 px-4 backdrop-blur md:hidden">
         <Sheet>
@@ -75,18 +81,42 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SheetContent>
         </Sheet>
         <Logo />
-        <ThemeToggle />
+        <ProfilePill profile={profile} compact />
       </header>
 
       {/* Main content */}
       <div className="md:pl-64">
-        <main className="min-h-[calc(100vh-3.5rem)] pb-24 md:min-h-screen md:pb-8">{children}</main>
+        <main className="min-h-[calc(100vh-3.5rem)] pb-24 md:min-h-[calc(100vh-3.5rem)] md:pb-8">{children}</main>
       </div>
 
       {/* Mobile bottom nav */}
       <MobileBottomNav onSignOut={handleSignOut} profile={profile} />
     </div>
   );
+}
+
+function ProfilePill({ profile, compact = false }: { profile: Profile | null; compact?: boolean }) {
+  const initials = getInitials(profile?.business_name || profile?.email || "U");
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-background px-2 py-1">
+      {profile?.logo_url && (
+        <img src={profile.logo_url} alt="Business logo" className="h-7 w-7 rounded-md object-contain" />
+      )}
+      {!compact && (
+        <span className="hidden max-w-[140px] truncate text-sm font-medium sm:inline">
+          {profile?.business_name || "Your business"}
+        </span>
+      )}
+      <Avatar className="h-7 w-7">
+        {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="Profile" />}
+        <AvatarFallback className="bg-primary text-[10px] font-semibold text-primary-foreground">{initials}</AvatarFallback>
+      </Avatar>
+    </div>
+  );
+}
+
+function getInitials(s: string) {
+  return s.split(/[\s@.]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
 
 function SidebarLinks({ items }: { items: NavItem[] }) {
