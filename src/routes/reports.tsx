@@ -14,6 +14,8 @@ import { generateReportPdf } from "@/server/reports.functions";
 import { downloadPdfFromServerResult, defaultPdfName } from "@/lib/download";
 import { toast } from "sonner";
 import { Download, Loader2 } from "lucide-react";
+import { DateFilterBar } from "@/components/DateFilterBar";
+import { useDateFilter, getRange } from "@/lib/date-filter";
 
 type Sale = { id: string; total: number; cost_total: number; discount: number; payment_method: string; sale_date: string };
 type SaleItem = { product_name: string; quantity: number; unit_price: number; unit_cost: number; sale_id: string };
