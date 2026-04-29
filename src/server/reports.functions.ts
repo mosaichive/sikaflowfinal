@@ -44,10 +44,20 @@ export const generateReportPdf = createServerFn({ method: "POST" })
     const totalDiscount = (sales ?? []).reduce((s, x) => s + Number(x.discount || 0), 0);
     const totalExp = (expenses ?? []).reduce((s, x) => s + Number(x.amount), 0);
     const otherInc = (income ?? []).reduce((s, x) => s + Number(x.amount), 0);
+    const totalSavings = (savings ?? []).reduce((s, x) => s + Number(x.amount), 0);
     const grossProfit = revenue - cost;
     const netProfit = grossProfit - totalExp + otherInc;
+    const availableMoney = revenue + otherInc - totalExp - totalSavings;
     const txCount = (sales ?? []).length;
     const avgSale = txCount > 0 ? revenue / txCount : 0;
+
+    // Savings by type
+    const savingsMap = new Map<string, number>();
+    for (const s of savings ?? []) {
+      const k = String(s.type || "other");
+      savingsMap.set(k, (savingsMap.get(k) || 0) + Number(s.amount));
+    }
+    const savingsLabel: Record<string, string> = { bank: "Bank", mobile_money: "Mobile Money", susu: "Susu" };
 
     // Best sellers
     const productMap = new Map<string, { qty: number; revenue: number; profit: number }>();
