@@ -37,9 +37,7 @@ function DashboardPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [openSale, setOpenSale] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
-  const [openExpense, setOpenExpense] = useState(false);
   const { filter, setFilter, range } = useDateFilter();
 
   const loadAll = useCallback(async (uid: string) => {
