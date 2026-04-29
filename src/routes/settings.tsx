@@ -39,6 +39,8 @@ function SettingsPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
+  const [editorSrc, setEditorSrc] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<CropMode>("logo");
 
   // Email & password forms
   const [newEmail, setNewEmail] = useState("");
