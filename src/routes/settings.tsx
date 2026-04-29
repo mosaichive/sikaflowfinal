@@ -48,7 +48,7 @@ function SettingsPage() {
   useEffect(() => {
     if (!ready || !user) return;
     supabase.from("profiles")
-      .select("business_name,phone,email,business_type,num_employees,location,role,trial_end_date,currency,logo_url")
+      .select("business_name,phone,email,business_type,num_employees,location,role,trial_end_date,currency,logo_url,avatar_url")
       .eq("id", user.id).maybeSingle()
       .then(({ data }) => setProfile(data as Profile));
   }, [ready, user]);
