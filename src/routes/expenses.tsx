@@ -25,6 +25,7 @@ function ExpensesPage() {
   const [items, setItems] = useState<Expense[]>([]);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("All");
+  const { filter: dateFilter, setFilter: setDateFilter, range } = useDateFilter();
 
   async function load() {
     if (!user) return;
@@ -40,7 +41,11 @@ function ExpensesPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]); // eslint-disable-line
 
-  const filtered = filter === "All" ? items : items.filter((i) => i.category === filter);
+  const filtered = useMemo(() => {
+    return items
+      .filter((i) => filter === "All" || i.category === filter)
+      .filter((i) => inRange(i.expense_date, range));
+  }, [items, filter, range]);
   const total = useMemo(() => filtered.reduce((s, i) => s + Number(i.amount), 0), [filtered]);
 
   async function remove(id: string) {
