@@ -14,6 +14,8 @@ import { trialDaysLeft, isTrialActive } from "@/lib/trial";
 import { toast } from "sonner";
 import { PageHeader } from "./products";
 import { CURRENCIES } from "@/lib/constants";
+import { ImageEditorDialog, type CropMode } from "@/components/ImageEditor";
+import { readFileAsDataUrl } from "@/lib/crop-image";
 
 type Profile = {
   business_name: string | null; phone: string | null; email: string | null;
