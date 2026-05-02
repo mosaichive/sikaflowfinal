@@ -190,14 +190,11 @@ export default function SavingsInvestmentsPage() {
       toast({ title: 'Insufficient available funds', description: `You only have ${formatCurrency(availableCash)} available. Cannot invest ${formatCurrency(investForm.amount)}.`, variant: 'destructive' });
       return;
     }
-    if (!businessId) return;
-    const payload = {
-      business_id: businessId,
-      investment_name: investForm.investment_name, amount: investForm.amount,
+    const payload: any = {
+      user_id: user.id,
+      name: investForm.investment_name, amount: investForm.amount,
       investment_date: new Date(investForm.investment_date).toISOString(),
-      expected_return: investForm.expected_return, duration: investForm.duration,
       status: investForm.status, note: investForm.note,
-      bank_account_id: investForm.bank_account_id || null, reference: investForm.reference, recorded_by: user.id,
     };
     const { error } = editInvestId
       ? await supabase.from('investments').update(payload).eq('id', editInvestId)
