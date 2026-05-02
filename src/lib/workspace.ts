@@ -922,17 +922,37 @@ export async function insertStockMovementCompat(
 export async function deleteStockMovementsBySourceCompat(sourceIds: string[]) {
   if (sourceIds.length === 0) return { deleted: false, skipped: false } as const;
 
-  const { error } = await supabase
-    .from('stock_movements' as any)
-    .delete()
-    .in('source_id', sourceIds)
-    .eq('source_table', 'sale_items');
+  // The single-tenant schema uses `reference_id` + `reason` (not
+  // source_id/source_type). Match either column shape so we work against
+  // both schema variants.
+  const tryDelete = async (idColumn: 'reference_id' | 'source_id', reasonColumn: 'reason' | 'source_table', reasonValue: string) => {
+    return supabase
+      .from('stock_movements' as any)
+      .delete()
+      .in(idColumn, sourceIds)
+      .eq(reasonColumn, reasonValue);
+  };
+
+  // Try the actual schema first.
+  let { error } = await tryDelete('reference_id', 'reason', 'sold');
+  if (error && (isMissingColumnError(error, 'reference_id', 'stock_movements') || isMissingColumnError(error, 'reason', 'stock_movements'))) {
+    ({ error } = await tryDelete('source_id', 'source_table', 'sale_items'));
+  }
 
   if (!error) {
     return { deleted: true, skipped: false } as const;
   }
 
-  if (!isMissingTableError(error, 'stock_movements')) throw error;
+  if (!isMissingTableError(error, 'stock_movements')) {
+    // Don't crash sale deletion if the legacy column shape also doesn't match —
+    // log and skip so the sale itself can still be removed.
+    logSupabaseError('workspace.deleteStockMovementsBySourceCompat', error, {
+      table: 'stock_movements',
+      fallbackMode: 'skipOnSchemaMismatch',
+      sourceIds,
+    });
+    return { deleted: false, skipped: true } as const;
+  }
 
   logSupabaseError('workspace.deleteStockMovementsBySourceCompat', error, {
     table: 'stock_movements',
