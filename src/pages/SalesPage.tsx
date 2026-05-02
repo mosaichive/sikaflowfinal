@@ -26,6 +26,7 @@ import {
   deleteStockMovementsBySourceCompat,
   insertStockMovementCompat,
   insertSaleRecord,
+  insertSaleItemRecord,
   loadProductsCompat,
   logSupabaseError,
   updateSaleRecord,
