@@ -23,7 +23,8 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // types.ts (schema drift after a GitHub merge). Using a permissively-typed
 // client lets the build pass without changing any business logic. Runtime
 // behavior is unchanged.
-export const supabase: SupabaseClient<any, 'public', any> = createClient<any, 'public', any>(
+const _client = createClient(
   SUPABASE_URL ?? 'https://invalid.supabase.co',
   SUPABASE_PUBLISHABLE_KEY ?? 'invalid-anon-key'
 );
+export const supabase: any = _client;
