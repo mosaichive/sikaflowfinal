@@ -35,8 +35,12 @@ type CachedProductRow = {
   is_archived?: boolean | null;
 };
 
+// Use only columns that actually exist in the single-tenant products schema.
+// `quantity`/`cost_price`/`selling_price`/`reorder_level`/`business_id` are
+// remapped from `stock`/`cost`/`price`/`low_stock_threshold`/none in
+// normalizeProductRow().
 const STABLE_PRODUCT_SELECT =
-  'id,name,sku,category,quantity,cost_price,selling_price,reorder_level,image_url,business_id,created_at,updated_at';
+  'id,name,sku,category,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
