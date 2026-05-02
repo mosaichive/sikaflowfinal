@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const roles = ((data || []) as Array<{ role: AppRole }>).map((row) => row.role);
-    const priority: AppRole[] = ['super_admin', 'admin', 'manager', 'salesperson', 'distributor', 'staff'];
+    const priority: AppRole[] = ['super_admin', 'admin', 'business_owner', 'manager', 'salesperson', 'distributor', 'staff'];
     const nextRole = priority.find((candidate) => roles.includes(candidate)) || null;
     setRole(nextRole);
     return nextRole;
