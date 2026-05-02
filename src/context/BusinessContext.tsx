@@ -55,23 +55,44 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
       try {
         const db = supabase as any;
+        // The current schema is single-tenant: each user IS their own workspace.
+        // Read the business profile straight from the `profiles` row (matched
+        // by `id` = auth user id, since `profiles.id` is the PK in this schema).
         const { data: profile } = await db
           .from('profiles')
-          .select('business_id')
-          .eq('user_id', user.id)
+          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed')
+          .eq('id', user.id)
           .maybeSingle();
 
-        const bizId = (profile as any)?.business_id as string | undefined;
-        if (!bizId) {
+        if (!profile) {
           setBusiness(null);
           return;
         }
-        const { data: biz } = await db
-          .from('businesses')
-          .select('*')
-          .eq('id', bizId)
-          .maybeSingle();
-        setBusiness((biz as any) ?? null);
+
+        const p = profile as any;
+        // Treat the business as "set up" once a name has been saved during
+        // onboarding. Until then, leave `business` null so the setup dialog
+        // can prompt the user.
+        if (!p.business_name) {
+          setBusiness(null);
+          return;
+        }
+
+        setBusiness({
+          id: user.id,
+          name: p.business_name,
+          slug: null,
+          logo_light_url: p.logo_url ?? null,
+          logo_dark_url: p.logo_url ?? null,
+          email: user.email ?? null,
+          phone: p.phone ?? null,
+          location: p.location ?? null,
+          number_of_employees: null,
+          owner_user_id: user.id,
+          status: 'active',
+          email_verified: true,
+          phone_verified: false,
+        });
       } finally {
         setLoading(false);
         hasLoadedOnceRef.current = true;
