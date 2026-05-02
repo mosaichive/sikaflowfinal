@@ -112,8 +112,14 @@ function normalizeProductRow(row: Record<string, unknown>): CachedProductRow {
         : row.quantity !== undefined && row.quantity !== null
           ? Number(row.quantity)
           : Number(row.stock ?? 0),
-    cost_price: typeof row.cost_price === 'number' || typeof row.cost_price === 'string' ? row.cost_price : 0,
-    selling_price: typeof row.selling_price === 'number' || typeof row.selling_price === 'string' ? row.selling_price : 0,
+    cost_price:
+      row.cost_price !== undefined && row.cost_price !== null
+        ? row.cost_price as number | string
+        : (row.cost as number | string | undefined) ?? 0,
+    selling_price:
+      row.selling_price !== undefined && row.selling_price !== null
+        ? row.selling_price as number | string
+        : (row.price as number | string | undefined) ?? 0,
     reorder_level:
       typeof row.reorder_level === 'number' || typeof row.reorder_level === 'string'
         ? Number(row.reorder_level ?? 0)
