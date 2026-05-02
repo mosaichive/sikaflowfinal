@@ -580,14 +580,14 @@ export default function SalesPage() {
       const { data, error } = await supabase
         .from('sale_documents' as any)
         .upsert({
-          business_id: businessId,
+          user_id: user.id,
           sale_id: sale.id,
           kind,
           sale_date: sale.sale_date,
           payment_status: sale.payment_status,
-          amount_ghs: Number(sale.total),
-          amount_paid_ghs: Number(sale.amount_paid),
-          balance_ghs: Number(sale.balance),
+          amount_ghs: Number(sale.total ?? 0),
+          amount_paid_ghs: Number(sale.amount_paid ?? 0),
+          balance_ghs: Number(sale.balance ?? (Number(sale.total ?? 0) - Number(sale.amount_paid ?? 0))),
           customer_name: sale.customer_name || 'Walk-in',
           customer_phone: sale.customer_phone || '',
           seller_name: sale.staff_name || displayName || user.email || '',
