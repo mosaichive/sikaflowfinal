@@ -47,6 +47,7 @@ type RestockLike = {
   id?: string | null;
   total_cost?: NumberLike;
   status?: string | null;
+  is_opening_stock?: boolean | null;
 };
 
 export type FinancialSnapshot = {
@@ -181,7 +182,11 @@ export function calculateNegativeStockCount(products: ProductLike[]) {
 }
 
 export function calculateRestockSpending(rows: RestockLike[]) {
-  return rows.reduce((sum, row) => sum + toNumber(row.total_cost), 0);
+  return rows.reduce((sum, row) => {
+    if (isCancelledStatus(row.status)) return sum;
+    if (row.is_opening_stock === true) return sum;
+    return sum + toNumber(row.total_cost);
+  }, 0);
 }
 
 export function calculateFinancialSnapshot({

@@ -125,6 +125,7 @@ export default function InventoryPage() {
     selling_price: '0',
     payment_method: PAYMENT_METHODS[0].value as string,
     description: '',
+    is_opening_stock: false,
   });
 
   const canManage = isAdmin || isManager;
@@ -344,6 +345,7 @@ export default function InventoryPage() {
       selling_price: '0',
       payment_method: PAYMENT_METHODS[0].value,
       description: '',
+      is_opening_stock: false,
     });
     setEditingRestock(null);
   };
@@ -364,6 +366,7 @@ export default function InventoryPage() {
       selling_price: String(Number(product?.selling_price || 0)),
       payment_method: (restock.payment_method || PAYMENT_METHODS[0].value) as typeof PAYMENT_METHODS[number]['value'],
       description: restock.note || restock.reference || '',
+      is_opening_stock: Boolean((restock as any).is_opening_stock),
     });
     setDialogOpen(true);
   };
@@ -492,6 +495,7 @@ export default function InventoryPage() {
         note: form.description,
         reference: form.description || null,
         status: 'active',
+        is_opening_stock: form.is_opening_stock,
       };
 
       const savedRestock = editingRestock
@@ -696,12 +700,27 @@ export default function InventoryPage() {
                   <Label>Note / Reference (optional)</Label>
                   <Textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
                 </div>
+                <div className="md:col-span-2 flex items-start gap-2 rounded-2xl border border-border/60 bg-muted/20 p-3">
+                  <input
+                    id="is_opening_stock"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4"
+                    checked={form.is_opening_stock}
+                    onChange={(event) => setForm((current) => ({ ...current, is_opening_stock: event.target.checked }))}
+                  />
+                  <label htmlFor="is_opening_stock" className="text-sm">
+                    <span className="font-medium">This is opening stock</span>
+                    <p className="text-xs text-muted-foreground">
+                      Opening stock adds quantity but does NOT deduct from Available Business Money. Leave unchecked for normal restocks.
+                    </p>
+                  </label>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
                 <p className="text-sm font-medium">Restock money logic</p>
                 <p className="text-xs text-muted-foreground">
-                  Restocks are automatically deducted from Available Business Money. Opening Stock is not deducted.
+                  Normal restocks are automatically deducted from Available Business Money. Opening Stock entries are not deducted.
                 </p>
               </div>
 

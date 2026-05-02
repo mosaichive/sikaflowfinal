@@ -667,7 +667,7 @@ export async function insertRestockRecord(
   return insertWithOptionalColumnFallback({
     table: 'restocks',
     payload,
-    optionalColumns: ['status', 'business_id'],
+    optionalColumns: ['status', 'business_id', 'is_opening_stock'],
     context: 'workspace.insertRestock',
   });
 }
@@ -681,7 +681,7 @@ export async function updateRestockRecord(
     matchColumn: 'id',
     matchValue: restockId,
     payload,
-    optionalColumns: ['status', 'business_id'],
+    optionalColumns: ['status', 'business_id', 'is_opening_stock'],
     context: 'workspace.updateRestock',
   });
 }
