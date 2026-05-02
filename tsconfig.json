@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "allowJs": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
