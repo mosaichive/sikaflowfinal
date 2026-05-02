@@ -232,7 +232,6 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
           display_name: displayName || user.email || trimmedBusinessName,
           phone: trimmedPhone,
           email_verified: true,
-          onboarding_completed: false,
         });
 
       if (hasOpeningStock === 'yes' && activeProducts.length > 0) {
