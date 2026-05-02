@@ -124,7 +124,7 @@ export function calculateCOGS(sales: SaleLike[], saleItems: SaleItemLike[]) {
     const sale = item.sale_id ? saleMap.get(item.sale_id) : undefined;
     if (!sale || !isRecognizedSale(sale)) return sum;
     const quantity = Math.max(0, toNumber(item.quantity));
-    const costPrice = toNumber(item.cost_price);
+    const costPrice = toNumber(item.unit_cost ?? item.cost_price);
     return sum + costPrice * quantity;
   }, 0);
 }
