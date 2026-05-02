@@ -69,7 +69,12 @@ function ProtectedRoute({
   }
   if (!user) return <Navigate to="/sign-in" replace state={{ from: location.pathname + location.search }} />;
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />;
-  if (!business && !allowOnboarding) return <Navigate to="/dashboard" replace />;
+  // Only force users without a business back to /dashboard if they're not already there.
+  // /dashboard hosts the first-time setup dialog. Avoid bouncing on every nav while
+  // business data is still resolving by checking the current path.
+  if (!business && !allowOnboarding && location.pathname !== '/dashboard') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   // Subscription gating: only force billing if a subscription row exists AND access is truly denied.
   // This prevents a transient redirect to /billing while data is still resolving or for brand-new accounts.
