@@ -693,12 +693,26 @@ export type Database = {
     Functions: {
       accept_staff_invite: { Args: { _token: string }; Returns: Json }
       admin_platform_stats: { Args: never; Returns: Json }
+      get_table_columns: {
+        Args: { _table_name: string }
+        Returns: {
+          column_name: string
+          data_type: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      recompute_product_stock: {
+        Args: never
+        Returns: {
+          new_stock: number
+          product_id: string
+        }[]
       }
     }
     Enums: {

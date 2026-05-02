@@ -18,7 +18,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
-import { AlertTriangle, Boxes, PackagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Boxes, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { recomputeProductStock } from '@/lib/sale-items-schema';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   insertRestockRecord,
@@ -127,6 +128,7 @@ export default function InventoryPage() {
   });
 
   const canManage = isAdmin || isManager;
+  const [recomputing, setRecomputing] = useState(false);
 
   const load = useCallback(async () => {
     const [productsRes, movementsRes, restocksRes, expensesRes] = await Promise.allSettled([
@@ -164,6 +166,28 @@ export default function InventoryPage() {
       setExpenses([]);
     }
   }, [businessId]);
+
+  const handleRecomputeStock = useCallback(async () => {
+    setRecomputing(true);
+    try {
+      const result = await recomputeProductStock();
+      if (!result.ok) {
+        toast({
+          title: 'Could not recalculate stock',
+          description: result.error ?? 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({
+        title: 'Stock recalculated',
+        description: `${result.updated.length} product(s) updated from stock movements.`,
+      });
+      await load();
+    } finally {
+      setRecomputing(false);
+    }
+  }, [toast, load]);
 
   useEffect(() => {
     void load();
@@ -591,7 +615,20 @@ export default function InventoryPage() {
               <p className="mt-1 text-lg font-semibold">{financialsLoading ? 'Loading…' : formatCurrency(financials.stockValue)}</p>
             </div>
             {canManage ? (
-              <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
+              <div className="flex flex-wrap gap-2">
+                {isAdmin ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRecomputeStock}
+                    disabled={recomputing}
+                    title="Rebuild each product's available stock from the stock_movements ledger."
+                  >
+                    <RefreshCcw className={`mr-2 h-4 w-4 ${recomputing ? 'animate-spin' : ''}`} />
+                    {recomputing ? 'Recalculating…' : 'Recalculate Stock'}
+                  </Button>
+                ) : null}
+                <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
+              </div>
             ) : null}
           </div>
         </section>

@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SaleDocumentViewerDialog } from '@/components/sales/SaleDocumentViewerDialog';
 import { isNegativeStockSale } from '@/lib/sales-inventory';
+import { validateSaleItemPayload, recomputeProductStock } from '@/lib/sale-items-schema';
 import {
   deleteStockMovementsBySourceCompat,
   insertStockMovementCompat,
@@ -269,7 +270,7 @@ export default function SalesPage() {
         cost_total: costPrice * quantity,
       });
 
-      const saleItem = await insertSaleItemRecord({
+      const saleItemPayload = {
         user_id: user.id,
         business_id: businessId,
         sale_id: sale.id,
@@ -283,7 +284,17 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      });
+      };
+      const validation = validateSaleItemPayload(saleItemPayload);
+      if (validation.ok === false) {
+        toast({
+          title: 'Invalid sale item',
+          description: validation.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const saleItem = await insertSaleItemRecord(saleItemPayload);
 
       await updateProductQuantity(selectedProduct.id, Number(selectedProduct.quantity ?? 0) - quantity);
 
@@ -398,7 +409,7 @@ export default function SalesPage() {
       });
 
       // 3. Insert new sale_items (triggers stock deduction)
-      const saleItem = await insertSaleItemRecord({
+      const editSaleItemPayload = {
         user_id: user.id,
         business_id: businessId!,
         sale_id: editSaleId,
@@ -412,7 +423,17 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      });
+      };
+      const editValidation = validateSaleItemPayload(editSaleItemPayload);
+      if (editValidation.ok === false) {
+        toast({
+          title: 'Invalid sale item',
+          description: editValidation.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const saleItem = await insertSaleItemRecord(editSaleItemPayload);
 
       await createSaleMovement({
         saleItemId: saleItem.id,
