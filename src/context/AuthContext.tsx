@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 
-export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor';
+export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor' | 'business_owner';
 
 interface ProfileData {
   display_name: string;
@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const roles = ((data || []) as Array<{ role: AppRole }>).map((row) => row.role);
-    const priority: AppRole[] = ['super_admin', 'admin', 'manager', 'salesperson', 'distributor', 'staff'];
+    const priority: AppRole[] = ['super_admin', 'admin', 'business_owner', 'manager', 'salesperson', 'distributor', 'staff'];
     const nextRole = priority.find((candidate) => roles.includes(candidate)) || null;
     setRole(nextRole);
     return nextRole;
@@ -257,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!user?.id) return;
         await Promise.all([fetchProfile(user.id), fetchRole(user.id)]);
       },
-      isAdmin: role === 'admin',
+      isAdmin: role === 'admin' || role === 'business_owner',
       isManager: role === 'manager',
       isSalesperson: role === 'salesperson',
       isDistributor: role === 'distributor',
