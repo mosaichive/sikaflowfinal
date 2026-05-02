@@ -228,8 +228,9 @@ export function saleDocumentLabel(kind: SaleDocumentKind) {
   return kind === 'invoice' ? 'Invoice' : 'Receipt';
 }
 
-export function salePaymentLabel(status: SalePaymentStatus) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+export function salePaymentLabel(status: SalePaymentStatus | null | undefined) {
+  const safe = (status ?? '').toString();
+  return safe ? safe.charAt(0).toUpperCase() + safe.slice(1) : '—';
 }
 
 export function buildSaleDocumentSnapshot({
