@@ -421,10 +421,7 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
               </div>
             </div>
           )}
-          {false && (
-              </div>
-            </div>
-          )}
+
 
           {currentStep === 'opening_stock' && (
             <div className="space-y-4">
