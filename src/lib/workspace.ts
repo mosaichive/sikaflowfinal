@@ -962,7 +962,16 @@ export async function ensureUserBusinessWorkspace({
     _logo_dark_url: '',
   });
 
-  if (error) throw error;
-  if (!data) throw new Error('Business setup did not return a workspace id.');
+  if (error) {
+    if (isMissingFunctionError(error)) {
+      // Single-tenant fallback: the user IS their own workspace.
+      logSupabaseError('workspace.createBusinessFallback', error, { userId: user.id });
+      return ensureMembership(user.id);
+    }
+    throw error;
+  }
+  if (!data) {
+    return ensureMembership(user.id);
+  }
   return ensureMembership(data as string);
 }
