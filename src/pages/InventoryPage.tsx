@@ -86,6 +86,18 @@ type InventoryHistoryRow = {
   editableRestock: RestockRow | null;
 };
 
+type ExpenseRow = Record<string, any>;
+
+function getErrorMessage(error: unknown, fallback = 'Something went wrong.') {
+  if (error instanceof Error) return error.message || fallback;
+  if (typeof error === 'string') return error || fallback;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const m = (error as any).message;
+    return typeof m === 'string' && m ? m : fallback;
+  }
+  return fallback;
+}
+
 function extractRestockExpenseId(description: string | null | undefined) {
   const match = String(description ?? '').match(/\[RESTOCK:([a-f0-9-]+)\]/i);
   return match?.[1] ?? null;
@@ -110,7 +122,7 @@ export default function InventoryPage() {
     quantity: '1',
     unit_cost: '0',
     selling_price: '0',
-    payment_method: PAYMENT_METHODS[0].value,
+    payment_method: PAYMENT_METHODS[0].value as string,
     description: '',
   });
 
