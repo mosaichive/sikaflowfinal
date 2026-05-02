@@ -175,11 +175,11 @@ export default function SettingsPage() {
   const logAudit = async (action: string, details?: string) => {
     if (!user) return;
     await supabase.from('audit_log').insert({
+      user_id: user.id,
       action,
       details: details || null,
       performed_by: user.id,
       performed_by_name: displayName || user.email || '',
-      business_id: businessId,
     } as any);
   };
 
@@ -187,12 +187,13 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     setProfileSaving(true);
+    // profiles PK is `id` (= auth user id) in this schema, not `user_id`.
     const { error } = await supabase.from('profiles').update({
       display_name: profileForm.display_name,
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-    } as any).eq('user_id', user.id);
+    } as any).eq('id', user.id);
     if (error) {
       toast({ title: 'Error saving profile', description: error.message, variant: 'destructive' });
     } else {
@@ -217,7 +218,6 @@ export default function SettingsPage() {
     }
     setCropperSrc(URL.createObjectURL(file));
     setCropperOpen(true);
-    // Reset file input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -232,16 +232,16 @@ export default function SettingsPage() {
     if (!avatarFile || !user) return;
     setAvatarUploading(true);
     const ext = avatarFile.name.split('.').pop();
-    const path = `avatars/${user.id}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('product-images').upload(path, avatarFile, { upsert: true });
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true });
     if (upErr) {
       toast({ title: 'Upload failed', description: upErr.message, variant: 'destructive' });
       setAvatarUploading(false);
       return;
     }
-    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
     const avatarUrlNew = urlData.publicUrl + '?t=' + Date.now();
-    await supabase.from('profiles').update({ avatar_url: avatarUrlNew }).eq('user_id', user.id);
+    await supabase.from('profiles').update({ avatar_url: avatarUrlNew } as any).eq('id', user.id);
     toast({ title: 'Profile photo updated' });
     setAvatarFile(null); setAvatarPreview(null);
     await refreshProfile();
@@ -250,10 +250,11 @@ export default function SettingsPage() {
 
   const handleRemoveAvatar = async () => {
     if (!user) return;
-    await supabase.from('profiles').update({ avatar_url: '' }).eq('user_id', user.id);
+    await supabase.from('profiles').update({ avatar_url: '' } as any).eq('id', user.id);
     toast({ title: 'Profile photo removed' });
     await refreshProfile();
   };
+
 
   const handleChangePassword = async () => {
     const pwErrors = validatePassword(newPassword);
@@ -499,19 +500,22 @@ export default function SettingsPage() {
 
   const handleSystemReset = async () => {
     if (resetInput !== resetConfirmText) return;
-    if (!businessId) return;
+    if (!user) return;
     setResetting(true);
     try {
-      // Delete sale_items first (FK to sales). All scoped to current business only.
-      await supabase.from('sale_items').delete().eq('business_id', businessId);
-      await supabase.from('sales').delete().eq('business_id', businessId);
-      await supabase.from('restocks').delete().eq('business_id', businessId);
-      await supabase.from('expenses').delete().eq('business_id', businessId);
-      await supabase.from('savings').delete().eq('business_id', businessId);
-      await supabase.from('investments').delete().eq('business_id', businessId);
-      await supabase.from('investor_funding').delete().eq('business_id', businessId);
-      await supabase.from('products').delete().eq('business_id', businessId);
-      await supabase.from('customers').delete().eq('business_id', businessId);
+      // Single-tenant schema: every row is scoped by user_id via RLS.
+      const uid = user.id;
+      // Delete sale_items first (FK to sales).
+      await supabase.from('sale_items').delete().eq('user_id', uid);
+      await supabase.from('sales').delete().eq('user_id', uid);
+      await supabase.from('restocks').delete().eq('user_id', uid);
+      await supabase.from('expenses').delete().eq('user_id', uid);
+      await supabase.from('savings').delete().eq('user_id', uid);
+      await supabase.from('investments').delete().eq('user_id', uid);
+      await supabase.from('investor_funding').delete().eq('user_id', uid);
+      await supabase.from('other_income').delete().eq('user_id', uid);
+      await supabase.from('products').delete().eq('user_id', uid);
+      await supabase.from('customers').delete().eq('user_id', uid);
       await logAudit('system_reset', `Full reset for ${businessName}`);
       setResetConfirmOpen(false); setResetOpen(false); setResetInput('');
       toast({ title: 'System reset complete', description: `${businessName} is starting fresh.` });

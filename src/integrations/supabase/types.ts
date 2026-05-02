@@ -56,6 +56,81 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          id: string
+          performed_by: string | null
+          performed_by_name: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          performed_by?: string | null
+          performed_by_name?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          performed_by?: string | null
+          performed_by_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          account_type: string
+          bank_name: string
+          branch: string | null
+          created_at: string
+          id: string
+          mobile_money_name: string | null
+          mobile_money_number: string | null
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string
+          account_number?: string
+          account_type?: string
+          bank_name?: string
+          branch?: string | null
+          created_at?: string
+          id?: string
+          mobile_money_name?: string | null
+          mobile_money_number?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          account_type?: string
+          bank_name?: string
+          branch?: string | null
+          created_at?: string
+          id?: string
+          mobile_money_name?: string | null
+          mobile_money_number?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -92,31 +167,121 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          attachment_name: string | null
+          attachment_path: string | null
           category: string
           created_at: string
+          description: string | null
           expense_date: string
           id: string
           note: string | null
+          payment_method: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
           category?: string
           created_at?: string
+          description?: string | null
           expense_date?: string
           id?: string
           note?: string | null
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
           category?: string
           created_at?: string
+          description?: string | null
           expense_date?: string
           id?: string
           note?: string | null
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          investment_date: string
+          name: string
+          note: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          investment_date?: string
+          name?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          investment_date?: string
+          name?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investor_funding: {
+        Row: {
+          amount: number
+          created_at: string
+          date_received: string
+          id: string
+          investor_name: string
+          note: string | null
+          reference: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          date_received?: string
+          id?: string
+          investor_name?: string
+          note?: string | null
+          reference?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date_received?: string
+          id?: string
+          investor_name?: string
+          note?: string | null
+          reference?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -261,6 +426,7 @@ export type Database = {
           logo_url: string | null
           num_employees: string | null
           onboarding_completed: boolean
+          opening_cash_balance: number
           phone: string | null
           role: string | null
           subscription_end_date: string | null
@@ -284,6 +450,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          opening_cash_balance?: number
           phone?: string | null
           role?: string | null
           subscription_end_date?: string | null
@@ -307,6 +474,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          opening_cash_balance?: number
           phone?: string | null
           role?: string | null
           subscription_end_date?: string | null
@@ -326,6 +494,7 @@ export type Database = {
           cost_price_per_unit: number
           created_at: string
           id: string
+          is_opening_stock: boolean
           note: string | null
           payment_method: string
           product_id: string | null
@@ -345,6 +514,7 @@ export type Database = {
           cost_price_per_unit?: number
           created_at?: string
           id?: string
+          is_opening_stock?: boolean
           note?: string | null
           payment_method?: string
           product_id?: string | null
@@ -364,6 +534,7 @@ export type Database = {
           cost_price_per_unit?: number
           created_at?: string
           id?: string
+          is_opening_stock?: boolean
           note?: string | null
           payment_method?: string
           product_id?: string | null
@@ -549,36 +720,48 @@ export type Database = {
         Row: {
           account_name: string | null
           amount: number
+          bank_account_id: string | null
           created_at: string
           id: string
           institution: string | null
           note: string | null
+          recorded_by: string | null
+          reference: string | null
           savings_date: string
-          type: Database["public"]["Enums"]["savings_type"]
+          source: string | null
+          type: Database["public"]["Enums"]["savings_type"] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account_name?: string | null
           amount?: number
+          bank_account_id?: string | null
           created_at?: string
           id?: string
           institution?: string | null
           note?: string | null
+          recorded_by?: string | null
+          reference?: string | null
           savings_date?: string
-          type?: Database["public"]["Enums"]["savings_type"]
+          source?: string | null
+          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           account_name?: string | null
           amount?: number
+          bank_account_id?: string | null
           created_at?: string
           id?: string
           institution?: string | null
           note?: string | null
+          recorded_by?: string | null
+          reference?: string | null
           savings_date?: string
-          type?: Database["public"]["Enums"]["savings_type"]
+          source?: string | null
+          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
           user_id?: string
         }
