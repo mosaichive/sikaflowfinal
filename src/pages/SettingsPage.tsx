@@ -499,19 +499,22 @@ export default function SettingsPage() {
 
   const handleSystemReset = async () => {
     if (resetInput !== resetConfirmText) return;
-    if (!businessId) return;
+    if (!user) return;
     setResetting(true);
     try {
-      // Delete sale_items first (FK to sales). All scoped to current business only.
-      await supabase.from('sale_items').delete().eq('business_id', businessId);
-      await supabase.from('sales').delete().eq('business_id', businessId);
-      await supabase.from('restocks').delete().eq('business_id', businessId);
-      await supabase.from('expenses').delete().eq('business_id', businessId);
-      await supabase.from('savings').delete().eq('business_id', businessId);
-      await supabase.from('investments').delete().eq('business_id', businessId);
-      await supabase.from('investor_funding').delete().eq('business_id', businessId);
-      await supabase.from('products').delete().eq('business_id', businessId);
-      await supabase.from('customers').delete().eq('business_id', businessId);
+      // Single-tenant schema: every row is scoped by user_id via RLS.
+      const uid = user.id;
+      // Delete sale_items first (FK to sales).
+      await supabase.from('sale_items').delete().eq('user_id', uid);
+      await supabase.from('sales').delete().eq('user_id', uid);
+      await supabase.from('restocks').delete().eq('user_id', uid);
+      await supabase.from('expenses').delete().eq('user_id', uid);
+      await supabase.from('savings').delete().eq('user_id', uid);
+      await supabase.from('investments').delete().eq('user_id', uid);
+      await supabase.from('investor_funding').delete().eq('user_id', uid);
+      await supabase.from('other_income').delete().eq('user_id', uid);
+      await supabase.from('products').delete().eq('user_id', uid);
+      await supabase.from('customers').delete().eq('user_id', uid);
       await logAudit('system_reset', `Full reset for ${businessName}`);
       setResetConfirmOpen(false); setResetOpen(false); setResetInput('');
       toast({ title: 'System reset complete', description: `${businessName} is starting fresh.` });
