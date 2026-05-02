@@ -738,6 +738,31 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">Opening Cash Balance</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="text-xs text-muted-foreground">
+              The cash you started the business with. This is added to Available Business Money. Set it once.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="opening-cash">Opening Cash (GH₵)</Label>
+                <Input
+                  id="opening-cash"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={openingCash}
+                  onChange={(e) => setOpeningCash(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleSaveOpeningCash} disabled={openingCashSaving}>
+                {openingCashSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle className="text-base">Sales / Inventory Settings</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/20 p-4">
