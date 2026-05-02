@@ -519,6 +519,38 @@ export async function updateSaleRecord(
   });
 }
 
+export async function insertSaleItemRecord(
+  payload: Record<string, unknown>,
+) {
+  // Remap multi-tenant column names to the single-tenant schema's names so
+  // the insert succeeds whether the column is `unit_cost` or `cost_price`.
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.cost_price !== undefined && remapped.unit_cost === undefined) {
+    remapped.unit_cost = remapped.cost_price;
+  }
+  if (remapped.line_total !== undefined && remapped.total === undefined) {
+    remapped.total = remapped.line_total;
+  }
+  return insertWithOptionalColumnFallback({
+    table: 'sale_items',
+    payload: remapped,
+    // Columns that exist in some schema variants but not others — drop on
+    // missing-column errors so the insert doesn't fail on schema mismatch.
+    optionalColumns: [
+      'business_id',
+      'sku',
+      'size',
+      'color',
+      'cost_price',
+      'line_total',
+      'total',
+      'default_price',
+      'price_note',
+    ],
+    context: 'workspace.insertSaleItem',
+  });
+}
+
 export async function createProductRecord(
   payload: Record<string, unknown>,
 ) {

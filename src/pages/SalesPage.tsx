@@ -26,6 +26,7 @@ import {
   deleteStockMovementsBySourceCompat,
   insertStockMovementCompat,
   insertSaleRecord,
+  insertSaleItemRecord,
   loadProductsCompat,
   logSupabaseError,
   updateSaleRecord,
@@ -313,7 +314,7 @@ export default function SalesPage() {
         cost_total: costPrice * quantity,
       });
 
-      const { data: saleItem, error: itemErr } = await supabase.from('sale_items').insert({
+      const saleItem = await insertSaleItemRecord({
         user_id: user.id,
         business_id: businessId,
         sale_id: sale.id,
@@ -327,8 +328,7 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      }).select().single();
-      if (itemErr) throw itemErr;
+      });
 
       await updateProductQuantity(selectedProduct.id, Number(selectedProduct.quantity ?? 0) - quantity);
 
@@ -443,7 +443,7 @@ export default function SalesPage() {
       });
 
       // 3. Insert new sale_items (triggers stock deduction)
-      const { data: saleItem, error: itemErr } = await supabase.from('sale_items').insert({
+      const saleItem = await insertSaleItemRecord({
         user_id: user.id,
         business_id: businessId!,
         sale_id: editSaleId,
@@ -457,8 +457,7 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      }).select().single();
-      if (itemErr) throw itemErr;
+      });
 
       await createSaleMovement({
         saleItemId: saleItem.id,
