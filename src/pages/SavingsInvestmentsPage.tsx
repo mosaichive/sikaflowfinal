@@ -159,9 +159,8 @@ export default function SavingsInvestmentsPage() {
       toast({ title: 'Insufficient available funds', description: `You only have ${formatCurrency(availableCash)} available. Cannot set aside ${formatCurrency(savingForm.amount)}.`, variant: 'destructive' });
       return;
     }
-    if (!businessId) return;
-    const payload = {
-      business_id: businessId,
+    const payload: any = {
+      user_id: user.id,
       amount: savingForm.amount, savings_date: new Date(savingForm.savings_date).toISOString(),
       source: savingForm.source, note: savingForm.note,
       bank_account_id: savingForm.bank_account_id || null, reference: savingForm.reference, recorded_by: user.id,
