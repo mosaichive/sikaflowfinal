@@ -261,6 +261,7 @@ export type Database = {
           logo_url: string | null
           num_employees: string | null
           onboarding_completed: boolean
+          opening_cash_balance: number
           phone: string | null
           role: string | null
           subscription_end_date: string | null
@@ -284,6 +285,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          opening_cash_balance?: number
           phone?: string | null
           role?: string | null
           subscription_end_date?: string | null
@@ -307,6 +309,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          opening_cash_balance?: number
           phone?: string | null
           role?: string | null
           subscription_end_date?: string | null
@@ -326,6 +329,7 @@ export type Database = {
           cost_price_per_unit: number
           created_at: string
           id: string
+          is_opening_stock: boolean
           note: string | null
           payment_method: string
           product_id: string | null
@@ -345,6 +349,7 @@ export type Database = {
           cost_price_per_unit?: number
           created_at?: string
           id?: string
+          is_opening_stock?: boolean
           note?: string | null
           payment_method?: string
           product_id?: string | null
@@ -364,6 +369,7 @@ export type Database = {
           cost_price_per_unit?: number
           created_at?: string
           id?: string
+          is_opening_stock?: boolean
           note?: string | null
           payment_method?: string
           product_id?: string | null
