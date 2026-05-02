@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
+import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
 
 export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor' | 'business_owner';
 
