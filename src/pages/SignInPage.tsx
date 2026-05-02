@@ -2,7 +2,22 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+
+function friendlyAuthError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const msg = raw.toLowerCase();
+  if (!isSupabaseConfigured) {
+    return 'Supabase is not connected. Please configure environment variables.';
+  }
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+    return 'Cannot connect to authentication server. Check your internet connection or Supabase URL and anon key.';
+  }
+  if (msg.includes('invalid api key') || msg.includes('invalid jwt')) {
+    return 'Authentication is misconfigured. Check Supabase URL and anon key.';
+  }
+  return raw || 'Authentication failed. Please try again.';
+}
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,8 +154,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setMode('sign-in');
       navigate('/sign-in', { replace: true });
     } catch (authError: unknown) {
-      const message = authError instanceof Error ? authError.message : 'Authentication failed. Please try again.';
-      setError(message);
+      setError(friendlyAuthError(authError));
     } finally {
       setSubmitting(false);
     }
