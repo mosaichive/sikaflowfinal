@@ -83,7 +83,9 @@ function ProtectedRoute({
   }
 
   if (adminOnly && !isAdmin) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
-  if (allowedRoles && (!role || !allowedRoles.includes(role))) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
+  // business_owner has full admin-equivalent access to all tenant pages.
+  const effectiveRole: AppRole | null = role === 'business_owner' ? 'admin' : role;
+  if (allowedRoles && (!effectiveRole || !allowedRoles.includes(effectiveRole))) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
   return <>{children}</>;
 }
 
