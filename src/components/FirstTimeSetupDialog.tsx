@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   createProductRecord,
   ensureUserBusinessWorkspace,
-  getErrorMessage,
+  
   insertStockMovementCompat,
   logSupabaseError,
   rememberCachedProduct,
