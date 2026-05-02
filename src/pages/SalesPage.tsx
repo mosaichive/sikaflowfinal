@@ -293,6 +293,7 @@ export default function SalesPage() {
     setLoading(true);
     try {
       const sale = await insertSaleRecord({
+        user_id: user.id,
         business_id: businessId,
         sale_date: new Date(saleDate).toISOString(),
         customer_name: customerName || 'Walk-in',
@@ -309,9 +310,11 @@ export default function SalesPage() {
         stock_status: stockShortfall > 0 ? 'negative_stock_sale' : 'in_stock',
         stock_shortfall: stockShortfall,
         notes: saleNotes,
+        cost_total: costPrice * quantity,
       });
 
       const { data: saleItem, error: itemErr } = await supabase.from('sale_items').insert({
+        user_id: user.id,
         business_id: businessId,
         sale_id: sale.id,
         product_id: selectedProduct.id,
@@ -319,6 +322,7 @@ export default function SalesPage() {
         sku: selectedProduct.sku,
         size, color, quantity,
         unit_price: unitPrice,
+        unit_cost: costPrice,
         cost_price: costPrice,
         line_total: subtotal,
         default_price: defaultPrice,
