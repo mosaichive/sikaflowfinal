@@ -366,6 +366,7 @@ export default function InventoryPage() {
       selling_price: String(Number(product?.selling_price || 0)),
       payment_method: (restock.payment_method || PAYMENT_METHODS[0].value) as typeof PAYMENT_METHODS[number]['value'],
       description: restock.note || restock.reference || '',
+      is_opening_stock: Boolean((restock as any).is_opening_stock),
     });
     setDialogOpen(true);
   };
