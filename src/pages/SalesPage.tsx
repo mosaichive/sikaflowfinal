@@ -286,7 +286,7 @@ export default function SalesPage() {
         price_note: isPriceOverridden ? priceNote : '',
       };
       const validation = validateSaleItemPayload(saleItemPayload);
-      if (!validation.ok) {
+      if (validation.ok === false) {
         toast({
           title: 'Invalid sale item',
           description: validation.message,
