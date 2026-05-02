@@ -154,8 +154,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setMode('sign-in');
       navigate('/sign-in', { replace: true });
     } catch (authError: unknown) {
-      const message = authError instanceof Error ? authError.message : 'Authentication failed. Please try again.';
-      setError(message);
+      setError(friendlyAuthError(authError));
     } finally {
       setSubmitting(false);
     }
