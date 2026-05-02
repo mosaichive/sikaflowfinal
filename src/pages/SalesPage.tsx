@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SaleDocumentViewerDialog } from '@/components/sales/SaleDocumentViewerDialog';
 import { isNegativeStockSale } from '@/lib/sales-inventory';
+import { validateSaleItemPayload, recomputeProductStock } from '@/lib/sale-items-schema';
 import {
   deleteStockMovementsBySourceCompat,
   insertStockMovementCompat,
