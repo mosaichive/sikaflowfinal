@@ -473,11 +473,9 @@ export default function InventoryPage() {
     try {
       const totalCost = unitCost * quantity;
       const movementDate = new Date(`${form.movement_date}T00:00:00`).toISOString();
-      const previousQuantity = Number(selectedProduct.quantity ?? 0);
-      const oldQuantity = editingRestock ? Number(editingRestock.quantity_added ?? 0) : 0;
-      const nextQuantity = editingRestock ? previousQuantity - oldQuantity + quantity : previousQuantity + quantity;
 
       const restockPayload = {
+        user_id: user.id,
         business_id: businessId,
         product_id: selectedProduct.id,
         product_name: selectedProduct.name,
@@ -509,23 +507,13 @@ export default function InventoryPage() {
       const { error: productError } = await supabase
         .from('products')
         .update({
-          quantity: nextQuantity,
-          cost_price: unitCost,
-          selling_price: sellingPrice,
+          cost: unitCost,
+          price: sellingPrice,
         } as never)
         .eq('id', selectedProduct.id);
       if (productError) throw productError;
 
-      await upsertRestockMovement({
-        restockId: savedRestock.id,
-        productId: selectedProduct.id,
-        quantityAdded: quantity,
-        quantityAfter: nextQuantity,
-        unitCost,
-        sellingPrice,
-        note: form.description,
-        movementDate,
-      });
+      await recomputeProductStock();
 
       setDialogOpen(false);
       resetForm();
@@ -556,22 +544,12 @@ export default function InventoryPage() {
     if (!confirmed) return;
     setDeletingRestockId(restock.id);
     try {
-      const product = products.find((row) => row.id === restock.product_id);
-      if (product && restock.product_id) {
-        const nextQuantity = Number(product.quantity ?? 0) - Number(restock.quantity_added ?? 0);
-        const { error: productError } = await supabase
-          .from('products')
-          .update({ quantity: nextQuantity } as never)
-          .eq('id', restock.product_id);
-        if (productError) throw productError;
-      }
-
       await cleanupLegacyRestockExpense(restock.id);
-
-      await deleteRestockMovement(restock.id);
 
       const { error: restockError } = await supabase.from('restocks').delete().eq('id', restock.id);
       if (restockError) throw restockError;
+
+      await recomputeProductStock();
 
       toast({ title: 'Restock deleted', description: 'Stock and available business money were recalculated.' });
       void load();
