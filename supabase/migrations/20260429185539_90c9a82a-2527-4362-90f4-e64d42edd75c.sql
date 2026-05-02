@@ -1,1 +1,0 @@
-ALTER TABLE public.stock_movements ADD COLUMN IF NOT EXISTS added_by_name text;
