@@ -147,6 +147,7 @@ export default function ExpensesPage() {
     try {
       const receipt = await uploadReceipt();
       await insertExpenseRecord({
+        user_id: user.id,
         business_id: businessId,
         category: form.category,
         description: form.description.trim(),
