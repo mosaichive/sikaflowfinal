@@ -95,6 +95,8 @@ export default function SettingsPage() {
   const [salesInventorySaving, setSalesInventorySaving] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [openingCash, setOpeningCash] = useState<string>('0');
+  const [openingCashSaving, setOpeningCashSaving] = useState(false);
 
   // Bank state
   const [banks, setBanks] = useState<BankAccount[]>([]);
@@ -134,11 +136,31 @@ export default function SettingsPage() {
       fetchUsers();
       fetchAuditLogs();
     }
+    if (user) {
+      void (async () => {
+        const { data } = await supabase.from('profiles').select('opening_cash_balance').eq('id', user.id).maybeSingle();
+        if (data) setOpeningCash(String((data as any).opening_cash_balance ?? 0));
+      })();
+    }
     const ch = supabase.channel('settings-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, fetchBanks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, businessId]);
+  }, [isAdmin, businessId, user]);
+
+  const handleSaveOpeningCash = async () => {
+    if (!user) return;
+    setOpeningCashSaving(true);
+    const value = Number(openingCash || 0);
+    const { error } = await supabase.from('profiles').update({ opening_cash_balance: value } as any).eq('id', user.id);
+    if (error) {
+      toast({ title: 'Could not save opening cash', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Opening cash balance updated' });
+      await logAudit('opening_cash_updated', `Set opening cash to ${value}`);
+    }
+    setOpeningCashSaving(false);
+  };
 
   const fetchBanks = async () => {
     const { data } = await supabase.from('bank_accounts').select('*').order('created_at', { ascending: false });
