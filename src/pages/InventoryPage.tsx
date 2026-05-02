@@ -125,6 +125,7 @@ export default function InventoryPage() {
     selling_price: '0',
     payment_method: PAYMENT_METHODS[0].value as string,
     description: '',
+    is_opening_stock: false,
   });
 
   const canManage = isAdmin || isManager;
@@ -344,6 +345,7 @@ export default function InventoryPage() {
       selling_price: '0',
       payment_method: PAYMENT_METHODS[0].value,
       description: '',
+      is_opening_stock: false,
     });
     setEditingRestock(null);
   };
