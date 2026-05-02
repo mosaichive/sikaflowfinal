@@ -27,7 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleSignIn = () => {
-    window.location.href = '/sign-in';
+    window.location.href = '/#/sign-in';
   };
 
   render() {

@@ -194,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled && profileResult && !profileResult.found && !profileResult.error && !nextRole) {
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
-          window.location.replace('/sign-in?reason=removed');
+          window.location.replace('/#/sign-in?reason=removed');
         }
         return;
       }
