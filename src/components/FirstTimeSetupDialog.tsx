@@ -232,7 +232,6 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
           display_name: displayName || user.email || trimmedBusinessName,
           phone: trimmedPhone,
           email_verified: true,
-          onboarding_completed: false,
         });
 
       if (hasOpeningStock === 'yes' && activeProducts.length > 0) {
@@ -419,18 +418,10 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
                   <Label htmlFor="setup-business-location">Location</Label>
                   <Input id="setup-business-location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Accra, Ghana" />
                 </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="setup-business-logo">Business Logo (optional)</Label>
-                  <Input
-                    id="setup-business-logo"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => setBusinessLogoFile(event.target.files?.[0] || null)}
-                  />
-                </div>
               </div>
             </div>
           )}
+
 
           {currentStep === 'opening_stock' && (
             <div className="space-y-4">
