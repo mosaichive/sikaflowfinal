@@ -299,6 +299,69 @@ export type Database = {
         }
         Relationships: []
       }
+      sale_documents: {
+        Row: {
+          amount_ghs: number
+          amount_paid_ghs: number
+          balance_ghs: number
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          document_number: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          kind: string
+          payment_status: string
+          sale_date: string
+          sale_id: string
+          seller_name: string | null
+          snapshot: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_ghs?: number
+          amount_paid_ghs?: number
+          balance_ghs?: number
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          document_number: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind: string
+          payment_status?: string
+          sale_date?: string
+          sale_id: string
+          seller_name?: string | null
+          snapshot?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_ghs?: number
+          amount_paid_ghs?: number
+          balance_ghs?: number
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          document_number?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind?: string
+          payment_status?: string
+          sale_date?: string
+          sale_id?: string
+          seller_name?: string | null
+          snapshot?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sale_items: {
         Row: {
           created_at: string
