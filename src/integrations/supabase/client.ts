@@ -2,14 +2,24 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY');
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  // Do NOT throw at module load — that would crash the entire React tree
+  // before the ErrorBoundary can render, producing a blank white screen.
+  // Log loudly instead so the issue is visible in console + network errors.
+  // eslint-disable-next-line no-console
+  console.error(
+    '[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
+      'The app will render but data calls will fail until env vars are restored.'
+  );
+}
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL ?? 'https://invalid.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY ?? 'invalid-anon-key'
+);
