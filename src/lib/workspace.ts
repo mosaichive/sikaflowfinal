@@ -35,8 +35,12 @@ type CachedProductRow = {
   is_archived?: boolean | null;
 };
 
+// Use only columns that actually exist in the single-tenant products schema.
+// `quantity`/`cost_price`/`selling_price`/`reorder_level`/`business_id` are
+// remapped from `stock`/`cost`/`price`/`low_stock_threshold`/none in
+// normalizeProductRow().
 const STABLE_PRODUCT_SELECT =
-  'id,name,sku,category,quantity,cost_price,selling_price,reorder_level,image_url,business_id,created_at,updated_at';
+  'id,name,sku,category,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
@@ -106,9 +110,20 @@ function normalizeProductRow(row: Record<string, unknown>): CachedProductRow {
     name: String(row.name ?? ''),
     sku: typeof row.sku === 'string' ? row.sku : '',
     category: typeof row.category === 'string' ? row.category : '',
-    quantity: typeof row.quantity === 'number' ? row.quantity : Number(row.quantity ?? 0),
-    cost_price: typeof row.cost_price === 'number' || typeof row.cost_price === 'string' ? row.cost_price : 0,
-    selling_price: typeof row.selling_price === 'number' || typeof row.selling_price === 'string' ? row.selling_price : 0,
+    quantity:
+      typeof row.quantity === 'number'
+        ? row.quantity
+        : row.quantity !== undefined && row.quantity !== null
+          ? Number(row.quantity)
+          : Number(row.stock ?? 0),
+    cost_price:
+      row.cost_price !== undefined && row.cost_price !== null
+        ? row.cost_price as number | string
+        : (row.cost as number | string | undefined) ?? 0,
+    selling_price:
+      row.selling_price !== undefined && row.selling_price !== null
+        ? row.selling_price as number | string
+        : (row.price as number | string | undefined) ?? 0,
     reorder_level:
       typeof row.reorder_level === 'number' || typeof row.reorder_level === 'string'
         ? Number(row.reorder_level ?? 0)
@@ -700,19 +715,13 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const allCachedRows = readAllCachedProducts();
   const scopedBaseQuery = () => {
-    let query = supabase.from('products').select('*').order('name');
-    if (effectiveBusinessId) {
-      query = query.eq('business_id', effectiveBusinessId);
-    }
-    return query;
+    // Note: in the single-tenant schema products are scoped by user_id via RLS,
+    // not business_id. We intentionally don't add a business_id filter here.
+    return supabase.from('products').select('*').order('name');
   };
   const visibleBaseQuery = () => supabase.from('products').select('*').order('name');
   const stableBaseQuery = () => {
-    let query = supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
-    if (effectiveBusinessId) {
-      query = query.eq('business_id', effectiveBusinessId);
-    }
-    return query;
+    return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   };
   const filterVisibleRows = (rows: CachedProductRow[]) =>
     effectiveBusinessId
@@ -735,7 +744,7 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
     try {
       const { data, error } = await scopedBaseQuery();
       if (error) throw error;
-      let liveRows = (data ?? []) as CachedProductRow[];
+      let liveRows = ((data ?? []) as Array<Record<string, unknown>>).map(normalizeProductRow);
       if (liveRows.length === 0 && effectiveBusinessId) {
         const stableRows = await loadStableRows();
         liveRows = stableRows;
@@ -763,10 +772,10 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
 
   const { data, error } = await scopedBaseQuery().eq('is_archived', false);
   if (!error) {
-    const rows = (data ?? []) as Array<{ is_archived?: boolean | null }>;
-    if (rows.length > 0) {
+    const rawRows = (data ?? []) as Array<Record<string, unknown>>;
+    if (rawRows.length > 0) {
       const mergedRows = mergeProductRows(
-        rows as CachedProductRow[],
+        rawRows.map(normalizeProductRow),
         filterVisibleRows(allCachedRows),
         false,
       );
@@ -776,7 +785,9 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
 
     const { data: fallbackData, error: fallbackError } = await scopedBaseQuery();
     if (fallbackError) throw fallbackError;
-    const filteredRows = ((fallbackData ?? []) as Array<{ is_archived?: boolean | null }>).filter((row) => row.is_archived !== true) as CachedProductRow[];
+    const filteredRows = ((fallbackData ?? []) as Array<Record<string, unknown>>)
+      .map(normalizeProductRow)
+      .filter((row) => row.is_archived !== true);
     const mergedRows = mergeProductRows(filteredRows, filterVisibleRows(allCachedRows), false);
     if (mergedRows.length > 0) {
       if (businessId) writeCachedProducts(businessId, mergedRows);
@@ -911,17 +922,37 @@ export async function insertStockMovementCompat(
 export async function deleteStockMovementsBySourceCompat(sourceIds: string[]) {
   if (sourceIds.length === 0) return { deleted: false, skipped: false } as const;
 
-  const { error } = await supabase
-    .from('stock_movements' as any)
-    .delete()
-    .in('source_id', sourceIds)
-    .eq('source_table', 'sale_items');
+  // The single-tenant schema uses `reference_id` + `reason` (not
+  // source_id/source_type). Match either column shape so we work against
+  // both schema variants.
+  const tryDelete = async (idColumn: 'reference_id' | 'source_id', reasonColumn: 'reason' | 'source_table', reasonValue: string) => {
+    return supabase
+      .from('stock_movements' as any)
+      .delete()
+      .in(idColumn, sourceIds)
+      .eq(reasonColumn, reasonValue);
+  };
+
+  // Try the actual schema first.
+  let { error } = await tryDelete('reference_id', 'reason', 'sold');
+  if (error && (isMissingColumnError(error, 'reference_id', 'stock_movements') || isMissingColumnError(error, 'reason', 'stock_movements'))) {
+    ({ error } = await tryDelete('source_id', 'source_table', 'sale_items'));
+  }
 
   if (!error) {
     return { deleted: true, skipped: false } as const;
   }
 
-  if (!isMissingTableError(error, 'stock_movements')) throw error;
+  if (!isMissingTableError(error, 'stock_movements')) {
+    // Don't crash sale deletion if the legacy column shape also doesn't match —
+    // log and skip so the sale itself can still be removed.
+    logSupabaseError('workspace.deleteStockMovementsBySourceCompat', error, {
+      table: 'stock_movements',
+      fallbackMode: 'skipOnSchemaMismatch',
+      sourceIds,
+    });
+    return { deleted: false, skipped: true } as const;
+  }
 
   logSupabaseError('workspace.deleteStockMovementsBySourceCompat', error, {
     table: 'stock_movements',
