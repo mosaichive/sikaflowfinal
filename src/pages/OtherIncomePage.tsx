@@ -122,7 +122,7 @@ export default function OtherIncomePage() {
         recorded_by: user.id,
         recorded_by_name: displayName || user.email || '',
       };
-      if (businessId) payload.business_id = businessId;
+      // other_income is scoped by user_id; no business_id column exists in this schema.
 
       const { error } = await supabase.from('other_income' as any).insert(payload);
       if (error) {
