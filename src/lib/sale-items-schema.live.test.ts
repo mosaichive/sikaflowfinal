@@ -112,7 +112,7 @@ describeMaybe('sale_items live integration', () => {
       line_total: 10,
     };
     const validation = validateSaleItemPayload(rawPayload);
-    expect(validation.ok, `validation failed: ${validation.ok ? '' : validation.message}`).toBe(true);
+    expect(validation.ok, validation.ok ? '' : `validation failed: ${validation.message}`).toBe(true);
 
     // 3. Insert the sale_item directly (mirrors what insertSaleItemRecord
     // does, minus the optional-column fallback). business_id will fail
