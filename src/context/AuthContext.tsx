@@ -235,6 +235,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void syncReferral();
   }, [userId]);
 
+  // One-time schema sanity check for admins. Logs to the browser console
+  // when the live `sale_items` schema doesn't match what the code expects.
+  // Helps catch deployment/migration drift before users hit a runtime error.
+  const isAdminUser =
+    role === 'admin' || role === 'business_owner' || role === 'super_admin';
+  useEffect(() => {
+    if (!userId || !isAdminUser) return;
+    void runSaleItemsSchemaCheck();
+  }, [userId, isAdminUser]);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
