@@ -443,7 +443,7 @@ export default function SalesPage() {
       });
 
       // 3. Insert new sale_items (triggers stock deduction)
-      const { data: saleItem, error: itemErr } = await supabase.from('sale_items').insert({
+      const saleItem = await insertSaleItemRecord({
         user_id: user.id,
         business_id: businessId!,
         sale_id: editSaleId,
@@ -457,8 +457,7 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      }).select().single();
-      if (itemErr) throw itemErr;
+      });
 
       await createSaleMovement({
         saleItemId: saleItem.id,
