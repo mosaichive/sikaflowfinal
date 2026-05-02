@@ -409,7 +409,7 @@ export default function SalesPage() {
       });
 
       // 3. Insert new sale_items (triggers stock deduction)
-      const saleItem = await insertSaleItemRecord({
+      const editSaleItemPayload = {
         user_id: user.id,
         business_id: businessId!,
         sale_id: editSaleId,
@@ -423,7 +423,17 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      });
+      };
+      const editValidation = validateSaleItemPayload(editSaleItemPayload);
+      if (editValidation.ok === false) {
+        toast({
+          title: 'Invalid sale item',
+          description: editValidation.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const saleItem = await insertSaleItemRecord(editSaleItemPayload);
 
       await createSaleMovement({
         saleItemId: saleItem.id,
