@@ -857,21 +857,35 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
   }
 }
 
+function normalizeStockMovementRow(row: Record<string, unknown>) {
+  const changeValue = row.quantity_change ?? row.change ?? 0;
+  return {
+    ...row,
+    movement_type: String(row.movement_type ?? row.reason ?? 'adjustment'),
+    quantity_change: Number(changeValue ?? 0),
+    quantity_after: row.quantity_after ?? null,
+    created_by_name: row.created_by_name ?? row.added_by_name ?? null,
+    movement_date: String(row.movement_date ?? row.created_at ?? new Date().toISOString()),
+  };
+}
+
 export async function loadStockMovementsCompat(limit = 100, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
+  const { data: authData } = await supabase.auth.getUser();
+  const userId = authData.user?.id ?? effectiveBusinessId ?? null;
   let query = supabase
     .from('stock_movements' as any)
     .select('*')
-    .order('movement_date', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (effectiveBusinessId) {
-    query = query.eq('business_id', effectiveBusinessId);
+  if (userId) {
+    query = query.eq('user_id', userId);
   }
 
   const { data, error } = await query;
 
-  if (!error) return (data ?? []) as any[];
+  if (!error) return ((data ?? []) as Array<Record<string, unknown>>).map(normalizeStockMovementRow) as any[];
   if (!isMissingTableError(error, 'stock_movements')) throw error;
 
   logSupabaseError('workspace.loadStockMovementsCompat', error, {
@@ -884,12 +898,29 @@ export async function loadStockMovementsCompat(limit = 100, businessId?: string 
 export async function insertStockMovementCompat(
   payload: Record<string, unknown>,
 ) {
-  const businessId = typeof payload.business_id === 'string' ? payload.business_id : null;
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.user_id === undefined && typeof remapped.created_by === 'string') {
+    remapped.user_id = remapped.created_by;
+  }
+  if (remapped.change === undefined && remapped.quantity_change !== undefined) {
+    remapped.change = remapped.quantity_change;
+  }
+  if (remapped.reason === undefined && remapped.movement_type !== undefined) {
+    remapped.reason = remapped.movement_type === 'sale' ? 'sold' : remapped.movement_type;
+  }
+  if (remapped.reference_id === undefined && remapped.source_id !== undefined) {
+    remapped.reference_id = remapped.source_id;
+  }
+  if (remapped.added_by_name === undefined && remapped.created_by_name !== undefined) {
+    remapped.added_by_name = remapped.created_by_name;
+  }
+
+  const businessId = typeof remapped.business_id === 'string' ? remapped.business_id : null;
   const userId =
-    typeof payload.created_by === 'string'
-      ? payload.created_by
-      : typeof payload.user_id === 'string'
-        ? payload.user_id
+    typeof remapped.created_by === 'string'
+      ? remapped.created_by
+      : typeof remapped.user_id === 'string'
+        ? remapped.user_id
         : null;
 
   if (businessId && userId) {
@@ -903,9 +934,35 @@ export async function insertStockMovementCompat(
     }
   }
 
-  const { error } = await supabase.from('stock_movements' as any).insert(payload);
+  const { error } = await supabase.from('stock_movements' as any).insert(remapped);
 
   if (!error) {
+    return { inserted: true, skipped: false } as const;
+  }
+
+  const missingColumnInsert = await insertWithOptionalColumnFallback({
+    table: 'stock_movements',
+    payload: remapped,
+    optionalColumns: [
+      'business_id',
+      'movement_type',
+      'quantity_change',
+      'quantity_after',
+      'unit_cost',
+      'unit_price',
+      'created_by',
+      'created_by_name',
+      'movement_date',
+      'source_table',
+      'source_id',
+    ],
+    context: 'workspace.insertStockMovementCompat',
+  }).catch((fallbackError) => {
+    if (!isMissingTableError(fallbackError, 'stock_movements')) throw fallbackError;
+    return null;
+  });
+
+  if (missingColumnInsert) {
     return { inserted: true, skipped: false } as const;
   }
 
