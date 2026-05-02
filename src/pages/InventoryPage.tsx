@@ -615,7 +615,20 @@ export default function InventoryPage() {
               <p className="mt-1 text-lg font-semibold">{financialsLoading ? 'Loading…' : formatCurrency(financials.stockValue)}</p>
             </div>
             {canManage ? (
-              <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
+              <div className="flex flex-wrap gap-2">
+                {isAdmin ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRecomputeStock}
+                    disabled={recomputing}
+                    title="Rebuild each product's available stock from the stock_movements ledger."
+                  >
+                    <RefreshCcw className={`mr-2 h-4 w-4 ${recomputing ? 'animate-spin' : ''}`} />
+                    {recomputing ? 'Recalculating…' : 'Recalculate Stock'}
+                  </Button>
+                ) : null}
+                <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
+              </div>
             ) : null}
           </div>
         </section>
