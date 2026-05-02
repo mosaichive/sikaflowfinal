@@ -169,31 +169,62 @@ async function ensureBusinessRoleMembership({
   businessId: string;
   userId: string;
 }) {
-  const { data, error } = await supabase
+  // Read existing roles. Try with business_id first, fall back to plain role.
+  let roles: Array<{ role: string; business_id: string | null }> = [];
+  let queryError: any = null;
+  const richQuery = await supabase
     .from('user_roles')
     .select('role, business_id')
     .eq('user_id', userId);
+  if (richQuery.error && isMissingColumnError(richQuery.error, 'business_id', 'user_roles')) {
+    const plainQuery = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    queryError = plainQuery.error;
+    roles = ((plainQuery.data || []) as Array<{ role: string }>).map((row) => ({
+      role: row.role,
+      business_id: null,
+    }));
+  } else {
+    queryError = richQuery.error;
+    roles = (richQuery.data || []) as Array<{ role: string; business_id: string | null }>;
+  }
+  if (queryError) throw queryError;
 
-  if (error) throw error;
-
-  const roles = (data || []) as Array<{ role: string; business_id: string | null }>;
-  if (roles.some((row) => row.business_id === businessId && (row.role === 'admin' || row.role === 'manager'))) {
+  if (
+    roles.some(
+      (row) =>
+        (row.business_id === null || row.business_id === businessId) &&
+        (row.role === 'admin' || row.role === 'manager' || row.role === 'business_owner'),
+    )
+  ) {
     return;
   }
   if (roles.some((row) => row.role === 'super_admin')) {
     return;
   }
 
-  const { error: insertError } = await supabase
-    .from('user_roles')
-    .insert({
-      user_id: userId,
-      role: 'admin' as any,
-      business_id: businessId,
-    } as never);
-
-  if (insertError && insertError.code !== '23505') {
-    throw insertError;
+  // Insert role; if business_id column is missing, insert without it.
+  const tryInsert = async (payload: Record<string, unknown>) =>
+    supabase.from('user_roles').insert(payload as never);
+  let insertResult = await tryInsert({
+    user_id: userId,
+    role: 'admin',
+    business_id: businessId,
+  });
+  if (
+    insertResult.error &&
+    isMissingColumnError(insertResult.error, 'business_id', 'user_roles')
+  ) {
+    insertResult = await tryInsert({ user_id: userId, role: 'admin' });
+  }
+  // Some single-tenant deployments use a different default role enum value.
+  if (insertResult.error && insertResult.error.code === '22P02') {
+    insertResult = await tryInsert({ user_id: userId, role: 'business_owner' });
+  }
+  if (insertResult.error && insertResult.error.code !== '23505') {
+    throw insertResult.error;
   }
 }
 
