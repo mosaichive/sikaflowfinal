@@ -55,20 +55,21 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
       if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
       try {
+        const db = supabase as any;
         const [salesRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes] =
           await Promise.allSettled([
-            supabase
+            db
               .from('sales')
               .select('id,total,amount_paid,payment_status,status,sale_date,stock_status')
               .eq('business_id', businessId)
               .order('sale_date', { ascending: false }),
             loadProductsCompat(false, businessId),
-            supabase.from('expenses').select('amount,category,description').eq('business_id', businessId),
-            supabase.from('other_income' as any).select('amount').eq('business_id', businessId),
-            supabase.from('savings').select('amount').eq('business_id', businessId),
-            supabase.from('investments').select('amount').eq('business_id', businessId),
-            supabase.from('investor_funding').select('amount').eq('business_id', businessId),
-            supabase.from('restocks').select('total_cost,status').eq('business_id', businessId).order('restock_date', { ascending: false }),
+            db.from('expenses').select('amount,category,description').eq('business_id', businessId),
+            db.from('other_income').select('amount').eq('business_id', businessId),
+            db.from('savings').select('amount').eq('business_id', businessId),
+            db.from('investments').select('amount').eq('business_id', businessId),
+            db.from('investor_funding').select('amount').eq('business_id', businessId),
+            db.from('restocks').select('total_cost,status').eq('business_id', businessId).order('restock_date', { ascending: false }),
           ]);
 
         if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { businessId });
@@ -80,21 +81,21 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         if (investorFundsRes.status === 'rejected') logSupabaseError('financials.load.investorFunds', investorFundsRes.reason, { businessId });
         if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { businessId });
 
-        if (salesRes.status === 'fulfilled' && salesRes.value.error) logSupabaseError('financials.load.sales', salesRes.value.error, { businessId });
-        if (expensesRes.status === 'fulfilled' && expensesRes.value.error) logSupabaseError('financials.load.expenses', expensesRes.value.error, { businessId });
-        if (otherIncomeRes.status === 'fulfilled' && otherIncomeRes.value.error) logSupabaseError('financials.load.otherIncome', otherIncomeRes.value.error, { businessId });
-        if (savingsRes.status === 'fulfilled' && savingsRes.value.error) logSupabaseError('financials.load.savings', savingsRes.value.error, { businessId });
-        if (investmentsRes.status === 'fulfilled' && investmentsRes.value.error) logSupabaseError('financials.load.investments', investmentsRes.value.error, { businessId });
-        if (investorFundsRes.status === 'fulfilled' && investorFundsRes.value.error) logSupabaseError('financials.load.investorFunds', investorFundsRes.value.error, { businessId });
-        if (restocksRes.status === 'fulfilled' && restocksRes.value.error) logSupabaseError('financials.load.restocks', restocksRes.value.error, { businessId });
+        if (salesRes.status === 'fulfilled' && (salesRes.value as any).error) logSupabaseError('financials.load.sales', (salesRes.value as any).error, { businessId });
+        if (expensesRes.status === 'fulfilled' && (expensesRes.value as any).error) logSupabaseError('financials.load.expenses', (expensesRes.value as any).error, { businessId });
+        if (otherIncomeRes.status === 'fulfilled' && (otherIncomeRes.value as any).error) logSupabaseError('financials.load.otherIncome', (otherIncomeRes.value as any).error, { businessId });
+        if (savingsRes.status === 'fulfilled' && (savingsRes.value as any).error) logSupabaseError('financials.load.savings', (savingsRes.value as any).error, { businessId });
+        if (investmentsRes.status === 'fulfilled' && (investmentsRes.value as any).error) logSupabaseError('financials.load.investments', (investmentsRes.value as any).error, { businessId });
+        if (investorFundsRes.status === 'fulfilled' && (investorFundsRes.value as any).error) logSupabaseError('financials.load.investorFunds', (investorFundsRes.value as any).error, { businessId });
+        if (restocksRes.status === 'fulfilled' && (restocksRes.value as any).error) logSupabaseError('financials.load.restocks', (restocksRes.value as any).error, { businessId });
 
-        const sales = salesRes.status === 'fulfilled' ? (salesRes.value.data ?? []) : [];
+        const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
         let saleItems: any[] = [];
 
-        if (salesRes.status === 'fulfilled' && !salesRes.value.error) {
+        if (salesRes.status === 'fulfilled' && !(salesRes.value as any).error) {
           const saleIds = sales.map((sale: any) => sale.id).filter(Boolean);
           if (saleIds.length > 0) {
-            const { data, error } = await supabase
+            const { data, error } = await db
               .from('sale_items')
               .select('sale_id,quantity,cost_price,unit_price,line_total')
               .in('sale_id', saleIds);
@@ -102,21 +103,21 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
             if (error) {
               logSupabaseError('financials.load.saleItems', error, { businessId, saleCount: saleIds.length });
             } else {
-              saleItems = data ?? [];
+              saleItems = (data as any[]) ?? [];
             }
           }
         }
 
         const next = calculateBusinessFinancials({
-          sales,
+          sales: sales as any,
           saleItems,
-          products: productsRes.status === 'fulfilled' ? (productsRes.value ?? []) : [],
-          otherIncome: otherIncomeRes.status === 'fulfilled' ? (otherIncomeRes.value.data ?? []) : [],
-          expenses: expensesRes.status === 'fulfilled' ? (expensesRes.value.data ?? []) : [],
-          savings: savingsRes.status === 'fulfilled' ? (savingsRes.value.data ?? []) : [],
-          investments: investmentsRes.status === 'fulfilled' ? (investmentsRes.value.data ?? []) : [],
-          investorFunds: investorFundsRes.status === 'fulfilled' ? (investorFundsRes.value.data ?? []) : [],
-          restocks: restocksRes.status === 'fulfilled' ? (restocksRes.value.data ?? []) : [],
+          products: (productsRes.status === 'fulfilled' ? ((productsRes.value as any) ?? []) : []) as any,
+          otherIncome: (otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value as any).data ?? []) : []) as any,
+          expenses: (expensesRes.status === 'fulfilled' ? ((expensesRes.value as any).data ?? []) : []) as any,
+          savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any).data ?? []) : []) as any,
+          investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any).data ?? []) : []) as any,
+          investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any).data ?? []) : []) as any,
+          restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
           openingCashBalance: 0,
         });
 

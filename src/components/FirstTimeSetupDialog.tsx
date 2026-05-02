@@ -402,7 +402,7 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="setup-business-type">Business Type</Label>
-                  <Select value={businessType} onValueChange={setBusinessType}>
+                  <Select value={businessType} onValueChange={(v) => setBusinessType(v as any)}>
                     <SelectTrigger id="setup-business-type"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {BUSINESS_TYPES.map((type) => (
