@@ -48,9 +48,18 @@ export default function OtherIncomePage() {
   const canManage = isAdmin || isManager;
 
   const fetchRows = useCallback(async () => {
-    const { data } = await supabase.from('other_income' as any).select('*').order('income_date', { ascending: false });
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('other_income' as any)
+      .select('*')
+      .eq('user_id', user.id)
+      .order('income_date', { ascending: false });
+    if (error) {
+      console.error('[other_income] fetch failed', error);
+      return;
+    }
     setRows((data || []) as OtherIncomeRow[]);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     void fetchRows();
