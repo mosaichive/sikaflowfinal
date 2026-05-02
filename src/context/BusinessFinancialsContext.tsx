@@ -56,7 +56,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         // Tables that exist for this user. `restocks`, `investments`, and
         // `investor_funding` do not exist in the live schema and have been
         // removed to avoid silent query failures that zero out financials.
-        const [salesRes, productsRes, expensesRes, otherIncomeRes, savingsRes] =
+        const [salesRes, productsRes, expensesRes, otherIncomeRes, savingsRes, restocksRes] =
           await Promise.allSettled([
             db
               .from('sales')
@@ -67,6 +67,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
             db.from('expenses').select('amount,category,note').eq('user_id', userId),
             db.from('other_income').select('amount').eq('user_id', userId),
             db.from('savings').select('amount').eq('user_id', userId),
+            db.from('restocks').select('total_cost,status').eq('user_id', userId),
           ]);
 
         if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { userId });
@@ -74,11 +75,13 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         if (expensesRes.status === 'rejected') logSupabaseError('financials.load.expenses', expensesRes.reason, { userId });
         if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { userId });
         if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { userId });
+        if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { userId });
 
         if (salesRes.status === 'fulfilled' && (salesRes.value as any).error) logSupabaseError('financials.load.sales', (salesRes.value as any).error, { userId });
         if (expensesRes.status === 'fulfilled' && (expensesRes.value as any).error) logSupabaseError('financials.load.expenses', (expensesRes.value as any).error, { userId });
         if (otherIncomeRes.status === 'fulfilled' && (otherIncomeRes.value as any).error) logSupabaseError('financials.load.otherIncome', (otherIncomeRes.value as any).error, { userId });
         if (savingsRes.status === 'fulfilled' && (savingsRes.value as any).error) logSupabaseError('financials.load.savings', (savingsRes.value as any).error, { userId });
+        if (restocksRes.status === 'fulfilled' && (restocksRes.value as any).error) logSupabaseError('financials.load.restocks', (restocksRes.value as any).error, { userId });
 
         const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
         let saleItems: any[] = [];
@@ -109,7 +112,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
           savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any).data ?? []) : []) as any,
           investments: [],
           investorFunds: [],
-          restocks: [],
+          restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
           openingCashBalance: 0,
         });
 
@@ -153,6 +156,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `user_id=eq.${userId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${userId}` }, refresh)
       .subscribe();
 

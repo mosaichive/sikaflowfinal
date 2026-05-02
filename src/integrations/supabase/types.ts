@@ -299,6 +299,66 @@ export type Database = {
         }
         Relationships: []
       }
+      restocks: {
+        Row: {
+          category: string
+          cost_price_per_unit: number
+          created_at: string
+          id: string
+          note: string | null
+          payment_method: string
+          product_id: string | null
+          product_name: string
+          quantity_added: number
+          recorded_by: string | null
+          recorded_by_name: string | null
+          reference: string | null
+          restock_date: string
+          status: string
+          total_cost: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          category?: string
+          cost_price_per_unit?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          payment_method?: string
+          product_id?: string | null
+          product_name?: string
+          quantity_added?: number
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          reference?: string | null
+          restock_date?: string
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          cost_price_per_unit?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          payment_method?: string
+          product_id?: string | null
+          product_name?: string
+          quantity_added?: number
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          reference?: string | null
+          restock_date?: string
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       sale_documents: {
         Row: {
           amount_ghs: number
@@ -713,6 +773,10 @@ export type Database = {
           new_stock: number
           product_id: string
         }[]
+      }
+      sync_product_stock: {
+        Args: { _product_id: string; _user_id: string }
+        Returns: number
       }
     }
     Enums: {
