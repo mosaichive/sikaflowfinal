@@ -553,7 +553,7 @@ export async function createProductRecord(
     remapped.low_stock_threshold = remapped.reorder_level;
   }
 
-  const nextPayload: Record<string, unknown> = { ...payload };
+  const nextPayload: Record<string, unknown> = { ...remapped };
   const remainingColumns = new Set([
     'user_id',
     'business_id',
