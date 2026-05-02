@@ -881,19 +881,21 @@ async function fallbackProfileMembership({
   email?: string | null;
   phone?: string;
 }) {
-  const profilePayload = {
-    user_id: userId,
+  // Use the schema-tolerant updater so unknown columns (business_id,
+  // email_verified, …) are silently dropped on single-tenant schemas.
+  await updateProfileRecord(userId, {
     business_id: businessId,
     display_name: displayName?.trim() || email?.split('@')[0]?.trim() || 'User',
     phone: phone?.trim() || null,
-  };
-
-  const { error } = await supabase
-    .from('profiles')
-    .upsert(profilePayload as never, { onConflict: 'user_id' });
-
-  if (error) throw error;
-  await ensureBusinessRoleMembership({ businessId, userId });
+  });
+  try {
+    await ensureBusinessRoleMembership({ businessId, userId });
+  } catch (roleError) {
+    logSupabaseError('workspace.fallbackProfileMembership.ensureRole', roleError, {
+      businessId,
+      userId,
+    });
+  }
   return businessId;
 }
 
