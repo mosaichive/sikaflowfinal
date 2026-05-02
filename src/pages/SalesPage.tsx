@@ -444,6 +444,7 @@ export default function SalesPage() {
 
       // 3. Insert new sale_items (triggers stock deduction)
       const { data: saleItem, error: itemErr } = await supabase.from('sale_items').insert({
+        user_id: user.id,
         business_id: businessId!,
         sale_id: editSaleId,
         product_id: selectedProduct.id,
@@ -451,6 +452,7 @@ export default function SalesPage() {
         sku: selectedProduct.sku,
         size, color, quantity: newQty,
         unit_price: unitPrice,
+        unit_cost: costPrice,
         cost_price: costPrice,
         line_total: subtotal,
         default_price: defaultPrice,
