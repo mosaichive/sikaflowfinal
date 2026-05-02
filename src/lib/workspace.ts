@@ -536,6 +536,23 @@ export async function createProductRecord(
     }
   }
 
+  // Remap multi-tenant schema names to the single-tenant schema's column
+  // names. We send BOTH so whichever exists succeeds; missing ones are
+  // dropped via the auto-detect fallback below.
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.cost_price !== undefined && remapped.cost === undefined) {
+    remapped.cost = remapped.cost_price;
+  }
+  if (remapped.selling_price !== undefined && remapped.price === undefined) {
+    remapped.price = remapped.selling_price;
+  }
+  if (remapped.quantity !== undefined && remapped.stock === undefined) {
+    remapped.stock = remapped.quantity;
+  }
+  if (remapped.reorder_level !== undefined && remapped.low_stock_threshold === undefined) {
+    remapped.low_stock_threshold = remapped.reorder_level;
+  }
+
   const nextPayload: Record<string, unknown> = { ...payload };
   const remainingColumns = new Set([
     'user_id',
