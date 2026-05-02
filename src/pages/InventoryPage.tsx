@@ -129,13 +129,18 @@ export default function InventoryPage() {
 
   const canManage = isAdmin || isManager;
   const [recomputing, setRecomputing] = useState(false);
+  const userId = user?.id ?? null;
 
   const load = useCallback(async () => {
     const [productsRes, movementsRes, restocksRes, expensesRes] = await Promise.allSettled([
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(100, businessId),
-      supabase.from('restocks').select('*').eq('business_id', businessId).order('restock_date', { ascending: false }),
-      supabase.from('expenses').select('*').eq('business_id', businessId),
+      userId
+        ? supabase.from('restocks').select('*').eq('user_id', userId).order('restock_date', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      userId
+        ? supabase.from('expenses').select('*').eq('user_id', userId)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (productsRes.status === 'fulfilled') {
@@ -165,7 +170,7 @@ export default function InventoryPage() {
       logSupabaseError('inventory.load.expenses', expensesRes.reason);
       setExpenses([]);
     }
-  }, [businessId]);
+  }, [businessId, userId]);
 
   const handleRecomputeStock = useCallback(async () => {
     setRecomputing(true);
@@ -191,18 +196,18 @@ export default function InventoryPage() {
 
   useEffect(() => {
     void load();
-    if (!businessId) return;
+    if (!userId) return;
     const channel = supabase
       .channel('inventory-v2')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `business_id=eq.${businessId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `user_id=eq.${userId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${userId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${userId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${userId}` }, () => { void load(); })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [businessId, load]);
+  }, [load, userId]);
 
   const selectedProduct = products.find((product) => product.id === form.product_id) || null;
   const inventoryProducts = useMemo(
