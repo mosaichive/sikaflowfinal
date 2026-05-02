@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   createProductRecord,
   ensureUserBusinessWorkspace,
-  getErrorMessage,
+  
   insertStockMovementCompat,
   logSupabaseError,
   rememberCachedProduct,
@@ -344,7 +344,7 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
       });
       toast({
         title: 'Could not finish setup',
-        description: getErrorMessage(error),
+        description: 'Could not finish setup. Please try again.',
         variant: 'destructive',
       });
     } finally {

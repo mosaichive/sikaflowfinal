@@ -169,31 +169,62 @@ async function ensureBusinessRoleMembership({
   businessId: string;
   userId: string;
 }) {
-  const { data, error } = await supabase
+  // Read existing roles. Try with business_id first, fall back to plain role.
+  let roles: Array<{ role: string; business_id: string | null }> = [];
+  let queryError: any = null;
+  const richQuery = await supabase
     .from('user_roles')
     .select('role, business_id')
     .eq('user_id', userId);
+  if (richQuery.error && isMissingColumnError(richQuery.error, 'business_id', 'user_roles')) {
+    const plainQuery = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    queryError = plainQuery.error;
+    roles = ((plainQuery.data || []) as Array<{ role: string }>).map((row) => ({
+      role: row.role,
+      business_id: null,
+    }));
+  } else {
+    queryError = richQuery.error;
+    roles = (richQuery.data || []) as Array<{ role: string; business_id: string | null }>;
+  }
+  if (queryError) throw queryError;
 
-  if (error) throw error;
-
-  const roles = (data || []) as Array<{ role: string; business_id: string | null }>;
-  if (roles.some((row) => row.business_id === businessId && (row.role === 'admin' || row.role === 'manager'))) {
+  if (
+    roles.some(
+      (row) =>
+        (row.business_id === null || row.business_id === businessId) &&
+        (row.role === 'admin' || row.role === 'manager' || row.role === 'business_owner'),
+    )
+  ) {
     return;
   }
   if (roles.some((row) => row.role === 'super_admin')) {
     return;
   }
 
-  const { error: insertError } = await supabase
-    .from('user_roles')
-    .insert({
-      user_id: userId,
-      role: 'admin' as any,
-      business_id: businessId,
-    } as never);
-
-  if (insertError && insertError.code !== '23505') {
-    throw insertError;
+  // Insert role; if business_id column is missing, insert without it.
+  const tryInsert = async (payload: Record<string, unknown>) =>
+    supabase.from('user_roles').insert(payload as never);
+  let insertResult = await tryInsert({
+    user_id: userId,
+    role: 'admin',
+    business_id: businessId,
+  });
+  if (
+    insertResult.error &&
+    isMissingColumnError(insertResult.error, 'business_id', 'user_roles')
+  ) {
+    insertResult = await tryInsert({ user_id: userId, role: 'admin' });
+  }
+  // Some single-tenant deployments use a different default role enum value.
+  if (insertResult.error && insertResult.error.code === '22P02') {
+    insertResult = await tryInsert({ user_id: userId, role: 'business_owner' });
+  }
+  if (insertResult.error && insertResult.error.code !== '23505') {
+    throw insertResult.error;
   }
 }
 
@@ -290,6 +321,34 @@ function isMissingTableError(error: unknown, tableName?: string) {
   );
 }
 
+function extractMissingColumnFromError(error: unknown): string | null {
+  const normalized = (error ?? {}) as SupabaseErrorLike;
+  const haystacks = [normalized.message, normalized.details, normalized.hint].filter(
+    (value): value is string => typeof value === 'string',
+  );
+  const code = normalized.code?.toUpperCase() ?? '';
+  if (code !== 'PGRST204' && code !== '42703' && !haystacks.some((h) => /column|schema cache/i.test(h))) {
+    return null;
+  }
+  const patterns = [
+    /column "([^"]+)"/i,
+    /column ([a-zA-Z0-9_.]+) does not exist/i,
+    /'([a-zA-Z0-9_]+)' column/i,
+    /Could not find the '([a-zA-Z0-9_]+)' column/i,
+  ];
+  for (const text of haystacks) {
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const raw = match[1];
+        const dot = raw.lastIndexOf('.');
+        return dot >= 0 ? raw.slice(dot + 1) : raw;
+      }
+    }
+  }
+  return null;
+}
+
 async function updateWithOptionalColumnFallback<T extends Record<string, unknown>>({
   table,
   matchColumn,
@@ -306,9 +365,10 @@ async function updateWithOptionalColumnFallback<T extends Record<string, unknown
   context: string;
 }) {
   const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = [...optionalColumns];
+  const remainingColumns = new Set(optionalColumns);
+  const droppedColumns = new Set<string>();
 
-  while (true) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { error } = await supabase
       .from(table as any)
       .update(nextPayload as never)
@@ -316,11 +376,26 @@ async function updateWithOptionalColumnFallback<T extends Record<string, unknown
 
     if (!error) return;
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, table));
+    // Try the listed optional columns first.
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, table),
+    );
+    // Then auto-detect any column from the error message and drop it too.
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
-    logSupabaseError(context, error, { table, missingColumn, fallbackMode: 'updateWithoutOptionalColumn' });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    logSupabaseError(context, error, {
+      table,
+      missingColumn,
+      fallbackMode: 'updateWithoutOptionalColumn',
+    });
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
 }
@@ -337,9 +412,10 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
   context: string;
 }) {
   const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = [...optionalColumns];
+  const remainingColumns = new Set(optionalColumns);
+  const droppedColumns = new Set<string>();
 
-  while (true) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data, error } = await supabase
       .from(table as any)
       .insert(nextPayload as never)
@@ -348,11 +424,24 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
 
     if (!error) return data;
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, table));
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, table),
+    );
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
-    logSupabaseError(context, error, { table, missingColumn, fallbackMode: 'insertWithoutOptionalColumn' });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    logSupabaseError(context, error, {
+      table,
+      missingColumn,
+      fallbackMode: 'insertWithoutOptionalColumn',
+    });
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
 }
@@ -361,12 +450,22 @@ export async function updateBusinessWorkspaceRecord(
   businessId: string,
   payload: Record<string, unknown>,
 ) {
+  // The current schema does not have a separate `businesses` table — the
+  // user's business info lives on `profiles`. Update that row instead so
+  // setup completes against single-tenant schemas without breaking
+  // multi-tenant ones (the helper auto-drops unknown columns).
   return updateWithOptionalColumnFallback({
-    table: 'businesses',
+    table: 'profiles',
     matchColumn: 'id',
     matchValue: businessId,
-    payload,
-    optionalColumns: ['business_type'],
+    payload: {
+      business_name: payload.name ?? payload.business_name,
+      business_type: payload.business_type,
+      phone: payload.phone,
+      location: payload.location,
+      logo_url: payload.logo_light_url ?? payload.logo_url,
+    },
+    optionalColumns: ['business_type', 'logo_url', 'logo_light_url', 'logo_dark_url', 'status', 'email_verified'],
     context: 'workspace.updateBusiness',
   });
 }
@@ -377,13 +476,23 @@ export async function updateProfileRecord(
 ) {
   return updateWithOptionalColumnFallback({
     table: 'profiles',
-    matchColumn: 'user_id',
+    // The schema uses `id` (= auth user id) as the primary key.
+    matchColumn: 'id',
     matchValue: userId,
     payload,
-    optionalColumns: ['onboarding_completed'],
+    optionalColumns: [
+      'onboarding_completed',
+      'business_id',
+      'display_name',
+      'email_verified',
+      'avatar_url',
+      'title',
+      'bio',
+    ],
     context: 'workspace.updateProfile',
   });
 }
+
 
 export async function insertSaleRecord(
   payload: Record<string, unknown>,
@@ -427,10 +536,39 @@ export async function createProductRecord(
     }
   }
 
-  const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = ['user_id', 'low_stock_threshold', 'is_archived'];
+  // Remap multi-tenant schema names to the single-tenant schema's column
+  // names. We send BOTH so whichever exists succeeds; missing ones are
+  // dropped via the auto-detect fallback below.
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.cost_price !== undefined && remapped.cost === undefined) {
+    remapped.cost = remapped.cost_price;
+  }
+  if (remapped.selling_price !== undefined && remapped.price === undefined) {
+    remapped.price = remapped.selling_price;
+  }
+  if (remapped.quantity !== undefined && remapped.stock === undefined) {
+    remapped.stock = remapped.quantity;
+  }
+  if (remapped.reorder_level !== undefined && remapped.low_stock_threshold === undefined) {
+    remapped.low_stock_threshold = remapped.reorder_level;
+  }
 
-  while (true) {
+  const nextPayload: Record<string, unknown> = { ...remapped };
+  const remainingColumns = new Set([
+    'user_id',
+    'business_id',
+    'low_stock_threshold',
+    'is_archived',
+    'reorder_level',
+    'category',
+    'cost_price',
+    'selling_price',
+    'quantity',
+    'image_url',
+  ]);
+  const droppedColumns = new Set<string>();
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data, error } = await supabase
       .from('products')
       .insert(nextPayload as never)
@@ -439,7 +577,15 @@ export async function createProductRecord(
 
     if (!error) return data as { id: string };
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, 'products'));
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, 'products'),
+    );
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
     logSupabaseError('workspace.createProduct', error, {
@@ -447,9 +593,11 @@ export async function createProductRecord(
       missingColumn,
       fallbackMode: 'insertWithoutOptionalColumn',
     });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
+  throw new Error('Could not create product after dropping unknown columns.');
 }
 
 export async function updateProductRecord(
@@ -772,14 +920,22 @@ export function logSupabaseError(context: string, error: unknown, extra?: Record
 }
 
 export async function resolveCurrentBusinessId(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('business_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return ((data as any)?.business_id as string | null) ?? null;
+  // Try the multi-tenant column first; fall back to single-tenant where
+  // each user IS their own workspace (businessId = userId).
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('business_id')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!error) {
+      return ((data as any)?.business_id as string | null) ?? userId;
+    }
+    if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
+  } catch (error) {
+    if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
+  }
+  return userId;
 }
 
 async function fallbackProfileMembership({
@@ -795,19 +951,21 @@ async function fallbackProfileMembership({
   email?: string | null;
   phone?: string;
 }) {
-  const profilePayload = {
-    user_id: userId,
+  // Use the schema-tolerant updater so unknown columns (business_id,
+  // email_verified, …) are silently dropped on single-tenant schemas.
+  await updateProfileRecord(userId, {
     business_id: businessId,
     display_name: displayName?.trim() || email?.split('@')[0]?.trim() || 'User',
     phone: phone?.trim() || null,
-  };
-
-  const { error } = await supabase
-    .from('profiles')
-    .upsert(profilePayload as never, { onConflict: 'user_id' });
-
-  if (error) throw error;
-  await ensureBusinessRoleMembership({ businessId, userId });
+  });
+  try {
+    await ensureBusinessRoleMembership({ businessId, userId });
+  } catch (roleError) {
+    logSupabaseError('workspace.fallbackProfileMembership.ensureRole', roleError, {
+      businessId,
+      userId,
+    });
+  }
   return businessId;
 }
 
@@ -876,7 +1034,16 @@ export async function ensureUserBusinessWorkspace({
     _logo_dark_url: '',
   });
 
-  if (error) throw error;
-  if (!data) throw new Error('Business setup did not return a workspace id.');
+  if (error) {
+    if (isMissingFunctionError(error)) {
+      // Single-tenant fallback: the user IS their own workspace.
+      logSupabaseError('workspace.createBusinessFallback', error, { userId: user.id });
+      return ensureMembership(user.id);
+    }
+    throw error;
+  }
+  if (!data) {
+    return ensureMembership(user.id);
+  }
   return ensureMembership(data as string);
 }
