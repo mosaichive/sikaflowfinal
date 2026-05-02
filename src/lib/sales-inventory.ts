@@ -20,6 +20,7 @@ type SaleItemLike = {
   sale_id?: string | null;
   quantity?: NumberLike;
   unit_price?: NumberLike;
+  unit_cost?: NumberLike;
   cost_price?: NumberLike;
   line_total?: NumberLike;
 };
