@@ -130,30 +130,6 @@ export default function InventoryPage() {
   const canManage = isAdmin || isManager;
   const [recomputing, setRecomputing] = useState(false);
 
-  const handleRecomputeStock = useCallback(async () => {
-    setRecomputing(true);
-    try {
-      const result = await recomputeProductStock();
-      if (!result.ok) {
-        toast({
-          title: 'Could not recalculate stock',
-          description: result.error ?? 'Please try again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      toast({
-        title: 'Stock recalculated',
-        description: `${result.updated.length} product(s) updated from stock movements.`,
-      });
-      // Reload so the UI reflects the new totals.
-      void load();
-    } finally {
-      setRecomputing(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]);
-
   const load = useCallback(async () => {
     const [productsRes, movementsRes, restocksRes, expensesRes] = await Promise.allSettled([
       loadProductsCompat(false, businessId),
@@ -190,6 +166,28 @@ export default function InventoryPage() {
       setExpenses([]);
     }
   }, [businessId]);
+
+  const handleRecomputeStock = useCallback(async () => {
+    setRecomputing(true);
+    try {
+      const result = await recomputeProductStock();
+      if (!result.ok) {
+        toast({
+          title: 'Could not recalculate stock',
+          description: result.error ?? 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({
+        title: 'Stock recalculated',
+        description: `${result.updated.length} product(s) updated from stock movements.`,
+      });
+      await load();
+    } finally {
+      setRecomputing(false);
+    }
+  }, [toast, load]);
 
   useEffect(() => {
     void load();
