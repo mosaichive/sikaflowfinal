@@ -125,31 +125,52 @@ export type Database = {
       other_income: {
         Row: {
           amount: number
+          attachment_name: string | null
+          attachment_path: string | null
+          category: string | null
           created_at: string
+          description: string | null
           id: string
           income_date: string
           note: string | null
-          source: string
+          payment_method: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
+          source: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
+          category?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           income_date?: string
           note?: string | null
-          source: string
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          source?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
+          category?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           income_date?: string
           note?: string | null
-          source?: string
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          source?: string | null
           updated_at?: string
           user_id?: string
         }

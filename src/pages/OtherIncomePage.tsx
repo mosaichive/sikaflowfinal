@@ -48,9 +48,18 @@ export default function OtherIncomePage() {
   const canManage = isAdmin || isManager;
 
   const fetchRows = useCallback(async () => {
-    const { data } = await supabase.from('other_income' as any).select('*').order('income_date', { ascending: false });
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('other_income' as any)
+      .select('*')
+      .eq('user_id', user.id)
+      .order('income_date', { ascending: false });
+    if (error) {
+      console.error('[other_income] fetch failed', error);
+      return;
+    }
     setRows((data || []) as OtherIncomeRow[]);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     void fetchRows();
@@ -70,7 +79,15 @@ export default function OtherIncomePage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user || !businessId) return;
+    if (!user) {
+      toast({ title: 'Not signed in', description: 'Please sign in again and retry.', variant: 'destructive' });
+      return;
+    }
+    const amountValue = Number(form.amount || 0);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      toast({ title: 'Enter a valid amount', description: 'Amount must be greater than zero.', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
 
     try {
@@ -79,26 +96,39 @@ export default function OtherIncomePage() {
 
       if (attachment) {
         const ext = attachment.name.split('.').pop() || 'png';
-        const path = `${businessId}/${Date.now()}-${attachment.name.replace(/\s+/g, '-')}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('other-income-receipts').upload(path, attachment, { upsert: true });
-        if (uploadError) throw uploadError;
+        const path = `${user.id}/${Date.now()}-${attachment.name.replace(/\s+/g, '-')}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('other-income-receipts')
+          .upload(path, attachment, { upsert: true });
+        if (uploadError) {
+          console.error('[other_income] upload failed', uploadError);
+          throw uploadError;
+        }
         attachmentPath = path;
         attachmentName = attachment.name;
       }
 
-      const { error } = await supabase.from('other_income' as any).insert({
-        business_id: businessId,
+      const payload: Record<string, unknown> = {
+        user_id: user.id,
+        source: form.category, // legacy NOT-NULL-friendly column; trigger also syncs this
         category: form.category,
-        amount: Number(form.amount || 0),
+        amount: amountValue,
         income_date: form.income_date,
         payment_method: form.payment_method,
         description: form.description,
+        note: form.description, // keep legacy "note" column populated for older readers
         attachment_path: attachmentPath,
         attachment_name: attachmentName,
         recorded_by: user.id,
         recorded_by_name: displayName || user.email || '',
-      });
-      if (error) throw error;
+      };
+      if (businessId) payload.business_id = businessId;
+
+      const { error } = await supabase.from('other_income' as any).insert(payload);
+      if (error) {
+        console.error('[other_income] insert failed', error, payload);
+        throw error;
+      }
 
       toast({ title: 'Other income saved', description: 'This income now contributes to available business money.' });
       setForm({
@@ -110,10 +140,15 @@ export default function OtherIncomePage() {
       });
       setAttachment(null);
       setOpen(false);
-    } catch (error) {
+      void fetchRows();
+    } catch (error: any) {
+      const description =
+        error?.message ||
+        error?.error_description ||
+        (typeof error === 'string' ? error : 'Please try again.');
       toast({
         title: 'Could not save other income',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description,
         variant: 'destructive',
       });
     } finally {
