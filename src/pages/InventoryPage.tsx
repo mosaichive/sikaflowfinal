@@ -321,7 +321,7 @@ export default function InventoryPage() {
       quantity: String(restock.quantity_added),
       unit_cost: String(Number(restock.cost_price_per_unit || 0)),
       selling_price: String(Number(product?.selling_price || 0)),
-      payment_method: restock.payment_method || PAYMENT_METHODS[0].value,
+      payment_method: (restock.payment_method || PAYMENT_METHODS[0].value) as typeof PAYMENT_METHODS[number]['value'],
       description: restock.note || restock.reference || '',
     });
     setDialogOpen(true);
@@ -651,7 +651,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
-                  <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value }))}>
+                  <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as typeof current.payment_method }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PAYMENT_METHODS.map((method) => (

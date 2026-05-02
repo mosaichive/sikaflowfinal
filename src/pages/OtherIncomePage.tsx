@@ -172,7 +172,7 @@ export default function OtherIncomePage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Income Category</Label>
-                        <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value }))}>
+                        <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value as typeof current.category }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {OTHER_INCOME_CATEGORIES.map((category) => (
@@ -191,7 +191,7 @@ export default function OtherIncomePage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Payment Method</Label>
-                        <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value }))}>
+                        <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as typeof current.payment_method }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {PAYMENT_METHODS.map((method) => (
