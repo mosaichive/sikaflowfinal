@@ -270,7 +270,7 @@ export default function SalesPage() {
         cost_total: costPrice * quantity,
       });
 
-      const saleItem = await insertSaleItemRecord({
+      const saleItemPayload = {
         user_id: user.id,
         business_id: businessId,
         sale_id: sale.id,
@@ -284,7 +284,17 @@ export default function SalesPage() {
         line_total: subtotal,
         default_price: defaultPrice,
         price_note: isPriceOverridden ? priceNote : '',
-      });
+      };
+      const validation = validateSaleItemPayload(saleItemPayload);
+      if (!validation.ok) {
+        toast({
+          title: 'Invalid sale item',
+          description: validation.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const saleItem = await insertSaleItemRecord(saleItemPayload);
 
       await updateProductQuantity(selectedProduct.id, Number(selectedProduct.quantity ?? 0) - quantity);
 
