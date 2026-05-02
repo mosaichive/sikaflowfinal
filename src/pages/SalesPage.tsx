@@ -126,46 +126,29 @@ export default function SalesPage() {
     await Promise.all([fetchAllProducts(), fetchSales()]);
   };
 
-  const updateProductQuantity = async (productId: string, nextQuantity: number) => {
-    const { error } = await supabase
-      .from('products')
-      .update({ quantity: nextQuantity } as never)
-      .eq('id', productId);
-
-    if (error) throw error;
+  // Stock is managed entirely by the DB triggers `adjust_stock_on_sale_item`
+  // (decrements products.stock on sale_items insert/delete) and
+  // `log_stock_movement_on_sale_item` (writes the corresponding stock_movements
+  // row). The app must NOT write to products.quantity / products.stock or to
+  // stock_movements directly — the schema doesn't have a `quantity` column on
+  // products and the triggers will double-count if we do.
+  const updateProductQuantity = async (_productId: string, _nextQuantity: number) => {
+    // no-op: handled by adjust_stock_on_sale_item trigger
   };
 
-  const restoreSaleStock = async (items: any[]) => {
-    for (const item of items) {
-      if (!item?.product_id) continue;
-      const product = allProducts.find((row) => row.id === item.product_id);
-      const currentQuantity = Number(product?.quantity ?? 0);
-      await updateProductQuantity(item.product_id, currentQuantity + Number(item.quantity ?? 0));
-    }
+  const restoreSaleStock = async (_items: any[]) => {
+    // no-op: deleting sale_items rows fires adjust_stock_on_sale_item which
+    // restores products.stock automatically.
   };
 
-  const applyEditStockAdjustments = async ({
-    oldProductId,
-    oldQty,
-    newProduct,
-    newQty,
-  }: {
+  const applyEditStockAdjustments = async (_args: {
     oldProductId: string;
     oldQty: number;
     newProduct: any;
     newQty: number;
   }) => {
-    if (oldProductId === newProduct.id) {
-      const currentQuantity = Number(newProduct.quantity ?? 0);
-      await updateProductQuantity(newProduct.id, currentQuantity + oldQty - newQty);
-      return;
-    }
-
-    const previousProduct = allProducts.find((row) => row.id === oldProductId);
-    if (previousProduct) {
-      await updateProductQuantity(oldProductId, Number(previousProduct.quantity ?? 0) + oldQty);
-    }
-    await updateProductQuantity(newProduct.id, Number(newProduct.quantity ?? 0) - newQty);
+    // no-op: removing the old sale_items row + inserting the new one fires the
+    // adjust_stock_on_sale_item trigger, which handles all stock deltas.
   };
 
   const resetForm = () => {
