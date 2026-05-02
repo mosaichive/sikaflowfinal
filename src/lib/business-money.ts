@@ -46,7 +46,7 @@ export function sumAmounts(...args: Parameters<typeof calculateTotalOtherIncome>
 }
 
 export function calculateAvailableBusinessMoneyBreakdown(args: AvailableBusinessMoneyArgs) {
-  return calculateAvailableBusinessMoneyBreakdownBase(args);
+  return calculateAvailableBusinessMoneyBreakdownBase(args as any);
 }
 
 export function calculateAvailableBusinessMoney(args: AvailableBusinessMoneyArgs) {

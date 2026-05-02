@@ -45,6 +45,7 @@ type OrderRow = {
   created_by: string | null;
   created_by_name: string | null;
   order_date: string;
+  due_date?: string | null;
 };
 
 type OrderItemRow = {
@@ -440,7 +441,7 @@ export default function OrdersPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Payment Method</Label>
-                      <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value }))}>
+                      <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as typeof current.payment_method }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {PAYMENT_METHODS.map((method) => (

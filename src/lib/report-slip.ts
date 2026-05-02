@@ -51,13 +51,13 @@ type ReportSourceArgs = {
 type BaseTransaction = Omit<ReportStatementRow, 'runningBalance'> & { timestamp: number };
 
 const COLORS = {
-  ink: [15, 23, 42] as const,
-  muted: [100, 116, 139] as const,
-  line: [226, 232, 240] as const,
-  surface: [248, 250, 252] as const,
-  accent: [159, 18, 57] as const,
-  success: [5, 150, 105] as const,
-  danger: [220, 38, 38] as const,
+  ink: [15, 23, 42] as [number, number, number],
+  muted: [100, 116, 139] as [number, number, number],
+  line: [226, 232, 240] as [number, number, number],
+  surface: [248, 250, 252] as [number, number, number],
+  accent: [159, 18, 57] as [number, number, number],
+  success: [5, 150, 105] as [number, number, number],
+  danger: [220, 38, 38] as [number, number, number],
 };
 
 let logoPromise: Promise<HTMLImageElement | null> | null = null;

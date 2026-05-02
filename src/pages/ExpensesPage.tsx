@@ -258,7 +258,7 @@ export default function ExpensesPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Payment Method</Label>
-                      <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value }))}>
+                      <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as typeof current.payment_method }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {PAYMENT_METHODS.map((method) => (

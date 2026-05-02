@@ -108,11 +108,11 @@ type DocumentSummaryRow = {
 };
 
 const PDF_COLORS = {
-  ink: [15, 23, 42] as const,
-  muted: [100, 116, 139] as const,
-  line: [226, 232, 240] as const,
-  surface: [245, 247, 250] as const,
-  accent: [31, 41, 55] as const,
+  ink: [15, 23, 42] as [number, number, number],
+  muted: [100, 116, 139] as [number, number, number],
+  line: [226, 232, 240] as [number, number, number],
+  surface: [245, 247, 250] as [number, number, number],
+  accent: [31, 41, 55] as [number, number, number],
 };
 
 let fontBinaryPromise: Promise<string> | null = null;
@@ -1035,17 +1035,17 @@ export async function downloadSaleDocument(document: SaleDocumentRecord) {
     doc.setFontSize(row.emphasis ? 11 : 10);
     doc.setTextColor(...PDF_COLORS.muted);
     doc.text(row.label, summaryBoxX + 12, summaryRowY);
-    const tone = row.tone
+    const tone: [number, number, number] = row.tone
       ? (() => {
-          if (row.tone === '#0f766e') return [15, 118, 110] as const;
-          if (row.tone === '#b45309') return [180, 83, 9] as const;
-          if (row.tone === '#b91c1c') return [185, 28, 28] as const;
+          if (row.tone === '#0f766e') return [15, 118, 110] as [number, number, number];
+          if (row.tone === '#b45309') return [180, 83, 9] as [number, number, number];
+          if (row.tone === '#b91c1c') return [185, 28, 28] as [number, number, number];
           return PDF_COLORS.ink;
         })()
       : PDF_COLORS.ink;
     doc.setFont('NotoSans', 'bold');
     doc.setFontSize(row.emphasis ? 13 : 10);
-    doc.setTextColor(...tone);
+    doc.setTextColor(tone[0], tone[1], tone[2]);
     doc.text(row.value, summaryBoxX + summaryBoxWidth - 12, summaryRowY, { align: 'right' });
     summaryRowY += 28;
   });
