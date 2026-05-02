@@ -537,9 +537,21 @@ export async function createProductRecord(
   }
 
   const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = ['user_id', 'low_stock_threshold', 'is_archived'];
+  const remainingColumns = new Set([
+    'user_id',
+    'business_id',
+    'low_stock_threshold',
+    'is_archived',
+    'reorder_level',
+    'category',
+    'cost_price',
+    'selling_price',
+    'quantity',
+    'image_url',
+  ]);
+  const droppedColumns = new Set<string>();
 
-  while (true) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data, error } = await supabase
       .from('products')
       .insert(nextPayload as never)
@@ -548,7 +560,15 @@ export async function createProductRecord(
 
     if (!error) return data as { id: string };
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, 'products'));
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, 'products'),
+    );
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
     logSupabaseError('workspace.createProduct', error, {
@@ -556,9 +576,11 @@ export async function createProductRecord(
       missingColumn,
       fallbackMode: 'insertWithoutOptionalColumn',
     });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
+  throw new Error('Could not create product after dropping unknown columns.');
 }
 
 export async function updateProductRecord(
