@@ -711,19 +711,13 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const allCachedRows = readAllCachedProducts();
   const scopedBaseQuery = () => {
-    let query = supabase.from('products').select('*').order('name');
-    if (effectiveBusinessId) {
-      query = query.eq('business_id', effectiveBusinessId);
-    }
-    return query;
+    // Note: in the single-tenant schema products are scoped by user_id via RLS,
+    // not business_id. We intentionally don't add a business_id filter here.
+    return supabase.from('products').select('*').order('name');
   };
   const visibleBaseQuery = () => supabase.from('products').select('*').order('name');
   const stableBaseQuery = () => {
-    let query = supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
-    if (effectiveBusinessId) {
-      query = query.eq('business_id', effectiveBusinessId);
-    }
-    return query;
+    return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   };
   const filterVisibleRows = (rows: CachedProductRow[]) =>
     effectiveBusinessId
