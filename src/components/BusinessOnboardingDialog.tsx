@@ -139,7 +139,8 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     if (!user || !validateStep('review')) return;
     setSubmitting(true);
     try {
-      const { data: businessId, error: businessError } = await supabase.rpc('create_business_for_owner', {
+      const db = supabase as any;
+      const { data: businessId, error: businessError } = await db.rpc('create_business_for_owner', {
         _name: companyName.trim(),
         _email: email,
         _phone: phone.trim(),
@@ -152,12 +153,12 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
       if (!businessId) throw new Error('Business setup did not return an id');
 
       await Promise.all([
-        supabase.from('businesses').update({
+        db.from('businesses').update({
           email_verified: true,
           phone_verified: true,
           status: 'active',
         }).eq('id', businessId),
-        supabase.from('profiles').update({
+        db.from('profiles').update({
           display_name: ownerName.trim(),
           phone: phone.trim(),
           title: role,

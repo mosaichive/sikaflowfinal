@@ -140,19 +140,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const uid = userId || user?.id;
     if (!uid) return { found: false, error: false };
 
-    let { data, error } = await supabase
+    const db = supabase as any;
+    let { data, error } = await db
       .from('profiles')
       .select('display_name, avatar_url, title, phone, bio, onboarding_completed')
       .eq('user_id', uid)
       .maybeSingle();
 
     if (error && isMissingProfileColumnError(error, 'onboarding_completed')) {
-      const fallbackResult = await supabase
+      const fallbackResult = await db
         .from('profiles')
         .select('display_name, avatar_url, title, phone, bio')
         .eq('user_id', uid)
         .maybeSingle();
-      data = fallbackResult.data ? { ...fallbackResult.data, onboarding_completed: false } : null;
+      data = fallbackResult.data ? { ...(fallbackResult.data as any), onboarding_completed: false } : null;
       error = fallbackResult.error;
     }
 
@@ -162,13 +163,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { found: false, error: true };
     }
 
-    setProfile(data ? {
-      display_name: data.display_name || '',
-      avatar_url: data.avatar_url || '',
-      title: data.title || '',
-      phone: data.phone || '',
-      bio: data.bio || '',
-      onboarding_completed: Boolean((data as any).onboarding_completed),
+    const row = data as any;
+    setProfile(row ? {
+      display_name: row.display_name || '',
+      avatar_url: row.avatar_url || '',
+      title: row.title || '',
+      phone: row.phone || '',
+      bio: row.bio || '',
+      onboarding_completed: Boolean(row.onboarding_completed),
     } : emptyProfile);
     return { found: !!data, error: false };
   }, [user?.id]);

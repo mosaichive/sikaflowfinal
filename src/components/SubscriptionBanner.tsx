@@ -21,13 +21,14 @@ export function SubscriptionBanner() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const db = supabase as any;
+      const { data } = await db
         .from('platform_announcements')
         .select('id,title,body,level')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(5);
-      const list = data ?? [];
+      const list = (data ?? []) as Announcement[];
       setAnns(list.filter((a) => !localStorage.getItem(dismissedKey(a.id))));
     })();
   }, []);

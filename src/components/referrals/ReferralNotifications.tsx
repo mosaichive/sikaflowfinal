@@ -66,7 +66,7 @@ export function ReferralNotifications() {
       .order('updated_at', { ascending: false })
       .limit(8);
 
-    ((data as ReferralNoticeRow[]) ?? []).forEach((row) => notify(row, true));
+    ((data as unknown as ReferralNoticeRow[]) ?? []).forEach((row) => notify(row, true));
     hydratedRef.current = true;
   }, [businessId, notify, user?.id]);
 

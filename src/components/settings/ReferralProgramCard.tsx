@@ -94,8 +94,8 @@ export function ReferralProgramCard() {
         .limit(6),
     ]);
 
-    setAccount((accountRes.data as ReferralAccountRow | null) ?? null);
-    setRows((rowsRes.data as ReferralRow[]) ?? []);
+    setAccount((accountRes.data as unknown as ReferralAccountRow | null) ?? null);
+    setRows((rowsRes.data as unknown as ReferralRow[]) ?? []);
     setLoading(false);
   }, [businessId, isOwnerAdmin]);
 

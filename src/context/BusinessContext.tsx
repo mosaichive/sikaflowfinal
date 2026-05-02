@@ -54,7 +54,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
       try {
-        const { data: profile } = await supabase
+        const db = supabase as any;
+        const { data: profile } = await db
           .from('profiles')
           .select('business_id')
           .eq('user_id', user.id)
@@ -65,8 +66,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
           setBusiness(null);
           return;
         }
-        const { data: biz } = await supabase
-          .from('businesses' as any)
+        const { data: biz } = await db
+          .from('businesses')
           .select('*')
           .eq('id', bizId)
           .maybeSingle();
