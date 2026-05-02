@@ -746,7 +746,7 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
     try {
       const { data, error } = await scopedBaseQuery();
       if (error) throw error;
-      let liveRows = (data ?? []) as CachedProductRow[];
+      let liveRows = ((data ?? []) as Array<Record<string, unknown>>).map(normalizeProductRow);
       if (liveRows.length === 0 && effectiveBusinessId) {
         const stableRows = await loadStableRows();
         liveRows = stableRows;
@@ -774,10 +774,10 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
 
   const { data, error } = await scopedBaseQuery().eq('is_archived', false);
   if (!error) {
-    const rows = (data ?? []) as Array<{ is_archived?: boolean | null }>;
-    if (rows.length > 0) {
+    const rawRows = (data ?? []) as Array<Record<string, unknown>>;
+    if (rawRows.length > 0) {
       const mergedRows = mergeProductRows(
-        rows as CachedProductRow[],
+        rawRows.map(normalizeProductRow),
         filterVisibleRows(allCachedRows),
         false,
       );
@@ -787,7 +787,9 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
 
     const { data: fallbackData, error: fallbackError } = await scopedBaseQuery();
     if (fallbackError) throw fallbackError;
-    const filteredRows = ((fallbackData ?? []) as Array<{ is_archived?: boolean | null }>).filter((row) => row.is_archived !== true) as CachedProductRow[];
+    const filteredRows = ((fallbackData ?? []) as Array<Record<string, unknown>>)
+      .map(normalizeProductRow)
+      .filter((row) => row.is_archived !== true);
     const mergedRows = mergeProductRows(filteredRows, filterVisibleRows(allCachedRows), false);
     if (mergedRows.length > 0) {
       if (businessId) writeCachedProducts(businessId, mergedRows);
