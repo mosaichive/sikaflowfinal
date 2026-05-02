@@ -69,7 +69,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         ] = await Promise.allSettled([
             db
               .from('sales')
-              .select('id,total,amount_paid,sale_date,payment_status,status')
+              .select('id,total,amount_paid,sale_date')
               .eq('user_id', userId)
               .order('sale_date', { ascending: false }),
             loadProductsCompat(false, businessId ?? userId),

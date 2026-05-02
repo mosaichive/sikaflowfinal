@@ -251,12 +251,12 @@ export default function SavingsPage() {
       return;
     }
 
-    const payload = {
-      business_id: businessId,
+    const payload: any = {
+      user_id: user.id,
       amount: savingForm.amount,
       savings_date: new Date(savingForm.savings_date).toISOString(),
       source: savingForm.savings_type,
-      bank_account_id: savingForm.bank_account_id,
+      bank_account_id: savingForm.bank_account_id || null,
       reference: savingForm.reference || null,
       note: savingForm.note || null,
       recorded_by: user.id,
