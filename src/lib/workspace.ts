@@ -290,6 +290,34 @@ function isMissingTableError(error: unknown, tableName?: string) {
   );
 }
 
+function extractMissingColumnFromError(error: unknown): string | null {
+  const normalized = (error ?? {}) as SupabaseErrorLike;
+  const haystacks = [normalized.message, normalized.details, normalized.hint].filter(
+    (value): value is string => typeof value === 'string',
+  );
+  const code = normalized.code?.toUpperCase() ?? '';
+  if (code !== 'PGRST204' && code !== '42703' && !haystacks.some((h) => /column|schema cache/i.test(h))) {
+    return null;
+  }
+  const patterns = [
+    /column "([^"]+)"/i,
+    /column ([a-zA-Z0-9_.]+) does not exist/i,
+    /'([a-zA-Z0-9_]+)' column/i,
+    /Could not find the '([a-zA-Z0-9_]+)' column/i,
+  ];
+  for (const text of haystacks) {
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const raw = match[1];
+        const dot = raw.lastIndexOf('.');
+        return dot >= 0 ? raw.slice(dot + 1) : raw;
+      }
+    }
+  }
+  return null;
+}
+
 async function updateWithOptionalColumnFallback<T extends Record<string, unknown>>({
   table,
   matchColumn,
@@ -306,9 +334,10 @@ async function updateWithOptionalColumnFallback<T extends Record<string, unknown
   context: string;
 }) {
   const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = [...optionalColumns];
+  const remainingColumns = new Set(optionalColumns);
+  const droppedColumns = new Set<string>();
 
-  while (true) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { error } = await supabase
       .from(table as any)
       .update(nextPayload as never)
@@ -316,11 +345,26 @@ async function updateWithOptionalColumnFallback<T extends Record<string, unknown
 
     if (!error) return;
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, table));
+    // Try the listed optional columns first.
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, table),
+    );
+    // Then auto-detect any column from the error message and drop it too.
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
-    logSupabaseError(context, error, { table, missingColumn, fallbackMode: 'updateWithoutOptionalColumn' });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    logSupabaseError(context, error, {
+      table,
+      missingColumn,
+      fallbackMode: 'updateWithoutOptionalColumn',
+    });
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
 }
@@ -337,9 +381,10 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
   context: string;
 }) {
   const nextPayload: Record<string, unknown> = { ...payload };
-  const remainingColumns = [...optionalColumns];
+  const remainingColumns = new Set(optionalColumns);
+  const droppedColumns = new Set<string>();
 
-  while (true) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data, error } = await supabase
       .from(table as any)
       .insert(nextPayload as never)
@@ -348,11 +393,24 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
 
     if (!error) return data;
 
-    const missingColumn = remainingColumns.find((column) => isMissingColumnError(error, column, table));
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, table),
+    );
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
     if (!missingColumn) throw error;
 
-    logSupabaseError(context, error, { table, missingColumn, fallbackMode: 'insertWithoutOptionalColumn' });
-    remainingColumns.splice(remainingColumns.indexOf(missingColumn), 1);
+    logSupabaseError(context, error, {
+      table,
+      missingColumn,
+      fallbackMode: 'insertWithoutOptionalColumn',
+    });
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
 }
@@ -361,12 +419,22 @@ export async function updateBusinessWorkspaceRecord(
   businessId: string,
   payload: Record<string, unknown>,
 ) {
+  // The current schema does not have a separate `businesses` table — the
+  // user's business info lives on `profiles`. Update that row instead so
+  // setup completes against single-tenant schemas without breaking
+  // multi-tenant ones (the helper auto-drops unknown columns).
   return updateWithOptionalColumnFallback({
-    table: 'businesses',
+    table: 'profiles',
     matchColumn: 'id',
     matchValue: businessId,
-    payload,
-    optionalColumns: ['business_type'],
+    payload: {
+      business_name: payload.name ?? payload.business_name,
+      business_type: payload.business_type,
+      phone: payload.phone,
+      location: payload.location,
+      logo_url: payload.logo_light_url ?? payload.logo_url,
+    },
+    optionalColumns: ['business_type', 'logo_url', 'logo_light_url', 'logo_dark_url', 'status', 'email_verified'],
     context: 'workspace.updateBusiness',
   });
 }
@@ -377,13 +445,23 @@ export async function updateProfileRecord(
 ) {
   return updateWithOptionalColumnFallback({
     table: 'profiles',
-    matchColumn: 'user_id',
+    // The schema uses `id` (= auth user id) as the primary key.
+    matchColumn: 'id',
     matchValue: userId,
     payload,
-    optionalColumns: ['onboarding_completed'],
+    optionalColumns: [
+      'onboarding_completed',
+      'business_id',
+      'display_name',
+      'email_verified',
+      'avatar_url',
+      'title',
+      'bio',
+    ],
     context: 'workspace.updateProfile',
   });
 }
+
 
 export async function insertSaleRecord(
   payload: Record<string, unknown>,
