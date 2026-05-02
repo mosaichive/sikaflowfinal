@@ -850,14 +850,22 @@ export function logSupabaseError(context: string, error: unknown, extra?: Record
 }
 
 export async function resolveCurrentBusinessId(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('business_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return ((data as any)?.business_id as string | null) ?? null;
+  // Try the multi-tenant column first; fall back to single-tenant where
+  // each user IS their own workspace (businessId = userId).
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('business_id')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!error) {
+      return ((data as any)?.business_id as string | null) ?? userId;
+    }
+    if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
+  } catch (error) {
+    if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
+  }
+  return userId;
 }
 
 async function fallbackProfileMembership({
