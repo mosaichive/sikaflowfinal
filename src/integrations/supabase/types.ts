@@ -167,31 +167,49 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          attachment_name: string | null
+          attachment_path: string | null
           category: string
           created_at: string
+          description: string | null
           expense_date: string
           id: string
           note: string | null
+          payment_method: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
           category?: string
           created_at?: string
+          description?: string | null
           expense_date?: string
           id?: string
           note?: string | null
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          attachment_name?: string | null
+          attachment_path?: string | null
           category?: string
           created_at?: string
+          description?: string | null
           expense_date?: string
           id?: string
           note?: string | null
+          payment_method?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -702,36 +720,48 @@ export type Database = {
         Row: {
           account_name: string | null
           amount: number
+          bank_account_id: string | null
           created_at: string
           id: string
           institution: string | null
           note: string | null
+          recorded_by: string | null
+          reference: string | null
           savings_date: string
-          type: Database["public"]["Enums"]["savings_type"]
+          source: string | null
+          type: Database["public"]["Enums"]["savings_type"] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account_name?: string | null
           amount?: number
+          bank_account_id?: string | null
           created_at?: string
           id?: string
           institution?: string | null
           note?: string | null
+          recorded_by?: string | null
+          reference?: string | null
           savings_date?: string
-          type?: Database["public"]["Enums"]["savings_type"]
+          source?: string | null
+          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           account_name?: string | null
           amount?: number
+          bank_account_id?: string | null
           created_at?: string
           id?: string
           institution?: string | null
           note?: string | null
+          recorded_by?: string | null
+          reference?: string | null
           savings_date?: string
-          type?: Database["public"]["Enums"]["savings_type"]
+          source?: string | null
+          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
           user_id?: string
         }
