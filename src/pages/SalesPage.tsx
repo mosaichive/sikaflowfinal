@@ -161,15 +161,7 @@ export default function SalesPage() {
     setEditSaleId(null); setEditOriginal(null);
   };
 
-  const createSaleMovement = async ({
-    saleItemId,
-    product,
-    soldQuantity,
-    unitCost,
-    soldPrice,
-    note,
-    isNegativeStockSale = false,
-  }: {
+  const createSaleMovement = async (_args: {
     saleItemId: string;
     product: any;
     soldQuantity: number;
@@ -178,29 +170,9 @@ export default function SalesPage() {
     note: string;
     isNegativeStockSale?: boolean;
   }) => {
-    if (!businessId || !user) return;
-    const quantityAfter = Number(product.quantity ?? 0) - soldQuantity;
-    const result = await insertStockMovementCompat({
-      business_id: businessId,
-      product_id: product.id,
-      movement_type: 'sale',
-      quantity_change: soldQuantity * -1,
-      quantity_after: quantityAfter,
-      unit_cost: unitCost,
-      unit_price: soldPrice,
-      source_table: 'sale_items',
-      source_id: saleItemId,
-      note: isNegativeStockSale ? [note, 'Negative Stock Sale'].filter(Boolean).join(' • ') : note,
-      created_by: user.id,
-      created_by_name: displayName || user.email || '',
-      movement_date: new Date(saleDate).toISOString(),
-    });
-    if (result.skipped) {
-      logSupabaseError('sales.createSaleMovementSkipped', new Error('stock_movements table unavailable'), {
-        productId: product.id,
-        saleItemId,
-      });
-    }
+    // no-op: log_stock_movement_on_sale_item DB trigger writes the
+    // stock_movements row automatically when the sale_items row is inserted.
+    // Writing it again here would double the movement.
   };
 
   const handleProductChange = (v: string) => {
