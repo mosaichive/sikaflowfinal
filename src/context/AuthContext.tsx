@@ -257,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!user?.id) return;
         await Promise.all([fetchProfile(user.id), fetchRole(user.id)]);
       },
-      isAdmin: role === 'admin',
+      isAdmin: role === 'admin' || role === 'business_owner',
       isManager: role === 'manager',
       isSalesperson: role === 'salesperson',
       isDistributor: role === 'distributor',
