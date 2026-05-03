@@ -160,22 +160,22 @@ export default function SavingsPage() {
     }
 
     setLoading(false);
-  }, [businessId]);
+  }, [user]);
 
   useEffect(() => {
     void fetchAll();
-    if (!businessId) return;
+    if (!user) return;
 
     const channel = supabase
       .channel('savings-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [businessId, fetchAll]);
+  }, [user, fetchAll]);
 
   const availableBusinessMoney = financials.availableBusinessMoney;
 
