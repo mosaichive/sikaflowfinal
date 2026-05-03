@@ -135,11 +135,12 @@ export default function SavingsPage() {
   const [editDestinationId, setEditDestinationId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
 
     const [destinationsRes, savingsRes] = await Promise.allSettled([
-      supabase.from('bank_accounts').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
-      supabase.from('savings').select('*').eq('business_id', businessId).order('savings_date', { ascending: false }),
+      supabase.from('bank_accounts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('savings').select('*').eq('user_id', user.id).order('savings_date', { ascending: false }),
     ]);
 
     if (destinationsRes.status === 'fulfilled') {
@@ -159,22 +160,22 @@ export default function SavingsPage() {
     }
 
     setLoading(false);
-  }, [businessId]);
+  }, [user]);
 
   useEffect(() => {
     void fetchAll();
-    if (!businessId) return;
+    if (!user) return;
 
     const channel = supabase
       .channel('savings-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [businessId, fetchAll]);
+  }, [user, fetchAll]);
 
   const availableBusinessMoney = financials.availableBusinessMoney;
 
@@ -290,7 +291,7 @@ export default function SavingsPage() {
   }
 
   async function handleSaveDestination() {
-    if (!businessId) return;
+    if (!user) return;
 
     const type = destinationForm.account_type;
     const isBank = type === 'bank';
@@ -315,7 +316,7 @@ export default function SavingsPage() {
     }
 
     const payload = {
-      business_id: businessId,
+      user_id: user.id,
       account_type: type,
       bank_name: destinationForm.bank_name.trim(),
       account_name: accountName,

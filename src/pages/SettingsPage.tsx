@@ -479,10 +479,10 @@ export default function SettingsPage() {
 
   // ---- Bank CRUD ----
   const handleBankSave = async () => {
-    if (!bankForm.bank_name || !businessId) return;
+    if (!bankForm.bank_name || !user) return;
     const { error } = editBankId
       ? await supabase.from('bank_accounts').update(bankForm).eq('id', editBankId)
-      : await supabase.from('bank_accounts').insert({ ...bankForm, business_id: businessId });
+      : await supabase.from('bank_accounts').insert({ ...bankForm, user_id: user.id });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: editBankId ? 'Bank updated' : 'Bank added' });
     setBankForm(emptyBank); setEditBankId(null); setBankOpen(false); fetchBanks();

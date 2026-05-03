@@ -220,17 +220,13 @@ export default function SavingsInvestmentsPage() {
   // Investor Funding CRUD
   const handleFundingSave = async () => {
     if (!fundingForm.investor_name || !fundingForm.amount || !user) return;
-    if (!businessId) return;
     const payload = {
-      business_id: businessId,
-      investor_name: fundingForm.investor_name, amount: fundingForm.amount,
+      user_id: user.id,
+      investor_name: fundingForm.investor_name,
+      amount: fundingForm.amount,
       date_received: new Date(fundingForm.date_received).toISOString(),
-      payment_method: fundingForm.payment_method,
-      bank_account_id: fundingForm.bank_account_id || null,
-      reference: fundingForm.reference, phone: fundingForm.phone, email: fundingForm.email,
-      investment_type: fundingForm.investment_type, repayment_terms: fundingForm.repayment_terms,
-      expected_return: fundingForm.expected_return, note: fundingForm.note,
-      status: fundingForm.status, recorded_by: user.id,
+      reference: fundingForm.reference || null,
+      note: fundingForm.note || null,
     };
     const { error } = editFundingId
       ? await supabase.from('investor_funding').update(payload).eq('id', editFundingId)
