@@ -210,14 +210,31 @@ export default function SettingsPage() {
     if (!user) return;
     setProfileSaving(true);
     // profiles PK is `id` (= auth user id) in this schema, not `user_id`.
-    const { error } = await supabase.from('profiles').update({
+    // Build payload progressively and drop any column the schema doesn't have yet.
+    const fullPayload: Record<string, any> = {
       display_name: profileForm.display_name,
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-    } as any).eq('id', user.id);
+      business_name: profileForm.display_name, // mirror for legacy column
+    };
+    let error: any = null;
+    let payload = { ...fullPayload };
+    for (let i = 0; i < 6; i++) {
+      const res = await supabase.from('profiles').update(payload as any).eq('id', user.id);
+      error = res.error;
+      if (!error) break;
+      const msg = String(error.message || '').toLowerCase();
+      const m = msg.match(/'([a-z_]+)' column/) || msg.match(/column "?([a-z_]+)"?/);
+      const missing = m?.[1];
+      if (missing && missing in payload) {
+        delete payload[missing];
+        continue;
+      }
+      break;
+    }
     if (error) {
-      toast({ title: 'Error saving profile', description: error.message, variant: 'destructive' });
+      toast({ title: 'Could not save profile', description: 'Please try again or contact support.', variant: 'destructive' });
     } else {
       toast({ title: 'Profile updated successfully' });
       await logAudit('profile_updated', `Updated profile: ${profileForm.display_name}`);
