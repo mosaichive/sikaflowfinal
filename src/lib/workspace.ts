@@ -771,7 +771,7 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
     }
   }
 
-  const { data, error } = await scopedBaseQuery().eq('is_archived', false);
+  const { data, error } = await scopedBaseQuery();
   if (!error) {
     const rawRows = (data ?? []) as Array<Record<string, unknown>>;
     if (rawRows.length > 0) {
