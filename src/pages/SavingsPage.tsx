@@ -316,7 +316,7 @@ export default function SavingsPage() {
     }
 
     const payload = {
-      business_id: businessId,
+      user_id: user.id,
       account_type: type,
       bank_name: destinationForm.bank_name.trim(),
       account_name: accountName,
