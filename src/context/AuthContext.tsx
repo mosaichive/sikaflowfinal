@@ -145,14 +145,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let { data, error } = await db
       .from('profiles')
       .select('display_name, avatar_url, title, phone, bio, onboarding_completed')
-      .eq('user_id', uid)
+      .eq('id', uid)
       .maybeSingle();
 
     if (error && isMissingProfileColumnError(error, 'onboarding_completed')) {
       const fallbackResult = await db
         .from('profiles')
         .select('display_name, avatar_url, title, phone, bio')
-        .eq('user_id', uid)
+        .eq('id', uid)
         .maybeSingle();
       data = fallbackResult.data ? { ...(fallbackResult.data as any), onboarding_completed: false } : null;
       error = fallbackResult.error;
