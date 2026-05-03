@@ -135,11 +135,12 @@ export default function SavingsPage() {
   const [editDestinationId, setEditDestinationId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
 
     const [destinationsRes, savingsRes] = await Promise.allSettled([
-      supabase.from('bank_accounts').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
-      supabase.from('savings').select('*').eq('business_id', businessId).order('savings_date', { ascending: false }),
+      supabase.from('bank_accounts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('savings').select('*').eq('user_id', user.id).order('savings_date', { ascending: false }),
     ]);
 
     if (destinationsRes.status === 'fulfilled') {
