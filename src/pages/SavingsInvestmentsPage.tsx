@@ -220,9 +220,8 @@ export default function SavingsInvestmentsPage() {
   // Investor Funding CRUD
   const handleFundingSave = async () => {
     if (!fundingForm.investor_name || !fundingForm.amount || !user) return;
-    if (!businessId) return;
     const payload = {
-      business_id: businessId,
+      user_id: user.id,
       investor_name: fundingForm.investor_name, amount: fundingForm.amount,
       date_received: new Date(fundingForm.date_received).toISOString(),
       payment_method: fundingForm.payment_method,
