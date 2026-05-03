@@ -40,7 +40,7 @@ type CachedProductRow = {
 // remapped from `stock`/`cost`/`price`/`low_stock_threshold`/none in
 // normalizeProductRow().
 const STABLE_PRODUCT_SELECT =
-  'id,name,sku,category,stock,cost,price,low_stock_threshold,created_at,updated_at';
+  'id,name,sku,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
