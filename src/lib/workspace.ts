@@ -40,7 +40,7 @@ type CachedProductRow = {
 // remapped from `stock`/`cost`/`price`/`low_stock_threshold`/none in
 // normalizeProductRow().
 const STABLE_PRODUCT_SELECT =
-  'id,name,sku,category,stock,cost,price,low_stock_threshold,created_at,updated_at';
+  'id,name,sku,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
@@ -714,12 +714,13 @@ export async function updateExpenseRecord(
 export async function loadProductsCompat(showArchived: boolean, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const allCachedRows = readAllCachedProducts();
+  // The live single-tenant schema has no `is_archived` or `category` columns.
+  // Always use the stable select to avoid schema-cache errors that wipe the
+  // product list (which then zeroes out Stock Left / Stock Value / Profit).
   const scopedBaseQuery = () => {
-    // Note: in the single-tenant schema products are scoped by user_id via RLS,
-    // not business_id. We intentionally don't add a business_id filter here.
-    return supabase.from('products').select('*').order('name');
+    return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   };
-  const visibleBaseQuery = () => supabase.from('products').select('*').order('name');
+  const visibleBaseQuery = () => supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   const stableBaseQuery = () => {
     return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   };
@@ -770,7 +771,7 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
     }
   }
 
-  const { data, error } = await scopedBaseQuery().eq('is_archived', false);
+  const { data, error } = await scopedBaseQuery();
   if (!error) {
     const rawRows = (data ?? []) as Array<Record<string, unknown>>;
     if (rawRows.length > 0) {
