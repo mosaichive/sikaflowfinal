@@ -421,6 +421,7 @@ export type Database = {
           business_type: string | null
           created_at: string
           currency: string
+          display_name: string | null
           email: string | null
           id: string
           location: string | null
@@ -435,6 +436,7 @@ export type Database = {
           subscription_start_date: string | null
           subscription_status: Database["public"]["Enums"]["subscription_status"]
           suspended: boolean
+          title: string | null
           trial_end_date: string
           trial_start_date: string
           updated_at: string
@@ -446,6 +448,7 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           currency?: string
+          display_name?: string | null
           email?: string | null
           id: string
           location?: string | null
@@ -460,6 +463,7 @@ export type Database = {
           subscription_start_date?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           suspended?: boolean
+          title?: string | null
           trial_end_date?: string
           trial_start_date?: string
           updated_at?: string
@@ -471,6 +475,7 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           currency?: string
+          display_name?: string | null
           email?: string | null
           id?: string
           location?: string | null
@@ -485,6 +490,7 @@ export type Database = {
           subscription_start_date?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           suspended?: boolean
+          title?: string | null
           trial_end_date?: string
           trial_start_date?: string
           updated_at?: string
