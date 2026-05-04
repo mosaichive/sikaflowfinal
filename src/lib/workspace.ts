@@ -651,12 +651,20 @@ export async function updateProductRecord(
   productId: string,
   payload: Record<string, unknown>,
 ) {
+  // Remap multi-tenant -> single-tenant column names so updates work either way.
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.cost_price !== undefined && remapped.cost === undefined) remapped.cost = remapped.cost_price;
+  if (remapped.selling_price !== undefined && remapped.price === undefined) remapped.price = remapped.selling_price;
+  if (remapped.quantity !== undefined && remapped.stock === undefined) remapped.stock = remapped.quantity;
+  if (remapped.reorder_level !== undefined && remapped.low_stock_threshold === undefined) {
+    remapped.low_stock_threshold = remapped.reorder_level;
+  }
   return updateWithOptionalColumnFallback({
     table: 'products',
     matchColumn: 'id',
     matchValue: productId,
-    payload,
-    optionalColumns: ['user_id', 'low_stock_threshold', 'is_archived'],
+    payload: remapped,
+    optionalColumns: ['user_id', 'low_stock_threshold', 'is_archived', 'reorder_level', 'cost_price', 'selling_price', 'quantity', 'business_id', 'image_url'],
     context: 'workspace.updateProduct',
   });
 }
