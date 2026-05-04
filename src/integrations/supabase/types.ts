@@ -376,6 +376,7 @@ export type Database = {
       }
       products: {
         Row: {
+          category: string
           cost: number
           created_at: string
           id: string
@@ -388,6 +389,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string
           cost?: number
           created_at?: string
           id?: string
@@ -400,6 +402,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string
           cost?: number
           created_at?: string
           id?: string

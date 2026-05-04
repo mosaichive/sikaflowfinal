@@ -81,7 +81,7 @@ export default function SettingsPage() {
 
   // Profile state
   const [profileForm, setProfileForm] = useState({
-    display_name: '', title: '', phone: '', bio: '',
+    display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -127,8 +127,9 @@ export default function SettingsPage() {
       title: profileTitle || '',
       phone: profilePhone || '',
       bio: profileBio || '',
+      business_name: business?.name || '',
     });
-  }, [displayName, profileTitle, profilePhone, profileBio]);
+  }, [displayName, profileTitle, profilePhone, profileBio, business?.name]);
 
   useEffect(() => {
     fetchBanks();
@@ -216,7 +217,7 @@ export default function SettingsPage() {
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-      business_name: profileForm.display_name, // mirror for legacy column
+      business_name: profileForm.business_name || profileForm.display_name,
     };
     let error: any = null;
     let payload = { ...fullPayload };
@@ -239,6 +240,7 @@ export default function SettingsPage() {
       toast({ title: 'Profile updated successfully' });
       await logAudit('profile_updated', `Updated profile: ${profileForm.display_name}`);
       await refreshProfile();
+      await refreshBusiness();
     }
     setProfileSaving(false);
   };
@@ -610,6 +612,10 @@ export default function SettingsPage() {
               <div>
                 <Label>Display Name</Label>
                 <Input value={profileForm.display_name} onChange={e => setProfileForm(p => ({ ...p, display_name: e.target.value }))} placeholder="Your name" />
+              </div>
+              <div>
+                <Label>Business Name</Label>
+                <Input value={profileForm.business_name} onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))} placeholder="Your business name" />
               </div>
               <div>
                 <Label>Title / Role Title</Label>
