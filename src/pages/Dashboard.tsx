@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
-import { AVAILABLE_BUSINESS_MONEY_FORMULA, calculateBusinessFinancials } from '@/lib/business-money';
+import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
@@ -443,26 +443,6 @@ export default function Dashboard() {
   }, [data, dateRange.from, dateRange.to]);
 
   const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
-  const periodFinancials = useMemo(
-    () => calculateBusinessFinancials({
-      sales: filtered.sales as any,
-      saleItems: filtered.saleItems as any,
-      products: filtered.products as any,
-      otherIncome: filtered.otherIncome as any,
-      expenses: filtered.expenses as any,
-      savings: filtered.savings as any,
-      investments: filtered.investments as any,
-      investorFunds: filtered.investorFunds as any,
-      restocks: data.restocks as any,
-      openingCashBalance: financials.openingCash,
-    }),
-    [filtered, data.restocks, financials.openingCash],
-  );
-  const periodDailySales = useMemo(
-    () => filtered.sales.reduce((sum, sale) => sum + (getPaidAmount(sale)), 0),
-    [filtered.sales],
-  );
-  const isAllTime = false; // filter is always applied (year or month)
   const dailySales = useMemo(() => sumTodaySales(data.sales), [data.sales]);
   const yesterdaySales = useMemo(() => {
     const yesterday = new Date();
@@ -570,44 +550,44 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(periodFinancials.availableBusinessMoney)}
+            value={formatCurrency(financials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={`${dateRange.label} • ${AVAILABLE_BUSINESS_MONEY_FORMULA}`}
+            helper={AVAILABLE_BUSINESS_MONEY_FORMULA}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
           />
           <MetricCard
-            title="Sales"
-            value={formatCurrency(periodDailySales)}
+            title="Daily Sales"
+            value={formatCurrency(dailySales)}
             icon={ShoppingCart}
-            helper={`Paid sales in ${dateRange.label} • Today: ${formatCurrency(dailySales)} (${dailyDelta.label})`}
+            helper={dailyDelta.label}
             valueClassName={dailyDelta.tone === 'up' ? 'text-emerald-500' : dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
-            value={formatCurrency(periodFinancials.profit)}
+            value={formatCurrency(financials.profit)}
             icon={TrendingUp}
-            helper={`Paid sales - COGS - expenses (${dateRange.label})`}
+            helper="Paid sales revenue - COGS - expenses"
             tooltip={SIKAFLOW_TOOLTIPS.profit}
           />
           <MetricCard
             title="Stock Left"
-            value={periodFinancials.stockLeft.toLocaleString('en-GH')}
+            value={financials.stockLeft.toLocaleString('en-GH')}
             icon={Boxes}
-            helper="Current inventory across active products"
+            helper="Current inventory quantity across active products"
           />
           <MetricCard
             title="Other Income"
-            value={formatCurrency(periodFinancials.otherIncome)}
+            value={formatCurrency(financials.otherIncome)}
             icon={HandCoins}
-            helper={`Other income in ${dateRange.label}`}
+            helper="Service, delivery fee, commission, and miscellaneous income"
             tooltip={SIKAFLOW_TOOLTIPS.otherIncome}
           />
           <MetricCard
             title="Low Stock Alerts"
-            value={periodFinancials.lowStockCount.toLocaleString('en-GH')}
+            value={financials.lowStockCount.toLocaleString('en-GH')}
             icon={AlertTriangle}
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((product) => product.name).join(', ') : 'No low stock products right now'}
-            valueClassName={periodFinancials.lowStockCount > 0 ? 'text-amber-500' : undefined}
+            valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
           />
         </div>
 
