@@ -81,7 +81,7 @@ export default function SettingsPage() {
 
   // Profile state
   const [profileForm, setProfileForm] = useState({
-    display_name: '', title: '', phone: '', bio: '',
+    display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -127,8 +127,9 @@ export default function SettingsPage() {
       title: profileTitle || '',
       phone: profilePhone || '',
       bio: profileBio || '',
+      business_name: business?.name || '',
     });
-  }, [displayName, profileTitle, profilePhone, profileBio]);
+  }, [displayName, profileTitle, profilePhone, profileBio, business?.name]);
 
   useEffect(() => {
     fetchBanks();
