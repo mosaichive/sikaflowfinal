@@ -127,8 +127,9 @@ export default function SettingsPage() {
       title: profileTitle || '',
       phone: profilePhone || '',
       bio: profileBio || '',
+      business_name: business?.name || '',
     });
-  }, [displayName, profileTitle, profilePhone, profileBio]);
+  }, [displayName, profileTitle, profilePhone, profileBio, business?.name]);
 
   useEffect(() => {
     fetchBanks();
