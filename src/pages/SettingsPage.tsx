@@ -614,6 +614,10 @@ export default function SettingsPage() {
                 <Input value={profileForm.display_name} onChange={e => setProfileForm(p => ({ ...p, display_name: e.target.value }))} placeholder="Your name" />
               </div>
               <div>
+                <Label>Business Name</Label>
+                <Input value={profileForm.business_name} onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))} placeholder="Your business name" />
+              </div>
+              <div>
                 <Label>Title / Role Title</Label>
                 <Input value={profileForm.title} onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Store Owner, Manager" />
               </div>
