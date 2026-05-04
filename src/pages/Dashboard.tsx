@@ -443,6 +443,26 @@ export default function Dashboard() {
   }, [data, dateRange.from, dateRange.to]);
 
   const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
+  const periodFinancials = useMemo(
+    () => calculateBusinessFinancials({
+      sales: filtered.sales as any,
+      saleItems: filtered.saleItems as any,
+      products: filtered.products as any,
+      otherIncome: filtered.otherIncome as any,
+      expenses: filtered.expenses as any,
+      savings: filtered.savings as any,
+      investments: filtered.investments as any,
+      investorFunds: filtered.investorFunds as any,
+      restocks: data.restocks as any,
+      openingCashBalance: financials.openingCash,
+    }),
+    [filtered, data.restocks, financials.openingCash],
+  );
+  const periodDailySales = useMemo(
+    () => filtered.sales.reduce((sum, sale) => sum + (getPaidAmount(sale)), 0),
+    [filtered.sales],
+  );
+  const isAllTime = false; // filter is always applied (year or month)
   const dailySales = useMemo(() => sumTodaySales(data.sales), [data.sales]);
   const yesterdaySales = useMemo(() => {
     const yesterday = new Date();
