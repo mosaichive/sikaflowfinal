@@ -651,12 +651,38 @@ export async function updateProductRecord(
   productId: string,
   payload: Record<string, unknown>,
 ) {
+  // Remap multi-tenant column names to single-tenant schema names so the
+  // update reaches the actual columns (e.g. `cost_price` → `cost`).
+  const remapped: Record<string, unknown> = { ...payload };
+  if (remapped.cost_price !== undefined && remapped.cost === undefined) {
+    remapped.cost = remapped.cost_price;
+  }
+  if (remapped.selling_price !== undefined && remapped.price === undefined) {
+    remapped.price = remapped.selling_price;
+  }
+  if (remapped.quantity !== undefined && remapped.stock === undefined) {
+    remapped.stock = remapped.quantity;
+  }
+  if (remapped.reorder_level !== undefined && remapped.low_stock_threshold === undefined) {
+    remapped.low_stock_threshold = remapped.reorder_level;
+  }
   return updateWithOptionalColumnFallback({
     table: 'products',
     matchColumn: 'id',
     matchValue: productId,
-    payload,
-    optionalColumns: ['user_id', 'low_stock_threshold', 'is_archived'],
+    payload: remapped,
+    optionalColumns: [
+      'user_id',
+      'business_id',
+      'low_stock_threshold',
+      'reorder_level',
+      'is_archived',
+      'cost_price',
+      'selling_price',
+      'quantity',
+      'image_url',
+      'sku',
+    ],
     context: 'workspace.updateProduct',
   });
 }
