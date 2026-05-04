@@ -81,7 +81,7 @@ export default function SettingsPage() {
 
   // Profile state
   const [profileForm, setProfileForm] = useState({
-    display_name: '', title: '', phone: '', bio: '',
+    display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
