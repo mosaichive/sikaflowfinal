@@ -515,7 +515,12 @@ export async function insertSaleRecord(
   return insertWithOptionalColumnFallback({
     table: 'sales',
     payload,
-    optionalColumns: ['due_date', 'status', 'sale_channel', 'stock_status', 'stock_shortfall'],
+    optionalColumns: [
+      'business_id', 'due_date', 'status', 'sale_channel',
+      'stock_status', 'stock_shortfall', 'payment_status',
+      'balance', 'customer_phone', 'staff_id', 'staff_name',
+      'subtotal', 'notes',
+    ],
     context: 'workspace.insertSale',
   });
 }
@@ -529,7 +534,12 @@ export async function updateSaleRecord(
     matchColumn: 'id',
     matchValue: saleId,
     payload,
-    optionalColumns: ['due_date', 'status', 'sale_channel', 'stock_status', 'stock_shortfall'],
+    optionalColumns: [
+      'business_id', 'due_date', 'status', 'sale_channel',
+      'stock_status', 'stock_shortfall', 'payment_status',
+      'balance', 'customer_phone', 'staff_id', 'staff_name',
+      'subtotal', 'notes',
+    ],
     context: 'workspace.updateSale',
   });
 }
