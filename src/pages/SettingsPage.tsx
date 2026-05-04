@@ -217,7 +217,7 @@ export default function SettingsPage() {
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-      business_name: profileForm.display_name, // mirror for legacy column
+      business_name: profileForm.business_name || profileForm.display_name,
     };
     let error: any = null;
     let payload = { ...fullPayload };
@@ -240,6 +240,7 @@ export default function SettingsPage() {
       toast({ title: 'Profile updated successfully' });
       await logAudit('profile_updated', `Updated profile: ${profileForm.display_name}`);
       await refreshProfile();
+      await refreshBusiness();
     }
     setProfileSaving(false);
   };
