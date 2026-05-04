@@ -81,7 +81,7 @@ export default function SettingsPage() {
 
   // Profile state
   const [profileForm, setProfileForm] = useState({
-    display_name: '', title: '', phone: '', bio: '',
+    display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -127,8 +127,9 @@ export default function SettingsPage() {
       title: profileTitle || '',
       phone: profilePhone || '',
       bio: profileBio || '',
+      business_name: business?.name || '',
     });
-  }, [displayName, profileTitle, profilePhone, profileBio]);
+  }, [displayName, profileTitle, profilePhone, profileBio, business?.name]);
 
   useEffect(() => {
     fetchBanks();
@@ -209,18 +210,16 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     setProfileSaving(true);
-    // profiles PK is `id` (= auth user id) in this schema, not `user_id`.
-    // Build payload progressively and drop any column the schema doesn't have yet.
     const fullPayload: Record<string, any> = {
       display_name: profileForm.display_name,
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-      business_name: profileForm.display_name, // mirror for legacy column
+      business_name: profileForm.business_name || profileForm.display_name,
     };
     let error: any = null;
     let payload = { ...fullPayload };
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
       const res = await supabase.from('profiles').update(payload as any).eq('id', user.id);
       error = res.error;
       if (!error) break;
@@ -238,7 +237,7 @@ export default function SettingsPage() {
     } else {
       toast({ title: 'Profile updated successfully' });
       await logAudit('profile_updated', `Updated profile: ${profileForm.display_name}`);
-      await refreshProfile();
+      await Promise.all([refreshProfile(), refreshBusiness()]);
     }
     setProfileSaving(false);
   };
@@ -615,6 +614,15 @@ export default function SettingsPage() {
                 <Label>Title / Role Title</Label>
                 <Input value={profileForm.title} onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Store Owner, Manager" />
               </div>
+            </div>
+            <div>
+              <Label>Business Name</Label>
+              <Input
+                value={profileForm.business_name}
+                onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))}
+                placeholder="Your business name"
+              />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Shows in sidebar, top bar, dashboard greeting and receipts.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

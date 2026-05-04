@@ -114,7 +114,15 @@ export default function SalesPage() {
 
   const fetchSales = async () => {
     const { data } = await supabase.from('sales').select('*').order('sale_date', { ascending: false }).limit(50);
-    setSales(data || []);
+    // Derive payment_status + balance for schemas that don't store them.
+    const enriched = (data || []).map((s: any) => {
+      const total = Number(s.total ?? 0);
+      const paid = Number(s.amount_paid ?? 0);
+      const balance = s.balance !== undefined && s.balance !== null ? Number(s.balance) : Math.max(0, total - paid);
+      const payment_status = s.payment_status || (balance <= 0 && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid');
+      return { ...s, balance, payment_status };
+    });
+    setSales(enriched);
   };
 
   const fetchSaleItems = async (saleId: string) => {
