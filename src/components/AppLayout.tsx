@@ -67,11 +67,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
             <div className="flex items-center gap-3">
               {!isMobile && <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors duration-200" />}
               <div className="flex items-center gap-2 md:hidden">
-                {tenantLogo ? (
-                  <img src={tenantLogo} alt={business?.name || 'Workspace'} className="h-6 w-6 object-contain" />
-                ) : (
-                  <Logo className="h-6 w-6 object-contain" />
-                )}
+                <Logo className="h-6 w-6 object-contain" />
                 <span className="text-sm font-semibold text-foreground truncate max-w-[140px]">
                   {business?.name || 'SikaFlow'}
                 </span>
