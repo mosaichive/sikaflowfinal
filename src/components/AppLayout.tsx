@@ -17,10 +17,9 @@ import { supabase } from '@/integrations/supabase/client';
 export function AppLayout({ children, title }: { children: ReactNode; title?: string }) {
   const { user, displayName, avatarUrl, profileTitle } = useAuth();
   const { business, businessId } = useBusiness();
-  const { isDark } = useTheme();
+  useTheme();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const tenantLogo = isDark ? business?.logo_dark_url : business?.logo_light_url;
   const [announcementBadge, setAnnouncementBadge] = useState(0);
 
   useEffect(() => {
