@@ -210,30 +210,16 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     setProfileSaving(true);
-    const fullPayload: Record<string, any> = {
+    const payload: Record<string, any> = {
       display_name: profileForm.display_name,
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
       business_name: profileForm.business_name || profileForm.display_name,
     };
-    let error: any = null;
-    let payload = { ...fullPayload };
-    for (let i = 0; i < 8; i++) {
-      const res = await supabase.from('profiles').update(payload as any).eq('id', user.id);
-      error = res.error;
-      if (!error) break;
-      const msg = String(error.message || '').toLowerCase();
-      const m = msg.match(/'([a-z_]+)' column/) || msg.match(/column "?([a-z_]+)"?/);
-      const missing = m?.[1];
-      if (missing && missing in payload) {
-        delete payload[missing];
-        continue;
-      }
-      break;
-    }
+    const { error } = await supabase.from('profiles').update(payload as any).eq('id', user.id);
     if (error) {
-      toast({ title: 'Could not save profile', description: 'Please try again or contact support.', variant: 'destructive' });
+      toast({ title: 'Could not save profile', description: error.message || 'Please try again.', variant: 'destructive' });
     } else {
       toast({ title: 'Profile updated successfully' });
       await logAudit('profile_updated', `Updated profile: ${profileForm.display_name}`);

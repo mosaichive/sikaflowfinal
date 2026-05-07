@@ -50,18 +50,11 @@ export function AppSidebar() {
           : allItems.filter((item) => salespersonItems.includes(item.title));
 
   const tenantName = business?.name || 'SikaFlow';
-  const tenantLogoLight = business?.logo_light_url; // shown in light mode (black logo)
-  const tenantLogoDark = business?.logo_dark_url;   // shown in dark mode (white logo)
-  const tenantLogo = isDark ? tenantLogoDark : tenantLogoLight;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <div className="p-4 flex items-center gap-3">
-        {tenantLogo ? (
-          <img src={tenantLogo} alt={tenantName} className="w-9 h-9 object-contain shrink-0" />
-        ) : (
-          <Logo className="w-9 h-9 object-contain shrink-0" />
-        )}
+        <Logo className="w-9 h-9 object-contain shrink-0" />
         {!collapsed && (
           <div>
             <h2 className="text-base font-bold text-foreground tracking-tight">{tenantName}</h2>
