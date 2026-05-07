@@ -318,20 +318,20 @@ export default function SettingsPage() {
   };
 
   const handleBusinessLogoUpload = async () => {
-    if (!businessLogoFile || !businessId) return;
+    if (!businessLogoFile || !user) return;
     setBusinessLogoUploading(true);
     try {
       const ext = businessLogoFile.name.split('.').pop() || 'png';
-      const path = `${businessId}/primary-logo.${ext}`;
+      const path = `${user.id}/primary-logo.${ext}`;
       const { error: uploadError } = await supabase.storage.from('business-logos').upload(path, businessLogoFile, { upsert: true });
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from('business-logos').getPublicUrl(path);
       const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase
-        .from('businesses' as any)
-        .update({ logo_light_url: publicUrl, logo_dark_url: publicUrl })
-        .eq('id', businessId);
+        .from('profiles')
+        .update({ logo_url: publicUrl } as any)
+        .eq('id', user.id);
       if (updateError) throw updateError;
 
       setBusinessLogoFile(null);
@@ -346,11 +346,11 @@ export default function SettingsPage() {
   };
 
   const handleRemoveBusinessLogo = async () => {
-    if (!businessId) return;
+    if (!user) return;
     const { error } = await supabase
-      .from('businesses' as any)
-      .update({ logo_light_url: null, logo_dark_url: null })
-      .eq('id', businessId);
+      .from('profiles')
+      .update({ logo_url: null } as any)
+      .eq('id', user.id);
     if (error) {
       toast({ title: 'Could not remove logo', description: error.message, variant: 'destructive' });
       return;
