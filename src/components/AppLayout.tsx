@@ -75,6 +75,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
               </div>
               {title && <h1 className="text-lg font-semibold text-foreground hidden md:block">{title}</h1>}
             </div>
+            <HeaderAdsTicker />
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/announcements')}
