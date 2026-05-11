@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -9,40 +9,60 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 type Row = {
   id: string;
-  business_id: string;
-  plan: string;
-  status: string;
-  price_ghs: number;
+  business_name: string | null;
+  email: string | null;
+  subscription_plan: string;
+  subscription_status: string;
+  subscription_end_date: string | null;
   trial_end_date: string | null;
-  current_period_end: string | null;
-  next_renewal_date: string | null;
-  businesses: { name: string; email: string | null } | null;
 };
+
+const PLAN_PRICE: Record<string, number> = { monthly: 50, annual: 500, lifetime: 0, trial: 0, free_trial: 0 };
 
 export default function SubscriptionsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
-  const [planChange, setPlanChange] = useState<{ id: string; business_id: string; name: string } | null>(null);
-  const [newPlan, setNewPlan] = useState<'free_trial' | 'monthly' | 'annual' | 'lifetime'>('monthly');
+  const [planChange, setPlanChange] = useState<{ id: string; name: string } | null>(null);
+  const [newPlan, setNewPlan] = useState<'trial' | 'monthly' | 'annual' | 'lifetime'>('monthly');
   const [busy, setBusy] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await supabase
-      .from('subscriptions' as any)
-      .select('*,businesses(name,email)')
+      .from('profiles')
+      .select('id,business_name,email,subscription_plan,subscription_status,subscription_end_date,trial_end_date')
       .order('updated_at', { ascending: false });
-    setRows((data as any) ?? []);
-  };
-  useEffect(() => { void load(); }, []);
+    setRows((data as Row[]) ?? []);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const ch = supabase.channel('platform-subs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => void load())
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [load]);
 
   const setPlan = async () => {
     if (!planChange) return;
     setBusy(true);
-    const { error, data } = await supabase.functions.invoke('manage-subscription', {
-      body: { action: 'set_plan', business_id: planChange.business_id, plan: newPlan },
-    });
+    const now = new Date();
+    const payload: any = { subscription_plan: newPlan };
+    if (newPlan === 'trial') {
+      payload.subscription_status = 'trial';
+      payload.trial_end_date = new Date(now.getTime() + 30 * 86400000).toISOString();
+    } else if (newPlan === 'lifetime') {
+      payload.subscription_status = 'lifetime' as any;
+      payload.subscription_start_date = now.toISOString();
+      payload.subscription_end_date = null;
+    } else {
+      const days = newPlan === 'annual' ? 365 : 30;
+      payload.subscription_status = 'active';
+      payload.subscription_start_date = now.toISOString();
+      payload.subscription_end_date = new Date(now.getTime() + days * 86400000).toISOString();
+    }
+    const { error } = await supabase.from('profiles').update(payload).eq('id', planChange.id);
     setBusy(false);
-    if (error || (data as any)?.error) return toast({ title: 'Failed', description: error?.message, variant: 'destructive' });
+    if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
     toast({ title: 'Plan updated' });
     setPlanChange(null);
     await load();
@@ -71,19 +91,19 @@ export default function SubscriptionsPage() {
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const renew = r.trial_end_date ?? r.current_period_end ?? r.next_renewal_date;
+                  const renew = r.trial_end_date ?? r.subscription_end_date;
                   return (
                     <tr key={r.id} className="border-b border-border/50">
                       <td className="px-3 py-2">
-                        <div className="font-medium">{r.businesses?.name ?? '—'}</div>
-                        <div className="text-[10px] text-muted-foreground">{r.businesses?.email}</div>
+                        <div className="font-medium">{r.business_name ?? '—'}</div>
+                        <div className="text-[10px] text-muted-foreground">{r.email}</div>
                       </td>
-                      <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{r.plan}</Badge></td>
-                      <td className="px-3 py-2"><Badge className="text-[10px]" variant={r.status === 'active' || r.status === 'lifetime' ? 'default' : r.status === 'trial' ? 'secondary' : 'destructive'}>{r.status}</Badge></td>
-                      <td className="px-3 py-2">GH₵{Number(r.price_ghs).toLocaleString()}</td>
+                      <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{r.subscription_plan}</Badge></td>
+                      <td className="px-3 py-2"><Badge className="text-[10px]" variant={r.subscription_status === 'active' ? 'default' : r.subscription_status === 'trial' ? 'secondary' : 'destructive'}>{r.subscription_status}</Badge></td>
+                      <td className="px-3 py-2">GH₵{(PLAN_PRICE[r.subscription_plan] ?? 0).toLocaleString()}</td>
                       <td className="px-3 py-2 text-[11px] text-muted-foreground">{renew ? new Date(renew).toLocaleDateString() : '—'}</td>
                       <td className="px-3 py-2 text-right">
-                        <Button size="sm" variant="outline" onClick={() => { setPlanChange({ id: r.id, business_id: r.business_id, name: r.businesses?.name ?? '' }); setNewPlan(r.plan as any); }}>
+                        <Button size="sm" variant="outline" onClick={() => { setPlanChange({ id: r.id, name: r.business_name ?? r.email ?? '' }); setNewPlan(r.subscription_plan as any); }}>
                           Change Plan
                         </Button>
                       </td>
@@ -104,10 +124,10 @@ export default function SubscriptionsPage() {
           <Select value={newPlan} onValueChange={(v) => setNewPlan(v as any)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="free_trial">Free Trial (30 days)</SelectItem>
+              <SelectItem value="trial">Free Trial (30 days)</SelectItem>
               <SelectItem value="monthly">Monthly — GH₵50</SelectItem>
               <SelectItem value="annual">Annual — GH₵500</SelectItem>
-              <SelectItem value="lifetime">Lifetime (free)</SelectItem>
+              <SelectItem value="lifetime">Lifetime</SelectItem>
             </SelectContent>
           </Select>
           <DialogFooter>
