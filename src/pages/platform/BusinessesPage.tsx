@@ -154,6 +154,9 @@ export default function BusinessesPage() {
                               <Pause className="h-3.5 w-3.5 text-amber-500" />
                             </Button>
                           )}
+                          <Button size="sm" variant="ghost" title="Delete user" disabled={busy} onClick={() => { setDeleteConfirm(''); setDeleteOpen({ id: r.id, name: r.business_name || r.email || '', email: r.email || '' }); }}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
