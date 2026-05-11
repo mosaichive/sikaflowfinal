@@ -10,36 +10,33 @@ export default function PlatformDashboard() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [biz, subs, pays] = await Promise.all([
-      supabase.from('businesses' as any).select('id,status,email_verified,phone_verified'),
-      supabase.from('subscriptions' as any).select('plan,status,price_ghs'),
-      supabase.from('payments' as any).select('amount_ghs,amount_paid_ghs,status,confirmed_at,plan'),
+    const [profilesRes, paymentsRes] = await Promise.all([
+      supabase.from('profiles').select('id,subscription_plan,subscription_status,suspended,created_at'),
+      supabase.from('subscription_payments').select('amount,status,plan'),
     ]);
-    const businesses = (biz.data as any[]) ?? [];
-    const subscriptions = (subs.data as any[]) ?? [];
-    const payments = (pays.data as any[]) ?? [];
+    const profiles = profilesRes.data ?? [];
+    const payments = paymentsRes.data ?? [];
 
     const totalRevenue = payments
-      .filter((payment) => payment.status === 'confirmed')
-      .reduce((sum, payment) => sum + Number(payment.amount_paid_ghs ?? payment.amount_ghs ?? 0), 0);
+      .filter((p: any) => p.status === 'confirmed' || p.status === 'approved')
+      .reduce((sum: number, p: any) => sum + Number(p.amount ?? 0), 0);
 
-    const expectedThisMonth = subscriptions
-      .filter((subscription) => subscription.status === 'active')
-      .reduce((sum, subscription) => sum + Number(subscription.price_ghs ?? 0), 0);
+    const activeMonthly = profiles.filter((p: any) => p.subscription_status === 'active' && p.subscription_plan === 'monthly').length;
+    const activeAnnual = profiles.filter((p: any) => p.subscription_status === 'active' && p.subscription_plan === 'annual').length;
 
     setStats([
-      { label: 'Total Businesses', value: businesses.length, icon: Building2, tone: 'text-blue-500' },
-      { label: 'Active Trials', value: subscriptions.filter((subscription) => subscription.status === 'trial').length, icon: Sparkles, tone: 'text-amber-500' },
-      { label: 'Active Monthly', value: subscriptions.filter((subscription) => subscription.status === 'active' && subscription.plan === 'monthly').length, icon: CheckCircle2, tone: 'text-emerald-500' },
-      { label: 'Active Annual', value: subscriptions.filter((subscription) => subscription.status === 'active' && subscription.plan === 'annual').length, icon: CheckCircle2, tone: 'text-emerald-600' },
-      { label: 'Lifetime', value: subscriptions.filter((subscription) => subscription.status === 'lifetime').length, icon: CheckCircle2, tone: 'text-purple-500' },
-      { label: 'Expired', value: subscriptions.filter((subscription) => subscription.status === 'expired').length, icon: AlertCircle, tone: 'text-orange-500' },
-      { label: 'Suspended', value: subscriptions.filter((subscription) => subscription.status === 'suspended').length, icon: XCircle, tone: 'text-red-500' },
-      { label: 'Verification Pending', value: businesses.filter((business) => !business.email_verified || !business.phone_verified).length, icon: Clock, tone: 'text-yellow-500' },
-      { label: 'Payments Pending', value: payments.filter((payment) => payment.status === 'pending').length, icon: Clock, tone: 'text-amber-500' },
-      { label: 'Needs Review', value: payments.filter((payment) => payment.status === 'review').length, icon: AlertTriangle, tone: 'text-orange-500' },
+      { label: 'Total Businesses', value: profiles.length, icon: Building2, tone: 'text-blue-500' },
+      { label: 'Active Trials', value: profiles.filter((p: any) => p.subscription_status === 'trial').length, icon: Sparkles, tone: 'text-amber-500' },
+      { label: 'Active Monthly', value: activeMonthly, icon: CheckCircle2, tone: 'text-emerald-500' },
+      { label: 'Active Annual', value: activeAnnual, icon: CheckCircle2, tone: 'text-emerald-600' },
+      { label: 'Lifetime', value: profiles.filter((p: any) => p.subscription_plan === 'lifetime').length, icon: CheckCircle2, tone: 'text-purple-500' },
+      { label: 'Expired', value: profiles.filter((p: any) => p.subscription_status === 'expired').length, icon: AlertCircle, tone: 'text-orange-500' },
+      { label: 'Suspended', value: profiles.filter((p: any) => p.suspended).length, icon: XCircle, tone: 'text-red-500' },
+      { label: 'Signups (30d)', value: profiles.filter((p: any) => new Date(p.created_at) > new Date(Date.now() - 30 * 86400000)).length, icon: Clock, tone: 'text-yellow-500' },
+      { label: 'Payments Pending', value: payments.filter((p: any) => p.status === 'pending').length, icon: Clock, tone: 'text-amber-500' },
+      { label: 'Payments Review', value: payments.filter((p: any) => p.status === 'review').length, icon: AlertTriangle, tone: 'text-orange-500' },
       { label: 'Total Revenue', value: `GH₵${totalRevenue.toLocaleString()}`, icon: Banknote, tone: 'text-emerald-600' },
-      { label: 'Expected this Month', value: `GH₵${expectedThisMonth.toLocaleString()}`, icon: Calendar, tone: 'text-blue-600' },
+      { label: 'Expected Monthly', value: `GH₵${(activeMonthly * 50 + activeAnnual * 42).toLocaleString()}`, icon: Calendar, tone: 'text-blue-600' },
     ]);
     setLoading(false);
   }, []);
@@ -47,11 +44,9 @@ export default function PlatformDashboard() {
   useEffect(() => {
     void load();
     const channel = supabase.channel('platform-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscription_payments' }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load(); })
       .subscribe();
-
     return () => { void supabase.removeChannel(channel); };
   }, [load]);
 
