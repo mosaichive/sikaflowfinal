@@ -9,6 +9,7 @@ import { useBusiness } from '@/context/BusinessContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Logo } from '@/components/Logo';
+import { HeaderAdsTicker } from '@/components/HeaderAdsTicker';
 import { ReferralNotifications } from '@/components/referrals/ReferralNotifications';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
