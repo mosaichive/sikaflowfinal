@@ -9,6 +9,7 @@ import { useBusiness } from '@/context/BusinessContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Logo } from '@/components/Logo';
+import { HeaderAdsTicker } from '@/components/HeaderAdsTicker';
 import { ReferralNotifications } from '@/components/referrals/ReferralNotifications';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
@@ -74,6 +75,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
               </div>
               {title && <h1 className="text-lg font-semibold text-foreground hidden md:block">{title}</h1>}
             </div>
+            <HeaderAdsTicker />
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/announcements')}

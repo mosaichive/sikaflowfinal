@@ -992,11 +992,16 @@ export type Database = {
       subscription_payments: {
         Row: {
           amount: number
+          amount_paid: number | null
           created_at: string
+          expires_at: string | null
           id: string
+          network: string | null
           note: string | null
           payment_method: string
+          paystack_reference: string | null
           plan: Database["public"]["Enums"]["subscription_plan"]
+          provider_response: Json | null
           reference: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -1006,11 +1011,16 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          amount_paid?: number | null
           created_at?: string
+          expires_at?: string | null
           id?: string
+          network?: string | null
           note?: string | null
           payment_method: string
+          paystack_reference?: string | null
           plan: Database["public"]["Enums"]["subscription_plan"]
+          provider_response?: Json | null
           reference?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -1020,11 +1030,16 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_paid?: number | null
           created_at?: string
+          expires_at?: string | null
           id?: string
+          network?: string | null
           note?: string | null
           payment_method?: string
+          paystack_reference?: string | null
           plan?: Database["public"]["Enums"]["subscription_plan"]
+          provider_response?: Json | null
           reference?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null

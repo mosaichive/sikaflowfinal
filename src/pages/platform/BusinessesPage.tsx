@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Pause, Play, Calendar } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Search, Pause, Play, Calendar, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
 type Row = {
@@ -32,6 +32,8 @@ export default function BusinessesPage() {
   const [busy, setBusy] = useState(false);
   const [extendOpen, setExtendOpen] = useState<{ id: string; name: string } | null>(null);
   const [extendDays, setExtendDays] = useState(7);
+  const [deleteOpen, setDeleteOpen] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -152,6 +154,9 @@ export default function BusinessesPage() {
                               <Pause className="h-3.5 w-3.5 text-amber-500" />
                             </Button>
                           )}
+                          <Button size="sm" variant="ghost" title="Delete user" disabled={busy} onClick={() => { setDeleteConfirm(''); setDeleteOpen({ id: r.id, name: r.business_name || r.email || '', email: r.email || '' }); }}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -186,6 +191,47 @@ export default function BusinessesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!deleteOpen} onOpenChange={(o) => !o && setDeleteOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteOpen?.name}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the user account, profile, and all business data (sales, products, expenses, etc.).
+              The email <span className="font-mono">{deleteOpen?.email}</span> will be free to register again as a new user.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label className="text-xs">Type the email to confirm</Label>
+            <Input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder={deleteOpen?.email} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteOpen(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={busy || !deleteOpen || deleteConfirm.trim().toLowerCase() !== (deleteOpen?.email || '').toLowerCase()}
+              onClick={async () => {
+                if (!deleteOpen) return;
+                setBusy(true);
+                const { data, error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: deleteOpen.id } });
+                setBusy(false);
+                if (error || (data as any)?.error) {
+                  toast({ title: 'Delete failed', description: (data as any)?.error || error?.message, variant: 'destructive' });
+                  return;
+                }
+                toast({ title: 'User deleted' });
+                setDeleteOpen(null);
+                setDeleteConfirm('');
+                await load();
+              }}
+            >
+              Delete user
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
