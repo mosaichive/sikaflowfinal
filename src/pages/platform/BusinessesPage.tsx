@@ -191,6 +191,47 @@ export default function BusinessesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!deleteOpen} onOpenChange={(o) => !o && setDeleteOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteOpen?.name}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the user account, profile, and all business data (sales, products, expenses, etc.).
+              The email <span className="font-mono">{deleteOpen?.email}</span> will be free to register again as a new user.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label className="text-xs">Type the email to confirm</Label>
+            <Input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder={deleteOpen?.email} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteOpen(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={busy || !deleteOpen || deleteConfirm.trim().toLowerCase() !== (deleteOpen?.email || '').toLowerCase()}
+              onClick={async () => {
+                if (!deleteOpen) return;
+                setBusy(true);
+                const { data, error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: deleteOpen.id } });
+                setBusy(false);
+                if (error || (data as any)?.error) {
+                  toast({ title: 'Delete failed', description: (data as any)?.error || error?.message, variant: 'destructive' });
+                  return;
+                }
+                toast({ title: 'User deleted' });
+                setDeleteOpen(null);
+                setDeleteConfirm('');
+                await load();
+              }}
+            >
+              Delete user
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
