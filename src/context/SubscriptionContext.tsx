@@ -1,14 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { useBusiness } from '@/context/BusinessContext';
 
-export type PlanKey = 'free_trial' | 'monthly' | 'annual' | 'lifetime';
+export type PlanKey = 'free_trial' | 'trial' | 'monthly' | 'annual' | 'lifetime';
 export type SubStatus = 'trial' | 'active' | 'overdue' | 'expired' | 'suspended' | 'canceled' | 'lifetime';
 
 export interface Subscription {
   id: string;
-  business_id: string;
   plan: PlanKey;
   status: SubStatus;
   price_ghs: number;
@@ -16,17 +14,13 @@ export interface Subscription {
   trial_end_date: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
-  next_renewal_date: string | null;
-  cancel_at_period_end: boolean;
-  discount_percent: number;
-  notes: string | null;
 }
 
 interface SubContextType {
   subscription: Subscription | null;
   loading: boolean;
-  hasAccess: boolean;       // can use full app
-  isReadOnly: boolean;      // expired / suspended / canceled — only billing+settings
+  hasAccess: boolean;
+  isReadOnly: boolean;
   daysRemaining: number | null;
   refresh: () => Promise<void>;
   isSuperAdmin: boolean;
@@ -36,15 +30,12 @@ const SubContext = createContext<SubContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { businessId, loading: bizLoading } = useBusiness();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  // Start in loading state and stay there until auth+business+subscription are all resolved.
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    // Wait until upstream contexts finish — prevents a flash of "no access".
-    if (authLoading || bizLoading) return;
+    if (authLoading) return;
 
     if (!user) {
       setSubscription(null);
@@ -53,7 +44,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Detect super_admin (separate from per-business role table check)
     const { data: superRow } = await supabase
       .from('user_roles')
       .select('id')
@@ -62,40 +52,54 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     setIsSuperAdmin(!!superRow);
 
-    if (!businessId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, subscription_plan, subscription_status, subscription_start_date, subscription_end_date, trial_start_date, trial_end_date')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profile) {
       setSubscription(null);
       setLoading(false);
       return;
     }
 
-    const { data } = await supabase
-      .from('subscriptions' as any)
-      .select('*')
-      .eq('business_id', businessId)
-      .maybeSingle();
-    setSubscription((data as any) ?? null);
+    const planRaw = (profile.subscription_plan as string) ?? 'trial';
+    const statusRaw = (profile.subscription_status as string) ?? 'trial';
+    const plan = (planRaw === 'trial' ? 'free_trial' : planRaw) as PlanKey;
+
+    setSubscription({
+      id: profile.id,
+      plan,
+      status: statusRaw as SubStatus,
+      price_ghs: plan === 'monthly' ? 50 : plan === 'annual' ? 500 : 0,
+      trial_start_date: profile.trial_start_date,
+      trial_end_date: profile.trial_end_date,
+      current_period_start: profile.subscription_start_date,
+      current_period_end: profile.subscription_end_date,
+    });
     setLoading(false);
-  }, [user, businessId, authLoading, bizLoading]);
+  }, [user, authLoading]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!businessId) return;
-    const channel = supabase.channel(`subscription:${businessId}`)
+    if (!user) return;
+    const channel = supabase.channel(`subscription:${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'subscriptions', filter: `business_id=eq.${businessId}` },
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         () => { void load(); },
       )
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
-  }, [businessId, load]);
+  }, [user, load]);
 
   const computeAccess = (): { hasAccess: boolean; daysRemaining: number | null } => {
     if (!subscription) return { hasAccess: false, daysRemaining: null };
     if (subscription.status === 'lifetime') return { hasAccess: true, daysRemaining: null };
-    const endRaw = subscription.trial_end_date ?? subscription.current_period_end;
+    const endRaw = subscription.status === 'trial' ? subscription.trial_end_date : subscription.current_period_end;
     const days = endRaw ? Math.ceil((new Date(endRaw).getTime() - Date.now()) / 86400000) : null;
     if (subscription.status === 'trial' && subscription.trial_end_date && new Date(subscription.trial_end_date) > new Date())
       return { hasAccess: true, daysRemaining: days };
@@ -125,13 +129,14 @@ export const useSubscription = () => {
 
 export const PLAN_LABELS: Record<PlanKey, string> = {
   free_trial: '30-Day Free Trial',
+  trial: '30-Day Free Trial',
   monthly: 'Monthly',
   annual: 'Annual',
   lifetime: 'Lifetime',
 };
 
 export const PLAN_PRICES: Record<PlanKey, number> = {
-  free_trial: 0, monthly: 50, annual: 500, lifetime: 0,
+  free_trial: 0, trial: 0, monthly: 50, annual: 500, lifetime: 0,
 };
 
 export const STATUS_LABELS: Record<SubStatus, string> = {
