@@ -374,6 +374,99 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_ads: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          cta_text: string | null
+          cta_url: string | null
+          description: string
+          id: string
+          image_url: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          description?: string
+          id?: string
+          image_url?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          description?: string
+          id?: string
+          image_url?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_support_settings: {
+        Row: {
+          created_at: string
+          id: string
+          office_address: string
+          phone_number: string
+          show_email: boolean
+          show_office_address: boolean
+          show_phone: boolean
+          show_whatsapp: boolean
+          singleton_key: string
+          support_email: string
+          updated_at: string
+          updated_by: string | null
+          whatsapp_link: string
+          whatsapp_number: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          office_address?: string
+          phone_number?: string
+          show_email?: boolean
+          show_office_address?: boolean
+          show_phone?: boolean
+          show_whatsapp?: boolean
+          singleton_key?: string
+          support_email?: string
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_link?: string
+          whatsapp_number?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          office_address?: string
+          phone_number?: string
+          show_email?: boolean
+          show_office_address?: boolean
+          show_phone?: boolean
+          show_whatsapp?: boolean
+          singleton_key?: string
+          support_email?: string
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_link?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string
@@ -938,6 +1031,42 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          read_at: string | null
+          sender_contact: string
+          sender_name: string
+          subject: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          read_at?: string | null
+          sender_contact?: string
+          sender_name?: string
+          subject?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          read_at?: string | null
+          sender_contact?: string
+          sender_name?: string
+          subject?: string
+          user_id?: string | null
         }
         Relationships: []
       }
