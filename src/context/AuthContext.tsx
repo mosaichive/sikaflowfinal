@@ -212,6 +212,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userId = user?.id ?? null;
 
+  // Live sync: when super admin updates this user's profile, role, or
+  // payment status, refresh immediately. If the user is deleted, sign out.
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`auth-user-sync-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, async (payload) => {
+        if (payload.eventType === 'DELETE') {
+          await supabase.auth.signOut();
+          if (typeof window !== 'undefined') window.location.replace('/sign-in?reason=removed');
+          return;
+        }
+        await fetchProfile(userId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${userId}` }, () => {
+        void fetchRole(userId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscription_payments', filter: `user_id=eq.${userId}` }, () => {
+        // Trigger downstream refresh by re-reading the profile (subscription fields live there).
+        void fetchProfile(userId);
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, fetchProfile, fetchRole]);
+
+
   useEffect(() => {
     if (!userId) return;
 
