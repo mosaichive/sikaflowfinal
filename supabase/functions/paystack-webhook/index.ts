@@ -1,7 +1,7 @@
 // Paystack webhook — verifies HMAC signature, then activates the matching
 // subscription_payments row using the same logic as paystack-verify.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
-import { activatePayment } from "../paystack-verify/index.ts";
+import { activatePayment } from "../_shared/paystack.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
