@@ -32,6 +32,8 @@ export default function BusinessesPage() {
   const [busy, setBusy] = useState(false);
   const [extendOpen, setExtendOpen] = useState<{ id: string; name: string } | null>(null);
   const [extendDays, setExtendDays] = useState(7);
+  const [deleteOpen, setDeleteOpen] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
