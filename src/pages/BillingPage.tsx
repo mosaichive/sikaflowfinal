@@ -118,14 +118,27 @@ export default function BillingPage() {
 
   const loadMethods = useCallback(async () => {
     const { data } = await supabase
-      .from('platform_payment_methods' as any)
+      .from('payment_methods')
       .select('*')
       .eq('active', true)
-      .in('kind', ['momo', 'bank'])
-      .order('kind')
+      .in('type', ['momo', 'bank'])
+      .order('type')
       .order('sort_order')
       .order('created_at');
-    setMethods((data as PaymentMethod[]) ?? []);
+    const mapped: PaymentMethod[] = ((data as any[]) ?? []).map((row) => {
+      const details = (row.details ?? {}) as Record<string, any>;
+      const { instructions, badge, ...rest } = details;
+      return {
+        id: row.id,
+        kind: row.type as PaymentMethod['kind'],
+        label: row.label,
+        details: Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, String(v ?? '')])),
+        instructions: instructions ?? null,
+        badge: badge ?? null,
+        sort_order: row.sort_order ?? 0,
+      };
+    });
+    setMethods(mapped);
   }, []);
 
   const checkPaystack = useCallback(async () => {
