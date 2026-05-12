@@ -287,6 +287,134 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          business_id: string
+          cost_price: number
+          created_at: string
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          sku: string | null
+          unit_price: number
+        }
+        Insert: {
+          business_id: string
+          cost_price?: number
+          created_at?: string
+          id?: string
+          line_total?: number
+          order_id: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sku?: string | null
+          unit_price?: number
+        }
+        Update: {
+          business_id?: string
+          cost_price?: number
+          created_at?: string
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sku?: string | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          amount_paid: number
+          assigned_to: string | null
+          assigned_to_name: string | null
+          balance: number
+          business_id: string
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          delivered_at: string | null
+          delivery_location: string | null
+          discount: number
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          payment_method: string
+          payment_status: string
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          balance?: number
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          delivered_at?: string | null
+          delivery_location?: string | null
+          discount?: number
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          payment_method?: string
+          payment_status?: string
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          balance?: number
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          delivered_at?: string | null
+          delivery_location?: string | null
+          discount?: number
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          payment_method?: string
+          payment_status?: string
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       other_income: {
         Row: {
           amount: number
@@ -721,34 +849,46 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          business_id: string | null
+          cost_price: number
           created_at: string
           id: string
+          line_total: number
           product_id: string | null
           product_name: string
           quantity: number
           sale_id: string
+          sku: string | null
           unit_cost: number
           unit_price: number
           user_id: string
         }
         Insert: {
+          business_id?: string | null
+          cost_price?: number
           created_at?: string
           id?: string
+          line_total?: number
           product_id?: string | null
           product_name: string
           quantity?: number
           sale_id: string
+          sku?: string | null
           unit_cost?: number
           unit_price?: number
           user_id: string
         }
         Update: {
+          business_id?: string | null
+          cost_price?: number
           created_at?: string
           id?: string
+          line_total?: number
           product_id?: string | null
           product_name?: string
           quantity?: number
           sale_id?: string
+          sku?: string | null
           unit_cost?: number
           unit_price?: number
           user_id?: string
@@ -773,48 +913,84 @@ export type Database = {
       sales: {
         Row: {
           amount_paid: number
+          balance: number
+          business_id: string | null
           cost_total: number
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          customer_phone: string | null
           discount: number
+          due_date: string | null
           id: string
           invoice_number: string | null
           note: string | null
+          notes: string | null
+          order_id: string | null
           payment_method: string
+          payment_status: string
+          sale_channel: string
           sale_date: string
+          staff_id: string | null
+          staff_name: string | null
+          status: string
+          subtotal: number
           total: number
           updated_at: string
           user_id: string
         }
         Insert: {
           amount_paid?: number
+          balance?: number
+          business_id?: string | null
           cost_total?: number
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           discount?: number
+          due_date?: string | null
           id?: string
           invoice_number?: string | null
           note?: string | null
+          notes?: string | null
+          order_id?: string | null
           payment_method?: string
+          payment_status?: string
+          sale_channel?: string
           sale_date?: string
+          staff_id?: string | null
+          staff_name?: string | null
+          status?: string
+          subtotal?: number
           total?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           amount_paid?: number
+          balance?: number
+          business_id?: string | null
           cost_total?: number
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           discount?: number
+          due_date?: string | null
           id?: string
           invoice_number?: string | null
           note?: string | null
+          notes?: string | null
+          order_id?: string | null
           payment_method?: string
+          payment_status?: string
+          sale_channel?: string
           sale_date?: string
+          staff_id?: string | null
+          staff_name?: string | null
+          status?: string
+          subtotal?: number
           total?: number
           updated_at?: string
           user_id?: string
