@@ -82,6 +82,8 @@ export default function OrdersPage() {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [orderLines, setOrderLines] = useState<DraftOrderItem[]>([makeDraftItem()]);
   const [form, setForm] = useState({
     customer_name: '',
