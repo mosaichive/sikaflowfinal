@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BarChart3, CalendarRange, Download, FileText, FilterX, PackageSearch, Receipt, TrendingUp, WalletCards } from 'lucide-react';
 import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
 import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
-import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { useFinancialEngine } from '@/hooks/useFinancialEngine';
 
 type RawReportData = {
   sales: any[];
@@ -128,7 +128,7 @@ export default function ReportsPage() {
   const { business, businessId } = useBusiness();
   const { displayName, user } = useAuth();
   const { toast } = useToast();
-  const { financials, loading: financialsLoading } = useBusinessFinancials();
+  const { financials, loading: financialsLoading } = useFinancialEngine();
 
   const [year, setYear] = useState(currentYear);
   const [monthEnabled, setMonthEnabled] = useState(false);
@@ -248,6 +248,7 @@ export default function ReportsPage() {
       investments: raw.investments.filter((entry) => inDateRange(entry.investment_date, from, to)),
       funding: raw.funding.filter((entry) => inDateRange(entry.date_received, from, to)),
       restocks: raw.restocks.filter((entry) => inDateRange(entry.restock_date, from, to)),
+      stockMovements: raw.stockMovements.filter((entry) => inDateRange(entry.movement_date, from, to)),
     };
   }, [from, invalidRange, raw, to]);
 
@@ -277,6 +278,7 @@ export default function ReportsPage() {
       investments: filtered.investments,
       investorFunds: filtered.funding,
       restocks: filtered.restocks,
+      stockMovements: filtered.stockMovements,
     });
   }, [filtered, raw.products, recognizedSaleItems]);
 
@@ -414,6 +416,7 @@ export default function ReportsPage() {
         fundings: raw.funding,
         restocks: raw.restocks,
         products: raw.products,
+        stockMovements: raw.stockMovements,
         openingStockMovements,
         from,
         to,

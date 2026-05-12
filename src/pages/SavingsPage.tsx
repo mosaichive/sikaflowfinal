@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/constants';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { useBusiness } from '@/context/BusinessContext';
-import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { useFinancialEngine } from '@/hooks/useFinancialEngine';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -119,7 +119,7 @@ function getDestinationTypeIcon(type: string | null | undefined) {
 export default function SavingsPage() {
   const { user, isAdmin, isManager, displayName } = useAuth();
   const { businessId } = useBusiness();
-  const { financials, loading: financialsLoading } = useBusinessFinancials();
+  const { financials, loading: financialsLoading } = useFinancialEngine();
   const { toast } = useToast();
 
   const [destinations, setDestinations] = useState<SavingsDestination[]>([]);
