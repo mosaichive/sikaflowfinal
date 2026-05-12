@@ -14,7 +14,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, ORDER_STATUSES, PAYMENT_METHODS } from '@/lib/constants';
-import { ClipboardList, Plus, Truck } from 'lucide-react';
+import { ClipboardList, Plus, Truck, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 
 type ProductRow = {
