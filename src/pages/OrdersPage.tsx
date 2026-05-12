@@ -202,6 +202,52 @@ export default function OrdersPage() {
       due_date: '',
     });
     setOrderLines([makeDraftItem()]);
+    setEditingId(null);
+  };
+
+  const openEditDialog = (order: OrderRow) => {
+    setEditingId(order.id);
+    setForm({
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      delivery_location: order.delivery_location || '',
+      discount: String(order.discount ?? '0'),
+      amount_paid: String(order.amount_paid ?? '0'),
+      payment_method: order.payment_method || PAYMENT_METHODS[0].value,
+      notes: order.notes || '',
+      status: order.status || 'pending',
+      due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+    });
+    const lines = orderItems
+      .filter((it) => it.order_id === order.id)
+      .map((it) => ({ id: crypto.randomUUID(), product_id: it.product_id || '', quantity: String(it.quantity) }));
+    setOrderLines(lines.length ? lines : [makeDraftItem()]);
+    setOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    const prevOrders = orders;
+    const prevItems = orderItems;
+    setOrders((o) => o.filter((x) => x.id !== id));
+    setOrderItems((it) => it.filter((x) => x.order_id !== id));
+    setDeleteId(null);
+    try {
+      const itemsRes = await supabase.from('order_items' as any).delete().eq('order_id', id);
+      if (itemsRes.error) throw itemsRes.error;
+      const orderRes = await supabase.from('orders' as any).delete().eq('id', id);
+      if (orderRes.error) throw orderRes.error;
+      toast({ title: 'Order deleted' });
+    } catch (error) {
+      setOrders(prevOrders);
+      setOrderItems(prevItems);
+      toast({
+        title: 'Could not delete order',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    }
   };
 
   const createOrder = async (event: React.FormEvent) => {
@@ -222,37 +268,50 @@ export default function OrdersPage() {
     setSaving(true);
 
     try {
-      const { data: order, error: orderError } = await supabase
-        .from('orders' as any)
-        .insert({
-          business_id: businessId,
-          customer_name: form.customer_name || 'Walk-in',
-          customer_phone: form.customer_phone,
-          delivery_location: form.delivery_location,
-          notes: form.notes,
-          subtotal,
-          discount,
-          total,
-          amount_paid: amountPaid,
-          balance,
-          payment_method: form.payment_method,
-          payment_status: paymentStatus,
-          status: form.status,
-          created_by: user.id,
-          created_by_name: displayName || user.email || '',
-          assigned_to: user.id,
-          assigned_to_name: displayName || user.email || '',
-          due_date: form.due_date || null,
-          order_date: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-      if (orderError) throw orderError;
+      const orderPayload = {
+        business_id: businessId,
+        customer_name: form.customer_name || 'Walk-in',
+        customer_phone: form.customer_phone,
+        delivery_location: form.delivery_location,
+        notes: form.notes,
+        subtotal,
+        discount,
+        total,
+        amount_paid: amountPaid,
+        balance,
+        payment_method: form.payment_method,
+        payment_status: paymentStatus,
+        status: form.status,
+        due_date: form.due_date || null,
+      };
+
+      let orderId: string | null = editingId;
+      if (editingId) {
+        const { error: upErr } = await supabase.from('orders' as any).update(orderPayload).eq('id', editingId);
+        if (upErr) throw upErr;
+        const { error: delErr } = await supabase.from('order_items' as any).delete().eq('order_id', editingId);
+        if (delErr) throw delErr;
+      } else {
+        const { data: order, error: orderError } = await supabase
+          .from('orders' as any)
+          .insert({
+            ...orderPayload,
+            created_by: user.id,
+            created_by_name: displayName || user.email || '',
+            assigned_to: user.id,
+            assigned_to_name: displayName || user.email || '',
+            order_date: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+        if (orderError) throw orderError;
+        orderId = (order as any).id;
+      }
 
       const { error: itemsError } = await supabase.from('order_items' as any).insert(
         selectedItems.map((item) => ({
           business_id: businessId,
-          order_id: order.id,
+          order_id: orderId,
           product_id: item.product.id,
           product_name: item.product.name,
           sku: item.product.sku,
@@ -264,20 +323,21 @@ export default function OrdersPage() {
       );
       if (itemsError) throw itemsError;
 
-      toast({ title: 'Order created', description: 'Track it here until it is delivered.' });
+      toast({ title: editingId ? 'Order updated' : 'Order created' });
       resetForm();
       setOpen(false);
       void load();
     } catch (error) {
       toast({
-        title: 'Could not create order',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        title: editingId ? 'Could not update order' : 'Could not create order',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
       setSaving(false);
     }
   };
+
 
   const finalizeDeliveredOrder = async (order: OrderRow) => {
     if (!businessId || !user) return;
