@@ -106,10 +106,14 @@ export default function CustomersPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      if (!businessId) throw new Error('No business selected');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be signed in.');
       const { error } = await supabase.from('customers').insert({
-        ...form,
-        business_id: businessId,
+        user_id: user.id,
+        name: form.name,
+        phone: form.phone || null,
+        email: form.email || null,
+        note: form.notes || null,
       });
       if (error) throw error;
       toast({ title: 'Customer added' });
