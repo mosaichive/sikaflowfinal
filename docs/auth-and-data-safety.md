@@ -14,9 +14,9 @@ SikaFlow uses Supabase Auth as the application identity provider. Existing produ
 
 Required frontend variables:
 
-- `VITE_SUPABASE_PROJECT_ID=akmoxsaihexwjijtjzsj`
-- `VITE_SUPABASE_URL=https://akmoxsaihexwjijtjzsj.supabase.co`
-- `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key-for-akmoxsaihexwjijtjzsj>`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
 
 Optional Supabase Edge Function secrets for WhatsApp OTP delivery:
 

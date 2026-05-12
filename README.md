@@ -23,9 +23,9 @@ npm run dev
 Required Vercel variables:
 
 ```sh
-VITE_SUPABASE_PROJECT_ID=akmoxsaihexwjijtjzsj
-VITE_SUPABASE_URL=https://akmoxsaihexwjijtjzsj.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key-for-akmoxsaihexwjijtjzsj>
+VITE_SUPABASE_PROJECT_ID=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_SUPABASE_URL=
 ```
 
 Supabase Edge Function secrets such as Paystack and Twilio credentials should be configured in Supabase, not exposed as client-side Vercel variables.

@@ -26,11 +26,7 @@ then the payment is marked `review` and **no automatic plan activation happens**
 
 ## Supabase Deploy
 
-Deploy these functions to the canonical live project:
-
-```txt
-akmoxsaihexwjijtjzsj
-```
+Deploy these functions to the live project:
 
 - `paystack-payment`
 - `paystack-webhook`
@@ -65,10 +61,10 @@ Set the Paystack webhook URL to:
 https://<your-project-ref>.supabase.co/functions/v1/paystack-webhook
 ```
 
-For the canonical live project this becomes:
+For the current live project this becomes:
 
 ```txt
-https://akmoxsaihexwjijtjzsj.supabase.co/functions/v1/paystack-webhook
+https://hhgnriavkqdnjmmpklbw.supabase.co/functions/v1/paystack-webhook
 ```
 
 ## Runtime Behavior
