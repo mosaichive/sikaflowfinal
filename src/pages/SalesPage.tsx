@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SaleDocumentViewerDialog } from '@/components/sales/SaleDocumentViewerDialog';
 import { isNegativeStockSale } from '@/lib/sales-inventory';
-import { validateSaleItemPayload, recomputeProductStock } from '@/lib/sale-items-schema';
+import { validateSaleItemPayload } from '@/lib/sale-items-schema';
 import {
   deleteStockMovementsBySourceCompat,
   insertStockMovementCompat,
@@ -135,19 +135,14 @@ export default function SalesPage() {
     await Promise.all([fetchAllProducts(), fetchSales()]);
   };
 
-  // Stock is managed entirely by the DB triggers `adjust_stock_on_sale_item`
-  // (decrements products.stock on sale_items insert/delete) and
-  // `log_stock_movement_on_sale_item` (writes the corresponding stock_movements
-  // row). The app must NOT write to products.quantity / products.stock or to
-  // stock_movements directly — the schema doesn't have a `quantity` column on
-  // products and the triggers will double-count if we do.
+  // Stock is projected from stock_movements. Product stock columns are treated
+  // as legacy compatibility fields and are not the source of truth.
   const updateProductQuantity = async (_productId: string, _nextQuantity: number) => {
-    // no-op: handled by adjust_stock_on_sale_item trigger
+    // no-op: loadProductsCompat overlays quantity from the movement ledger.
   };
 
   const restoreSaleStock = async (_items: any[]) => {
-    // no-op: deleting sale_items rows fires adjust_stock_on_sale_item which
-    // restores products.stock automatically.
+    // no-op: deleting the sale movement restores ledger-derived stock.
   };
 
   const applyEditStockAdjustments = async (_args: {
@@ -156,8 +151,7 @@ export default function SalesPage() {
     newProduct: any;
     newQty: number;
   }) => {
-    // no-op: removing the old sale_items row + inserting the new one fires the
-    // adjust_stock_on_sale_item trigger, which handles all stock deltas.
+    // no-op: edit flow removes old movements and writes the replacement one.
   };
 
   const resetForm = () => {
@@ -170,7 +164,15 @@ export default function SalesPage() {
     setEditSaleId(null); setEditOriginal(null);
   };
 
-  const createSaleMovement = async (_args: {
+  const createSaleMovement = async ({
+    saleItemId,
+    product,
+    soldQuantity,
+    unitCost,
+    soldPrice,
+    note,
+    isNegativeStockSale: _isNegativeStockSale,
+  }: {
     saleItemId: string;
     product: any;
     soldQuantity: number;
@@ -179,9 +181,24 @@ export default function SalesPage() {
     note: string;
     isNegativeStockSale?: boolean;
   }) => {
-    // no-op: log_stock_movement_on_sale_item DB trigger writes the
-    // stock_movements row automatically when the sale_items row is inserted.
-    // Writing it again here would double the movement.
+    if (!user || !businessId) return;
+    const quantityBefore = Number(product?.quantity ?? 0);
+    await insertStockMovementCompat({
+      user_id: user.id,
+      business_id: businessId,
+      product_id: product.id,
+      movement_type: 'sale',
+      quantity_change: -Math.abs(Number(soldQuantity || 0)),
+      quantity_after: quantityBefore - Math.abs(Number(soldQuantity || 0)),
+      unit_cost: unitCost,
+      unit_price: soldPrice,
+      note,
+      created_by: user.id,
+      created_by_name: displayName || user.email || '',
+      movement_date: new Date(saleDate).toISOString(),
+      source_table: 'sale_items',
+      source_id: saleItemId,
+    });
   };
 
   const handleProductChange = (v: string) => {
@@ -319,7 +336,7 @@ export default function SalesPage() {
       if (customerName && customerName !== 'Walk-in') {
         const { data: existing } = await supabase.from('customers').select('id').eq('name', customerName).maybeSingle();
         if (!existing) {
-          await supabase.from('customers').insert({ name: customerName, phone: customerPhone, business_id: businessId });
+          await supabase.from('customers').insert({ user_id: user.id, name: customerName, phone: customerPhone, business_id: businessId });
         }
       }
 

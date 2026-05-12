@@ -16,8 +16,8 @@ import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
-import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
-import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
+import { useFinancialEngine } from '@/hooks/useFinancialEngine';
 
 type SaleRow = {
   id: string;
@@ -78,6 +78,7 @@ type SavingsRow = {
 type InvestmentRow = { amount: number | string; investment_date: string };
 type FundingRow = { amount: number | string; date_received: string; investor_name?: string | null; reference?: string | null };
 type RestockRow = { total_cost: number | string; status?: string | null; restock_date?: string | null };
+type StockMovementRow = { product_id?: string | null; movement_type?: string | null; reason?: string | null; quantity_change?: number | string | null; change?: number | string | null; unit_cost?: number | string | null; movement_date?: string | null };
 
 type DashboardData = {
   sales: SaleRow[];
@@ -89,6 +90,7 @@ type DashboardData = {
   investments: InvestmentRow[];
   investorFunds: FundingRow[];
   restocks: RestockRow[];
+  stockMovements: StockMovementRow[];
 };
 
 function startOfYear(year: number) {
@@ -286,7 +288,7 @@ export default function Dashboard() {
   const { business } = useBusiness();
   const businessId = business?.id ?? null;
   const { isAdmin, isManager, displayName, onboardingCompleted, user } = useAuth();
-  const { financials, loading: financialsLoading } = useBusinessFinancials();
+  const { financials, loading: financialsLoading } = useFinancialEngine();
   const [data, setData] = useState<DashboardData>({
     sales: [],
     saleItems: [],
@@ -297,6 +299,7 @@ export default function Dashboard() {
     investments: [],
     investorFunds: [],
     restocks: [],
+    stockMovements: [],
   });
   const [loading, setLoading] = useState(true);
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
@@ -314,7 +317,7 @@ export default function Dashboard() {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [salesRes, saleItemsRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes] = await Promise.allSettled([
+      const [salesRes, saleItemsRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes, stockMovementsRes] = await Promise.allSettled([
         supabase.from('sales').select('*').order('sale_date', { ascending: false }),
         supabase.from('sale_items').select('*'),
         loadProductsCompat(false, businessId),
@@ -324,6 +327,7 @@ export default function Dashboard() {
         supabase.from('investments').select('amount,investment_date'),
         supabase.from('investor_funding').select('amount,date_received,investor_name,reference').order('date_received', { ascending: false }),
         supabase.from('restocks').select('total_cost,status,restock_date').order('restock_date', { ascending: false }),
+        loadStockMovementsCompat(1000, businessId),
       ]);
 
       if (salesRes.status === 'rejected') logSupabaseError('dashboard.load.sales', salesRes.reason);
@@ -335,6 +339,7 @@ export default function Dashboard() {
       if (investmentsRes.status === 'rejected') logSupabaseError('dashboard.load.investments', investmentsRes.reason);
       if (investorFundsRes.status === 'rejected') logSupabaseError('dashboard.load.investorFunds', investorFundsRes.reason);
       if (restocksRes.status === 'rejected') logSupabaseError('dashboard.load.restocks', restocksRes.reason);
+      if (stockMovementsRes.status === 'rejected') logSupabaseError('dashboard.load.stockMovements', stockMovementsRes.reason);
 
       if (salesRes.status === 'fulfilled' && salesRes.value.error) logSupabaseError('dashboard.load.sales', salesRes.value.error);
       if (saleItemsRes.status === 'fulfilled' && saleItemsRes.value.error) logSupabaseError('dashboard.load.saleItems', saleItemsRes.value.error);
@@ -355,6 +360,7 @@ export default function Dashboard() {
         investments: investmentsRes.status === 'fulfilled' ? ((investmentsRes.value.data || []) as InvestmentRow[]) : [],
         investorFunds: investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value.data || []) as FundingRow[]) : [],
         restocks: restocksRes.status === 'fulfilled' ? ((restocksRes.value.data || []) as RestockRow[]) : [],
+        stockMovements: stockMovementsRes.status === 'fulfilled' ? ((stockMovementsRes.value || []) as StockMovementRow[]) : [],
       });
     } finally {
       setLoading(false);
@@ -375,6 +381,7 @@ export default function Dashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'investments' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'investor_funding' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, refresh)
       .subscribe();
 
     return () => {
@@ -439,6 +446,7 @@ export default function Dashboard() {
       investments: data.investments.filter((row) => inRange(row.investment_date, dateRange.from, dateRange.to)),
       investorFunds: data.investorFunds.filter((row) => inRange(row.date_received, dateRange.from, dateRange.to)),
       products: data.products,
+      stockMovements: data.stockMovements,
     };
   }, [data, dateRange.from, dateRange.to]);
 

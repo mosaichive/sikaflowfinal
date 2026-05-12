@@ -42,6 +42,7 @@ type ReportSourceArgs = {
   fundings: any[];
   restocks: any[];
   products: any[];
+  stockMovements?: any[];
   openingStockMovements?: any[];
   from: string;
   to: string;
@@ -239,6 +240,7 @@ export function buildReportStatement({
   fundings,
   restocks,
   products,
+  stockMovements = [],
   openingStockMovements = [],
   from,
   to,
@@ -281,6 +283,7 @@ export function buildReportStatement({
   const filteredInvestments = investments.filter((investment) => inRange(investment.investment_date));
   const filteredFundings = fundings.filter((funding) => inRange(funding.date_received));
   const filteredRestocks = restocks.filter((restock) => inRange(restock.restock_date));
+  const filteredStockMovements = stockMovements.filter((movement) => inRange(movement.movement_date));
   const filteredOpeningStock = openingStockMovements.filter((movement) => inRange(movement.movement_date));
   const financials = calculateFinancialSnapshot({
     sales: filteredSales,
@@ -292,6 +295,7 @@ export function buildReportStatement({
     investments: filteredInvestments,
     investorFunds: filteredFundings,
     restocks: filteredRestocks,
+    stockMovements: filteredStockMovements,
   });
 
   const totalMoneyIn = rows.reduce((sum, row) => sum + row.moneyIn, 0);
