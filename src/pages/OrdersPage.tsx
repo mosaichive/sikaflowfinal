@@ -443,13 +443,13 @@ export default function OrdersPage() {
             </p>
           </div>
           {canCreate ? (
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
+                <Button onClick={() => resetForm()}><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>New Order</DialogTitle>
+                  <DialogTitle>{editingId ? 'Edit Order' : 'New Order'}</DialogTitle>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={createOrder}>
                   <div className="grid gap-4 md:grid-cols-2">
