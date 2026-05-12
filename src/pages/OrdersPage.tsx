@@ -616,6 +616,14 @@ export default function OrdersPage() {
                         <TableCell>{order.assigned_to_name || 'Unassigned'}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(Number(order.total || 0))}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(order.balance || 0))}</TableCell>
+                        <TableCell className="text-right">
+                          {canCreate ? (
+                            <div className="flex justify-end gap-1">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => openEditDialog(order)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteId(order.id)} title="Delete"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </div>
+                          ) : null}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
