@@ -213,7 +213,7 @@ export default function OrdersPage() {
       delivery_location: order.delivery_location || '',
       discount: String(order.discount ?? '0'),
       amount_paid: String(order.amount_paid ?? '0'),
-      payment_method: order.payment_method || PAYMENT_METHODS[0].value,
+      payment_method: (order.payment_method || PAYMENT_METHODS[0].value) as typeof PAYMENT_METHODS[number]['value'],
       notes: order.notes || '',
       status: order.status || 'pending',
       due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
