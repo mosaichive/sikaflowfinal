@@ -561,7 +561,7 @@ export default function OrdersPage() {
                   </div>
 
                   <Button type="submit" className="w-full" disabled={saving}>
-                    {saving ? 'Saving order...' : 'Save Order'}
+                    {saving ? 'Saving order...' : editingId ? 'Save Changes' : 'Save Order'}
                   </Button>
                 </form>
               </DialogContent>
