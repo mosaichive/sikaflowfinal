@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { type BusinessFinancials, calculateBusinessFinancials } from '@/lib/business-money';
 import { supabase } from '@/integrations/supabase/client';
-import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
+import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 
 type BusinessFinancialsContextValue = {
   financials: BusinessFinancials;
@@ -21,7 +21,6 @@ const EMPTY_FINANCIALS = calculateBusinessFinancials({
   investments: [],
   investorFunds: [],
   restocks: [],
-  stockMovements: [],
   openingCashBalance: 0,
 });
 
@@ -64,7 +63,6 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
           otherIncomeRes,
           savingsRes,
           restocksRes,
-          stockMovementsRes,
           investmentsRes,
           investorFundsRes,
           profileRes,
@@ -79,7 +77,6 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
             db.from('other_income').select('amount').eq('user_id', userId),
             db.from('savings').select('amount').eq('user_id', userId),
             db.from('restocks').select('total_cost,status,is_opening_stock').eq('user_id', userId),
-            loadStockMovementsCompat(1000, businessId ?? userId),
             db.from('investments').select('amount,status').eq('user_id', userId),
             db.from('investor_funding').select('amount').eq('user_id', userId),
             db.from('profiles').select('opening_cash_balance').eq('id', userId).maybeSingle(),
@@ -91,7 +88,6 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { userId });
         if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { userId });
         if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { userId });
-        if (stockMovementsRes.status === 'rejected') logSupabaseError('financials.load.stockMovements', stockMovementsRes.reason, { userId });
 
         const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
         let saleItems: any[] = [];
@@ -127,7 +123,6 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
           investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any).data ?? []) : []) as any,
           investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any).data ?? []) : []) as any,
           restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
-          stockMovements: (stockMovementsRes.status === 'fulfilled' ? ((stockMovementsRes.value as any) ?? []) : []) as any,
           openingCashBalance,
         });
 

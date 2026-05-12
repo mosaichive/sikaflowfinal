@@ -3,15 +3,11 @@ import {
   calculateFinancialSnapshot,
   calculateSalesIncome,
   calculateTotalOtherIncome,
-  applyStockMovementsToProducts,
-  calculateStockByProduct,
   normalizeText,
   toNumber,
 } from '@/lib/sales-inventory';
 
 export {
-  applyStockMovementsToProducts,
-  calculateStockByProduct,
   calculateFinancialSnapshot,
   normalizeText,
   toNumber,

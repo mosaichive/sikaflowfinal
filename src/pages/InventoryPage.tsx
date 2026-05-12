@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
-import { useFinancialEngine } from '@/hooks/useFinancialEngine';
+import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { toNumber } from '@/lib/sales-inventory';
@@ -107,7 +107,7 @@ function extractRestockExpenseId(description: string | null | undefined) {
 export default function InventoryPage() {
   const { user, displayName, isAdmin, isManager } = useAuth();
   const { businessId } = useBusiness();
-  const { financials, loading: financialsLoading } = useFinancialEngine();
+  const { financials, loading: financialsLoading } = useBusinessFinancials();
   const { toast } = useToast();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [movements, setMovements] = useState<StockMovementRow[]>([]);
@@ -387,7 +387,6 @@ export default function InventoryPage() {
     sellingPrice,
     note,
     movementDate,
-    movementType,
   }: {
     restockId: string;
     productId: string;
@@ -397,7 +396,6 @@ export default function InventoryPage() {
     sellingPrice: number;
     note: string;
     movementDate: string;
-    movementType: 'opening_stock' | 'restock';
   }) => {
     try {
       const { data: existingRows, error: selectError } = await supabase
@@ -409,10 +407,9 @@ export default function InventoryPage() {
       if (selectError) throw selectError;
 
       const payload = {
-        user_id: user?.id,
         business_id: businessId,
         product_id: productId,
-        movement_type: movementType,
+        movement_type: 'restock',
         quantity_change: quantityAdded,
         quantity_after: quantityAfter,
         unit_cost: unitCost,
@@ -511,23 +508,6 @@ export default function InventoryPage() {
 
       await cleanupLegacyRestockExpense(savedRestock.id);
 
-      const previousQuantity =
-        editingRestock && editingRestock.product_id === selectedProduct.id
-          ? Number(editingRestock.quantity_added ?? 0)
-          : 0;
-      const quantityAfter = Number(selectedProduct.quantity ?? 0) - previousQuantity + quantity;
-      await upsertRestockMovement({
-        restockId: savedRestock.id,
-        productId: selectedProduct.id,
-        quantityAdded: quantity,
-        quantityAfter,
-        unitCost,
-        sellingPrice,
-        note: form.description || (form.is_opening_stock ? 'Opening stock' : 'Normal restock'),
-        movementDate,
-        movementType: form.is_opening_stock ? 'opening_stock' : 'restock',
-      });
-
       const { error: productError } = await supabase
         .from('products')
         .update({
@@ -569,7 +549,6 @@ export default function InventoryPage() {
     setDeletingRestockId(restock.id);
     try {
       await cleanupLegacyRestockExpense(restock.id);
-      await deleteRestockMovement(restock.id);
 
       const { error: restockError } = await supabase.from('restocks').delete().eq('id', restock.id);
       if (restockError) throw restockError;

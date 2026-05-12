@@ -26,27 +26,12 @@ type SaleItemLike = {
 };
 
 type ProductLike = {
-  id?: string | null;
   quantity?: NumberLike;
   cost_price?: NumberLike;
   selling_price?: NumberLike;
   low_stock_threshold?: NumberLike;
   reorder_level?: NumberLike;
   is_archived?: boolean | null;
-};
-
-type StockMovementLike = {
-  product_id?: string | null;
-  movement_type?: string | null;
-  reason?: string | null;
-  quantity_change?: NumberLike;
-  change?: NumberLike;
-  unit_cost?: NumberLike;
-  cost_price?: NumberLike;
-  source_id?: string | null;
-  reference_id?: string | null;
-  source_table?: string | null;
-  status?: string | null;
 };
 
 type AmountLike = {
@@ -179,55 +164,6 @@ export function calculateRestockExpenseSpending(rows: RestockLike[]) {
   }, 0);
 }
 
-export function getStockMovementType(row: StockMovementLike) {
-  const type = normalizeText(row.movement_type ?? row.reason);
-  if (type === 'sold') return 'sale';
-  return type || 'adjustment';
-}
-
-export function getStockMovementQuantityChange(row: StockMovementLike) {
-  return toNumber(row.quantity_change ?? row.change);
-}
-
-export function isNormalRestockMovement(row: StockMovementLike) {
-  return getStockMovementType(row) === 'restock' && !isCancelledStatus(row.status);
-}
-
-export function isOpeningStockMovement(row: StockMovementLike) {
-  return getStockMovementType(row) === 'opening_stock' && !isCancelledStatus(row.status);
-}
-
-export function calculateStockByProduct(stockMovements: StockMovementLike[]) {
-  const stockByProduct = new Map<string, number>();
-
-  stockMovements.forEach((movement) => {
-    if (isCancelledStatus(movement.status)) return;
-    const productId = movement.product_id;
-    if (!productId) return;
-    stockByProduct.set(
-      productId,
-      (stockByProduct.get(productId) ?? 0) + getStockMovementQuantityChange(movement),
-    );
-  });
-
-  return stockByProduct;
-}
-
-export function applyStockMovementsToProducts<T extends ProductLike>(
-  products: T[],
-  stockMovements: StockMovementLike[] = [],
-) {
-  if (stockMovements.length === 0) return products;
-  const stockByProduct = calculateStockByProduct(stockMovements);
-  return products.map((product) => {
-    if (!product.id || !stockByProduct.has(product.id)) return product;
-    return {
-      ...product,
-      quantity: stockByProduct.get(product.id) ?? 0,
-    };
-  });
-}
-
 export function calculateStockLeft(products: ProductLike[]) {
   return products.reduce((sum, product) => sum + toNumber(product.quantity), 0);
 }
@@ -253,40 +189,6 @@ export function calculateRestockSpending(rows: RestockLike[]) {
   }, 0);
 }
 
-export function calculateRestockSpendingFromMovements(rows: StockMovementLike[]) {
-  return rows.reduce((sum, row) => {
-    if (!isNormalRestockMovement(row)) return sum;
-    const quantity = Math.max(0, getStockMovementQuantityChange(row));
-    const unitCost = toNumber(row.unit_cost ?? row.cost_price);
-    return sum + quantity * unitCost;
-  }, 0);
-}
-
-export function calculateNormalRestockSpending({
-  restocks,
-  stockMovements,
-}: {
-  restocks: RestockLike[];
-  stockMovements: StockMovementLike[];
-}) {
-  if (stockMovements.length === 0) return calculateRestockSpending(restocks);
-
-  const movementRestockSourceIds = new Set(
-    stockMovements
-      .filter(isNormalRestockMovement)
-      .map((movement) => movement.source_id ?? movement.reference_id)
-      .filter(Boolean),
-  );
-
-  const legacyRestockSpending = restocks.reduce((sum, restock) => {
-    if (!restock.id || movementRestockSourceIds.has(restock.id)) return sum;
-    if (isCancelledStatus(restock.status) || restock.is_opening_stock === true) return sum;
-    return sum + toNumber(restock.total_cost);
-  }, 0);
-
-  return calculateRestockSpendingFromMovements(stockMovements) + legacyRestockSpending;
-}
-
 export function calculateFinancialSnapshot({
   sales,
   saleItems = [],
@@ -297,7 +199,6 @@ export function calculateFinancialSnapshot({
   investments = [],
   investorFunds = [],
   restocks = [],
-  stockMovements = [],
   openingCashBalance = 0,
 }: {
   sales: SaleLike[];
@@ -309,10 +210,8 @@ export function calculateFinancialSnapshot({
   investments?: AmountLike[];
   investorFunds?: AmountLike[];
   restocks?: RestockLike[];
-  stockMovements?: StockMovementLike[];
   openingCashBalance?: NumberLike;
 }): FinancialSnapshot {
-  const ledgerProducts = applyStockMovementsToProducts(products, stockMovements);
   const opening = toNumber(openingCashBalance);
   const paidSalesRevenue = calculateSalesIncome(sales);
   const cogs = calculateCOGS(sales, saleItems);
@@ -321,14 +220,14 @@ export function calculateFinancialSnapshot({
   const totalInvestorFunds = calculateTotalOtherIncome(investorFunds);
   const totalIncome = paidSalesRevenue + totalOtherIncome + totalInvestorFunds;
   const operatingExpenses = calculateOperatingExpenses(expenses);
-  const totalRestockSpending = calculateNormalRestockSpending({ restocks, stockMovements });
+  const totalRestockSpending = calculateRestockSpending(restocks);
   const restockExpenseSpending = calculateRestockExpenseSpending(restocks);
   const totalSavings = calculateTotalExpenses(savings);
   const totalInvestments = calculateTotalExpenses(investments);
   const totalMoneyOut = operatingExpenses + totalRestockSpending + totalSavings + totalInvestments;
-  const stockLeft = calculateStockLeft(ledgerProducts);
-  const stockValueCost = calculateStockValue(ledgerProducts, 'cost');
-  const stockValueSelling = calculateStockValue(ledgerProducts, 'selling');
+  const stockLeft = calculateStockLeft(products);
+  const stockValueCost = calculateStockValue(products, 'cost');
+  const stockValueSelling = calculateStockValue(products, 'selling');
 
   return {
     openingCashBalance: opening,
@@ -349,8 +248,8 @@ export function calculateFinancialSnapshot({
     stockLeft,
     stockValueCost,
     stockValueSelling,
-    lowStockCount: calculateLowStockCount(ledgerProducts),
-    negativeStockCount: calculateNegativeStockCount(ledgerProducts),
+    lowStockCount: calculateLowStockCount(products),
+    negativeStockCount: calculateNegativeStockCount(products),
     totalRestockSpending,
   };
 }
@@ -365,7 +264,6 @@ export function calculateAvailableBusinessMoney({
   investments,
   investorFunds = [],
   restocks = [],
-  stockMovements = [],
   openingCashBalance = 0,
 }: {
   sales: SaleLike[];
@@ -377,7 +275,6 @@ export function calculateAvailableBusinessMoney({
   investments: AmountLike[];
   investorFunds?: AmountLike[];
   restocks?: RestockLike[];
-  stockMovements?: StockMovementLike[];
   openingCashBalance?: NumberLike;
 }) {
   const snapshot = calculateFinancialSnapshot({
@@ -390,7 +287,6 @@ export function calculateAvailableBusinessMoney({
     investments,
     investorFunds,
     restocks,
-    stockMovements,
     openingCashBalance,
   });
 
@@ -417,7 +313,6 @@ export function calculateDashboardTotals({
   investments,
   investorFunds = [],
   restocks = [],
-  stockMovements = [],
 }: {
   sales: SaleLike[];
   saleItems: SaleItemLike[];
@@ -428,7 +323,6 @@ export function calculateDashboardTotals({
   investments: AmountLike[];
   investorFunds?: AmountLike[];
   restocks?: RestockLike[];
-  stockMovements?: StockMovementLike[];
 }) {
   const snapshot = calculateFinancialSnapshot({
     sales,
@@ -440,7 +334,6 @@ export function calculateDashboardTotals({
     investments,
     investorFunds,
     restocks,
-    stockMovements,
   });
 
   return {
