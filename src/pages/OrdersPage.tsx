@@ -14,7 +14,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, ORDER_STATUSES, PAYMENT_METHODS } from '@/lib/constants';
-import { ClipboardList, Plus, Truck } from 'lucide-react';
+import { ClipboardList, Plus, Truck, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 
 type ProductRow = {
@@ -78,6 +82,8 @@ export default function OrdersPage() {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [orderLines, setOrderLines] = useState<DraftOrderItem[]>([makeDraftItem()]);
   const [form, setForm] = useState({
     customer_name: '',
@@ -85,7 +91,7 @@ export default function OrdersPage() {
     delivery_location: '',
     discount: '0',
     amount_paid: '0',
-    payment_method: PAYMENT_METHODS[0].value,
+    payment_method: PAYMENT_METHODS[0].value as string,
     notes: '',
     status: 'pending',
     due_date: '',
@@ -196,6 +202,52 @@ export default function OrdersPage() {
       due_date: '',
     });
     setOrderLines([makeDraftItem()]);
+    setEditingId(null);
+  };
+
+  const openEditDialog = (order: OrderRow) => {
+    setEditingId(order.id);
+    setForm({
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      delivery_location: order.delivery_location || '',
+      discount: String(order.discount ?? '0'),
+      amount_paid: String(order.amount_paid ?? '0'),
+      payment_method: order.payment_method || PAYMENT_METHODS[0].value,
+      notes: order.notes || '',
+      status: order.status || 'pending',
+      due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+    });
+    const lines = orderItems
+      .filter((it) => it.order_id === order.id)
+      .map((it) => ({ id: crypto.randomUUID(), product_id: it.product_id || '', quantity: String(it.quantity) }));
+    setOrderLines(lines.length ? lines : [makeDraftItem()]);
+    setOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    const prevOrders = orders;
+    const prevItems = orderItems;
+    setOrders((o) => o.filter((x) => x.id !== id));
+    setOrderItems((it) => it.filter((x) => x.order_id !== id));
+    setDeleteId(null);
+    try {
+      const itemsRes = await supabase.from('order_items' as any).delete().eq('order_id', id);
+      if (itemsRes.error) throw itemsRes.error;
+      const orderRes = await supabase.from('orders' as any).delete().eq('id', id);
+      if (orderRes.error) throw orderRes.error;
+      toast({ title: 'Order deleted' });
+    } catch (error) {
+      setOrders(prevOrders);
+      setOrderItems(prevItems);
+      toast({
+        title: 'Could not delete order',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    }
   };
 
   const createOrder = async (event: React.FormEvent) => {
@@ -216,37 +268,50 @@ export default function OrdersPage() {
     setSaving(true);
 
     try {
-      const { data: order, error: orderError } = await supabase
-        .from('orders' as any)
-        .insert({
-          business_id: businessId,
-          customer_name: form.customer_name || 'Walk-in',
-          customer_phone: form.customer_phone,
-          delivery_location: form.delivery_location,
-          notes: form.notes,
-          subtotal,
-          discount,
-          total,
-          amount_paid: amountPaid,
-          balance,
-          payment_method: form.payment_method,
-          payment_status: paymentStatus,
-          status: form.status,
-          created_by: user.id,
-          created_by_name: displayName || user.email || '',
-          assigned_to: user.id,
-          assigned_to_name: displayName || user.email || '',
-          due_date: form.due_date || null,
-          order_date: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-      if (orderError) throw orderError;
+      const orderPayload = {
+        business_id: businessId,
+        customer_name: form.customer_name || 'Walk-in',
+        customer_phone: form.customer_phone,
+        delivery_location: form.delivery_location,
+        notes: form.notes,
+        subtotal,
+        discount,
+        total,
+        amount_paid: amountPaid,
+        balance,
+        payment_method: form.payment_method,
+        payment_status: paymentStatus,
+        status: form.status,
+        due_date: form.due_date || null,
+      };
+
+      let orderId: string | null = editingId;
+      if (editingId) {
+        const { error: upErr } = await supabase.from('orders' as any).update(orderPayload).eq('id', editingId);
+        if (upErr) throw upErr;
+        const { error: delErr } = await supabase.from('order_items' as any).delete().eq('order_id', editingId);
+        if (delErr) throw delErr;
+      } else {
+        const { data: order, error: orderError } = await supabase
+          .from('orders' as any)
+          .insert({
+            ...orderPayload,
+            created_by: user.id,
+            created_by_name: displayName || user.email || '',
+            assigned_to: user.id,
+            assigned_to_name: displayName || user.email || '',
+            order_date: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+        if (orderError) throw orderError;
+        orderId = (order as any).id;
+      }
 
       const { error: itemsError } = await supabase.from('order_items' as any).insert(
         selectedItems.map((item) => ({
           business_id: businessId,
-          order_id: order.id,
+          order_id: orderId,
           product_id: item.product.id,
           product_name: item.product.name,
           sku: item.product.sku,
@@ -258,20 +323,21 @@ export default function OrdersPage() {
       );
       if (itemsError) throw itemsError;
 
-      toast({ title: 'Order created', description: 'Track it here until it is delivered.' });
+      toast({ title: editingId ? 'Order updated' : 'Order created' });
       resetForm();
       setOpen(false);
       void load();
     } catch (error) {
       toast({
-        title: 'Could not create order',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        title: editingId ? 'Could not update order' : 'Could not create order',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
       setSaving(false);
     }
   };
+
 
   const finalizeDeliveredOrder = async (order: OrderRow) => {
     if (!businessId || !user) return;
@@ -377,13 +443,13 @@ export default function OrdersPage() {
             </p>
           </div>
           {canCreate ? (
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
+                <Button onClick={() => resetForm()}><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>New Order</DialogTitle>
+                  <DialogTitle>{editingId ? 'Edit Order' : 'New Order'}</DialogTitle>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={createOrder}>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -495,7 +561,7 @@ export default function OrdersPage() {
                   </div>
 
                   <Button type="submit" className="w-full" disabled={saving}>
-                    {saving ? 'Saving order...' : 'Save Order'}
+                    {saving ? 'Saving order...' : editingId ? 'Save Changes' : 'Save Order'}
                   </Button>
                 </form>
               </DialogContent>
@@ -517,6 +583,7 @@ export default function OrdersPage() {
                       <TableHead>Assigned To</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -549,6 +616,14 @@ export default function OrdersPage() {
                         <TableCell>{order.assigned_to_name || 'Unassigned'}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(Number(order.total || 0))}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(order.balance || 0))}</TableCell>
+                        <TableCell className="text-right">
+                          {canCreate ? (
+                            <div className="flex justify-end gap-1">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => openEditDialog(order)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteId(order.id)} title="Delete"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </div>
+                          ) : null}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -564,6 +639,21 @@ export default function OrdersPage() {
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!deleteId} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes the order and all of its items. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
