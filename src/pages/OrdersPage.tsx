@@ -583,6 +583,7 @@ export default function OrdersPage() {
                       <TableHead>Assigned To</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
