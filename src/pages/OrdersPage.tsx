@@ -91,7 +91,7 @@ export default function OrdersPage() {
     delivery_location: '',
     discount: '0',
     amount_paid: '0',
-    payment_method: PAYMENT_METHODS[0].value,
+    payment_method: PAYMENT_METHODS[0].value as string,
     notes: '',
     status: 'pending',
     due_date: '',
