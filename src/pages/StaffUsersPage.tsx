@@ -147,18 +147,72 @@ export default function StaffUsersPage() {
     try {
       const { data, error } = await supabase.functions.invoke('manage-business-user', {
         body: {
-          action: 'remove',
-          user_id: userId,
+          action: 'invite',
+          mode: 'password',
+          email: form.email.trim(),
+          full_name: form.full_name.trim(),
+          phone: form.phone.trim() || undefined,
+          role: form.role,
+          password: form.password,
         },
       });
-      if (error) throw error;
+      if (error) {
+        // supabase-js wraps non-2xx into FunctionsHttpError with a generic message;
+        // pull the real error string from the response body.
+        let realMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const parsed = await ctx.json();
+            if (parsed?.error) realMessage = parsed.error;
+          } else if (ctx && typeof ctx.text === 'function') {
+            const text = await ctx.text();
+            try { realMessage = JSON.parse(text)?.error || text; } catch { realMessage = text; }
+          }
+        } catch { /* keep fallback */ }
+        throw new Error(realMessage);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      toast({ title: 'Team member added', description: `${form.full_name} can now sign in.` });
+      setForm({ full_name: '', email: '', phone: '', role: 'salesperson', password: '' });
+      setOpen(false);
+      void load();
+    } catch (error) {
+      toast({
+        title: 'Could not add team member',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeUser = async (userId: string) => {
+    setRemovingUserId(userId);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business-user', {
+        body: { action: 'remove', user_id: userId },
+      });
+      if (error) {
+        let realMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const parsed = await ctx.json();
+            if (parsed?.error) realMessage = parsed.error;
+          }
+        } catch { /* keep fallback */ }
+        throw new Error(realMessage);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: 'Team member removed' });
       void load();
     } catch (error) {
       toast({
         title: 'Could not remove team member',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
