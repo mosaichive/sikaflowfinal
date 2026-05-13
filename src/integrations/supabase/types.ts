@@ -1318,7 +1318,14 @@ export type Database = {
     Enums: {
       announcement_audience: "all" | "trial" | "active" | "expired"
       announcement_priority: "low" | "normal" | "high"
-      app_role: "super_admin" | "business_owner" | "staff"
+      app_role:
+        | "super_admin"
+        | "business_owner"
+        | "staff"
+        | "admin"
+        | "manager"
+        | "salesperson"
+        | "distributor"
       savings_type: "bank" | "mobile_money" | "susu"
       subscription_plan: "trial" | "monthly" | "annual"
       subscription_status: "trial" | "active" | "expired" | "suspended"
@@ -1451,7 +1458,15 @@ export const Constants = {
     Enums: {
       announcement_audience: ["all", "trial", "active", "expired"],
       announcement_priority: ["low", "normal", "high"],
-      app_role: ["super_admin", "business_owner", "staff"],
+      app_role: [
+        "super_admin",
+        "business_owner",
+        "staff",
+        "admin",
+        "manager",
+        "salesperson",
+        "distributor",
+      ],
       savings_type: ["bank", "mobile_money", "susu"],
       subscription_plan: ["trial", "monthly", "annual"],
       subscription_status: ["trial", "active", "expired", "suspended"],

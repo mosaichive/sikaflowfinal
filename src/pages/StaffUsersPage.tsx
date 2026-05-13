@@ -45,32 +45,68 @@ export default function StaffUsersPage() {
   });
 
   const load = useCallback(async () => {
-    if (!businessId) return;
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id,display_name,phone')
-      .eq('business_id', businessId);
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id,role')
-      .eq('business_id', businessId);
+    if (!user?.id) return;
 
-    const roleMap = new Map<string, string>();
-    (roles || []).forEach((row: any) => roleMap.set(row.user_id, row.role));
+    // Always include the owner row so they appear in the team list
+    const ownerRow: ManagedUser = {
+      user_id: user.id,
+      display_name: displayName || 'You',
+      phone: null,
+      role: 'business_owner',
+    };
 
-    setRows(
-      ((profiles || []) as any[]).map((profile) => ({
-        user_id: profile.user_id,
-        display_name: profile.display_name || 'Unknown',
-        phone: profile.phone,
-        role: roleMap.get(profile.user_id) || 'staff',
-      })),
-    );
-  }, [businessId]);
+    const { data: members } = await (supabase as any)
+      .from('staff_members')
+      .select('staff_user_id, display_name, email, active, permissions')
+      .eq('business_owner_id', user.id)
+      .eq('active', true);
+
+    const memberRows: ManagedUser[] = ((members || []) as any[]).map((m) => ({
+      user_id: m.staff_user_id,
+      display_name: m.display_name || m.email || 'Team member',
+      phone: null,
+      role: (m.permissions?.role as string) || 'staff',
+    }));
+
+    // Pull live role from user_roles (in case it diverges from permissions snapshot)
+    const userIds = memberRows.map((m) => m.user_id);
+    if (userIds.length > 0) {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+      const roleMap = new Map<string, string>();
+      (roles || []).forEach((r: any) => {
+        // prefer the team role over the default 'staff'
+        const existing = roleMap.get(r.user_id);
+        if (!existing || existing === 'staff') roleMap.set(r.user_id, r.role);
+      });
+      memberRows.forEach((row) => {
+        const live = roleMap.get(row.user_id);
+        if (live) row.role = live;
+      });
+    }
+
+    setRows([ownerRow, ...memberRows]);
+  }, [user?.id, displayName]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Realtime: refresh when staff_members changes for this owner
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`staff-members-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff_members', filter: `business_owner_id=eq.${user.id}` },
+        () => { void load(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id, load]);
 
   const inviteUser = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -88,7 +124,20 @@ export default function StaffUsersPage() {
           password: form.password,
         },
       });
-      if (error) throw error;
+      if (error) {
+        let realMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const parsed = await ctx.json();
+            if (parsed?.error) realMessage = parsed.error;
+          } else if (ctx && typeof ctx.text === 'function') {
+            const text = await ctx.text();
+            try { realMessage = JSON.parse(text)?.error || text; } catch { realMessage = text; }
+          }
+        } catch { /* keep fallback */ }
+        throw new Error(realMessage);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
 
       toast({ title: 'Team member added', description: `${form.full_name} can now sign in.` });
@@ -98,7 +147,7 @@ export default function StaffUsersPage() {
     } catch (error) {
       toast({
         title: 'Could not add team member',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
@@ -110,19 +159,26 @@ export default function StaffUsersPage() {
     setRemovingUserId(userId);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business-user', {
-        body: {
-          action: 'remove',
-          user_id: userId,
-        },
+        body: { action: 'remove', user_id: userId },
       });
-      if (error) throw error;
+      if (error) {
+        let realMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const parsed = await ctx.json();
+            if (parsed?.error) realMessage = parsed.error;
+          }
+        } catch { /* keep fallback */ }
+        throw new Error(realMessage);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: 'Team member removed' });
       void load();
     } catch (error) {
       toast({
         title: 'Could not remove team member',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {

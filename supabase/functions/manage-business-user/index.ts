@@ -1,7 +1,9 @@
-// Admin-only edge function for per-business user management.
-// Supports: invite (with password OR email invite link) and remove.
-// Remove preserves historical business records, then deletes the auth account
-// so the same email can sign up again later if needed.
+// Admin-only edge function for per-business team member management.
+// Schema notes:
+//   - This app is single-tenant per owner: business_id == owner's auth user id.
+//   - profiles PK is `id` (= auth user id). There is NO profiles.business_id column.
+//   - Team membership lives in `staff_members` (business_owner_id, staff_user_id).
+//   - Roles live in `user_roles` (user_id, role). No business_id column on user_roles.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -17,9 +19,21 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
+type TeamRole = 'admin' | 'manager' | 'staff' | 'salesperson' | 'distributor';
+
 type Action =
-  | { action: 'invite'; mode: 'password' | 'email'; email: string; full_name: string; phone?: string; role: 'admin' | 'manager' | 'staff' | 'salesperson' | 'distributor'; password?: string }
+  | {
+      action: 'invite';
+      mode?: 'password' | 'email';
+      email: string;
+      full_name: string;
+      phone?: string;
+      role: TeamRole;
+      password?: string;
+    }
   | { action: 'remove'; user_id: string };
+
+const VALID_ROLES: TeamRole[] = ['admin', 'manager', 'staff', 'salesperson', 'distributor'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -29,7 +43,6 @@ Deno.serve(async (req) => {
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-  // Auth: identify caller
   const authHeader = req.headers.get('Authorization') || '';
   const jwt = authHeader.replace('Bearer ', '');
   if (!jwt) return json(401, { error: 'Missing authorization' });
@@ -43,142 +56,185 @@ Deno.serve(async (req) => {
   if (userErr || !userRes?.user) return json(401, { error: 'Invalid session' });
   const callerId = userRes.user.id;
 
-  // Resolve caller's business + verify admin
-  const { data: callerProfile } = await admin
-    .from('profiles')
-    .select('business_id, display_name')
-    .eq('user_id', callerId)
-    .maybeSingle();
-  const businessId = callerProfile?.business_id;
-  if (!businessId) return json(403, { error: 'No business associated with account' });
-
-  const { data: callerRole } = await admin
+  // Caller must be a business_owner OR admin (or super_admin) on this workspace.
+  const { data: callerRoles } = await admin
     .from('user_roles')
     .select('role')
-    .eq('user_id', callerId)
-    .eq('business_id', businessId)
+    .eq('user_id', callerId);
+  const callerRoleSet = new Set((callerRoles || []).map((r: any) => r.role));
+  const canManage =
+    callerRoleSet.has('business_owner') ||
+    callerRoleSet.has('admin') ||
+    callerRoleSet.has('super_admin');
+  if (!canManage) return json(403, { error: 'Only the business owner or an admin can manage team users' });
+
+  const { data: callerProfile } = await admin
+    .from('profiles')
+    .select('display_name')
+    .eq('id', callerId)
     .maybeSingle();
-  if (callerRole?.role !== 'admin') return json(403, { error: 'Admin role required' });
+
+  const businessOwnerId = callerId; // single-tenant: caller IS the workspace
 
   let body: Action;
   try {
     body = (await req.json()) as Action;
   } catch {
-    return json(400, { error: 'Invalid JSON' });
+    return json(400, { error: 'Invalid JSON body' });
   }
 
   // ---------- INVITE ----------
   if (body.action === 'invite') {
-    const { mode, email, full_name, phone, role } = body;
-    if (!email || !full_name || !role) return json(400, { error: 'email, full_name, role required' });
-    if (!['admin', 'manager', 'staff', 'salesperson', 'distributor'].includes(role)) return json(400, { error: 'Invalid role' });
+    const mode = body.mode || 'password';
+    const email = (body.email || '').trim().toLowerCase();
+    const full_name = (body.full_name || '').trim();
+    const phone = body.phone?.trim() || null;
+    const role = body.role;
+
+    if (!email) return json(400, { error: 'Email is required' });
+    if (!full_name) return json(400, { error: 'Full name is required' });
+    if (!role || !VALID_ROLES.includes(role)) return json(400, { error: `Role must be one of ${VALID_ROLES.join(', ')}` });
     if (mode !== 'password' && mode !== 'email') return json(400, { error: 'mode must be password or email' });
 
-    // Block if email already belongs to a user in another business
-    const { data: existingByEmail } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const existingUser = existingByEmail?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    if (existingUser) {
-      const { data: existingProfile } = await admin
-        .from('profiles')
-        .select('business_id')
-        .eq('user_id', existingUser.id)
+    // Check for existing auth user with this email
+    let existingUserId: string | null = null;
+    try {
+      // Use the more efficient getUserByEmail via listUsers filter (paged scan as fallback)
+      const { data: listed } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const match = listed?.users?.find((u) => (u.email || '').toLowerCase() === email);
+      if (match) existingUserId = match.id;
+    } catch (e) {
+      // non-fatal, continue
+    }
+
+    if (existingUserId) {
+      // Already on this team?
+      const { data: existingMember } = await admin
+        .from('staff_members')
+        .select('id, business_owner_id')
+        .eq('staff_user_id', existingUserId)
         .maybeSingle();
-      if (existingProfile?.business_id && existingProfile.business_id !== businessId) {
-        return json(409, { error: 'This email already belongs to another business' });
+      if (existingMember?.business_owner_id === businessOwnerId) {
+        return json(409, { error: 'This user is already a member of your team' });
       }
-      if (existingProfile?.business_id === businessId) {
-        return json(409, { error: 'This user is already a member of your business' });
-      }
+      return json(409, {
+        error: 'This email already exists. Invite or link existing user instead.',
+      });
     }
 
     let newUserId: string | null = null;
 
     if (mode === 'password') {
       if (!body.password || body.password.length < 8) {
-        return json(400, { error: 'Password must be at least 8 characters' });
+        return json(400, { error: 'Temporary password must be at least 8 characters' });
       }
-      // Create confirmed user immediately
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
         password: body.password,
         email_confirm: true,
-        user_metadata: { display_name: full_name },
+        user_metadata: { display_name: full_name, phone, must_change_password: true },
       });
-      if (createErr || !created.user) return json(400, { error: createErr?.message || 'Failed to create user' });
+      if (createErr || !created.user) {
+        return json(400, { error: createErr?.message || 'Failed to create user' });
+      }
       newUserId = created.user.id;
     } else {
-      // Email invite
       const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: { display_name: full_name },
+        data: { display_name: full_name, phone },
       });
-      if (inviteErr || !invited.user) return json(400, { error: inviteErr?.message || 'Failed to send invite' });
+      if (inviteErr || !invited.user) {
+        return json(400, { error: inviteErr?.message || 'Failed to send invite email' });
+      }
       newUserId = invited.user.id;
     }
 
-    // Link profile to business (handle_new_user trigger may have already created the row)
-    await admin
+    // Ensure profile row (handle_new_user trigger may have created it)
+    const { error: profileErr } = await admin
       .from('profiles')
       .upsert(
         {
-          user_id: newUserId,
-          business_id: businessId,
+          id: newUserId,
+          email,
           display_name: full_name,
-          phone: phone || null,
+          phone,
+          onboarding_completed: true,
         },
-        { onConflict: 'user_id' }
+        { onConflict: 'id' },
       );
+    if (profileErr) {
+      // Roll back the auth user so this can be retried cleanly
+      await admin.auth.admin.deleteUser(newUserId).catch(() => undefined);
+      return json(500, { error: `Profile creation failed: ${profileErr.message}` });
+    }
 
-    // Assign role scoped to this business
-    await admin
+    // Replace any default 'business_owner' role the trigger may have inserted
+    // for this brand-new user — they're a team member, not their own owner.
+    await admin.from('user_roles').delete().eq('user_id', newUserId);
+
+    const { error: roleErr } = await admin
       .from('user_roles')
-      .upsert({ user_id: newUserId, business_id: businessId, role }, { onConflict: 'user_id,role' });
+      .insert({ user_id: newUserId, role });
+    if (roleErr) {
+      await admin.auth.admin.deleteUser(newUserId).catch(() => undefined);
+      return json(500, { error: `Role assignment failed: ${roleErr.message}` });
+    }
 
-    // Audit
+    // Link to this workspace
+    const { error: memberErr } = await admin
+      .from('staff_members')
+      .upsert(
+        {
+          business_owner_id: businessOwnerId,
+          staff_user_id: newUserId,
+          display_name: full_name,
+          email,
+          permissions: { role },
+          active: true,
+        },
+        { onConflict: 'business_owner_id,staff_user_id' },
+      );
+    if (memberErr) {
+      await admin.auth.admin.deleteUser(newUserId).catch(() => undefined);
+      return json(500, { error: `Team link failed: ${memberErr.message}` });
+    }
+
     await admin.from('audit_log').insert({
-      action: 'user_invited',
+      user_id: businessOwnerId,
+      action: 'team_user_invited',
       details: `Invited ${full_name} (${email}) as ${role} via ${mode}`,
       performed_by: callerId,
       performed_by_name: callerProfile?.display_name || '',
-      business_id: businessId,
     });
 
-    return json(200, { ok: true, user_id: newUserId, mode });
+    return json(200, { ok: true, user_id: newUserId, mode, role });
   }
 
   // ---------- REMOVE ----------
   if (body.action === 'remove') {
     const { user_id } = body;
-    if (!user_id) return json(400, { error: 'user_id required' });
+    if (!user_id) return json(400, { error: 'user_id is required' });
     if (user_id === callerId) return json(400, { error: 'You cannot remove yourself' });
 
-    // Verify the target actually belongs to this business
-    const { data: target } = await admin
-      .from('profiles')
-      .select('business_id, display_name')
-      .eq('user_id', user_id)
+    const { data: member } = await admin
+      .from('staff_members')
+      .select('id, business_owner_id, display_name, email')
+      .eq('business_owner_id', businessOwnerId)
+      .eq('staff_user_id', user_id)
       .maybeSingle();
-    if (!target || target.business_id !== businessId) {
-      return json(404, { error: 'User is not a member of your business' });
-    }
+    if (!member) return json(404, { error: 'User is not a member of your team' });
 
-    const targetName = target.display_name || 'Former team member';
-    const { data: authUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const targetAuthUser = authUsers?.users?.find((entry) => entry.id === user_id);
+    const targetName = member.display_name || 'Former team member';
 
-    // Keep historical records intact by re-linking the hard FK fields before deleting auth.users.
-    const { error: salesError } = await admin
+    // Reassign historical sales records on this workspace to the owner
+    await admin
       .from('sales')
       .update({ staff_id: callerId, staff_name: targetName })
-      .eq('business_id', businessId)
+      .eq('business_id', businessOwnerId)
       .eq('staff_id', user_id);
-    if (salesError) return json(500, { error: salesError.message });
 
-    const { error: expensesError } = await admin
-      .from('expenses')
-      .update({ recorded_by: callerId, recorded_by_name: targetName })
-      .eq('business_id', businessId)
-      .eq('recorded_by', user_id);
-    if (expensesError) return json(500, { error: expensesError.message });
+    // Drop the team link first so RLS reads are consistent
+    await admin.from('staff_members').delete().eq('id', member.id);
+    await admin.from('user_roles').delete().eq('user_id', user_id);
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(user_id);
     if (deleteError) {
@@ -186,11 +242,11 @@ Deno.serve(async (req) => {
     }
 
     await admin.from('audit_log').insert({
-      action: 'user_removed',
-      details: `Removed ${targetName}${targetAuthUser?.email ? ` (${targetAuthUser.email})` : ''} from business`,
+      user_id: businessOwnerId,
+      action: 'team_user_removed',
+      details: `Removed ${targetName}${member.email ? ` (${member.email})` : ''} from team`,
       performed_by: callerId,
       performed_by_name: callerProfile?.display_name || '',
-      business_id: businessId,
     });
 
     return json(200, { ok: true, removed_user_id: user_id });
