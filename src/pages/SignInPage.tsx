@@ -106,6 +106,24 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     if (queryToken) setPendingReferralToken(queryToken);
   }, [location.search]);
 
+  const handleGoogle = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectTo,
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch (authError: unknown) {
+      setError(friendlyAuthError(authError));
+      setSubmitting(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
