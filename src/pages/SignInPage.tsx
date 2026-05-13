@@ -281,12 +281,6 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         </Button>
       </form>
 
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'sign-in' ? 'Sign in' : 'Create account'}
-        </Button>
-      </form>
-
       <div className="my-4 flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
