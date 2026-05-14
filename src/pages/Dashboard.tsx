@@ -46,6 +46,7 @@ type ProductRow = {
   name: string;
   quantity: number | null;
   selling_price: number | string | null;
+  cost_price?: number | string | null;
   low_stock_threshold?: number | null;
   reorder_level?: number | null;
   is_archived?: boolean | null;
