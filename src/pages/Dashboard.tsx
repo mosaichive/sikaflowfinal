@@ -466,6 +466,30 @@ export default function Dashboard() {
     [data.products],
   );
 
+  const inventoryAssetValue = useMemo(
+    () =>
+      data.products
+        .filter((product) => !product.is_archived)
+        .reduce((sum, product) => {
+          const qty = toNumber(product.quantity);
+          const cost = toNumber(product.cost_price);
+          if (qty <= 0 || cost <= 0) return sum;
+          return sum + qty * cost;
+        }, 0),
+    [data.products],
+  );
+
+  const cashFlow = useMemo(() => {
+    const cash = financials.availableBusinessMoney;
+    if (cash < 0) {
+      return { label: 'Negative Cash Flow', helper: 'Cash is below zero — likely reinvested into stock', tone: 'text-rose-500' };
+    }
+    if (cash < 1000) {
+      return { label: 'Low Cash', helper: 'Liquid cash is running thin', tone: 'text-amber-500' };
+    }
+    return { label: 'Healthy', helper: 'Comfortable cash on hand', tone: 'text-emerald-500' };
+  }, [financials.availableBusinessMoney]);
+
   if (loading || financialsLoading) {
     return (
       <AppLayout title="Dashboard">
