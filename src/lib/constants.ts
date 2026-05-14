@@ -62,6 +62,8 @@ export const STOCK_MOVEMENT_TYPES = [
 export const SIKAFLOW_TOOLTIPS = {
   openingStock: 'Opening Stock is the inventory you already have on hand when you start using SikaFlow. It affects stock and profit cost basis, but it is not income or cash.',
   otherIncome: 'Other Income is business income that does not come from product sales, like services, delivery fees, commissions, or miscellaneous charges.',
-  availableBusinessMoney: 'Available Business Money is the working cash left after paid sales, other income, and investor funds, minus operating expenses, all normal restocks, savings, and investments. Opening Stock is excluded.',
+  availableBusinessMoney: 'Available Business Money shows liquid cash available now. Money used for restocking is converted into inventory assets and may reduce cash balance without reducing historical profit. Opening Stock is excluded.',
+  inventoryAssetValue: 'Inventory Asset Value is the monetary worth of all current stock at cost price (cost × quantity). It rises when you restock and falls when products are sold.',
+  cashFlowStatus: 'Cash Flow Status reflects your Available Business Money. Healthy means comfortable cash on hand. Low Cash means liquid cash is running thin. Negative Cash Flow means more cash has gone out than in — usually because profit was reinvested into inventory.',
   profit: 'Profit follows a simple sales formula: paid sales revenue minus COGS and operating expenses. Savings, investments, and investor funds do not change profit.',
 } as const;
