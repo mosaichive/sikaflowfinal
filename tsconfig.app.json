@@ -33,7 +33,6 @@
     "src"
   ],
   "exclude": [
-    "src/integrations/supabase/auth-middleware.ts",
-    "src/integrations/supabase/auth-attacher.ts"
+    "src/integrations/supabase/auth-middleware.ts"
   ]
 }

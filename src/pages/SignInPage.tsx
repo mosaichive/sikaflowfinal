@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable';
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
@@ -111,13 +110,14 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     setError('');
     setSubmitting(true);
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: typeof window !== 'undefined' ? window.location.origin : undefined,
-        extraParams: { prompt: 'select_account' },
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectTo,
+          queryParams: { prompt: 'select_account' },
+        },
       });
-      if (result.error) throw result.error;
-      if (result.redirected) return;
-      navigate(afterAuthPath, { replace: true });
+      if (oauthError) throw oauthError;
     } catch (authError: unknown) {
       setError(friendlyAuthError(authError));
       setSubmitting(false);
