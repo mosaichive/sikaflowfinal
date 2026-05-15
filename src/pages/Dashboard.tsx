@@ -577,21 +577,6 @@ export default function Dashboard() {
             helper="Current inventory quantity across active products"
           />
           <MetricCard
-            title="Inventory Asset Value"
-            value={formatCurrency(inventoryAssetValue)}
-            icon={Warehouse}
-            helper="Cost price × quantity across all active stock"
-            tooltip={SIKAFLOW_TOOLTIPS.inventoryAssetValue}
-          />
-          <MetricCard
-            title="Cash Flow Status"
-            value={cashFlow.label}
-            icon={Activity}
-            helper={cashFlow.helper}
-            tooltip={SIKAFLOW_TOOLTIPS.cashFlowStatus}
-            valueClassName={cashFlow.tone}
-          />
-          <MetricCard
             title="Other Income"
             value={formatCurrency(financials.otherIncome)}
             icon={HandCoins}
