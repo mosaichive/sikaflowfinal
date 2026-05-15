@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Boxes, HandCoins, Package, Receipt, ShoppingCart, TrendingUp, Warehouse, WalletCards } from 'lucide-react';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, Boxes, HandCoins, Package, Receipt, ShoppingCart, TrendingUp, WalletCards } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
@@ -465,30 +465,6 @@ export default function Dashboard() {
     () => data.products.filter((product) => !product.is_archived && toNumber(product.quantity) < 0),
     [data.products],
   );
-
-  const inventoryAssetValue = useMemo(
-    () =>
-      data.products
-        .filter((product) => !product.is_archived)
-        .reduce((sum, product) => {
-          const qty = toNumber(product.quantity);
-          const cost = toNumber(product.cost_price);
-          if (qty <= 0 || cost <= 0) return sum;
-          return sum + qty * cost;
-        }, 0),
-    [data.products],
-  );
-
-  const cashFlow = useMemo(() => {
-    const cash = financials.availableBusinessMoney;
-    if (cash < 0) {
-      return { label: 'Negative Cash Flow', helper: 'Cash is below zero — likely reinvested into stock', tone: 'text-rose-500' };
-    }
-    if (cash < 1000) {
-      return { label: 'Low Cash', helper: 'Liquid cash is running thin', tone: 'text-amber-500' };
-    }
-    return { label: 'Healthy', helper: 'Comfortable cash on hand', tone: 'text-emerald-500' };
-  }, [financials.availableBusinessMoney]);
 
   if (loading || financialsLoading) {
     return (
