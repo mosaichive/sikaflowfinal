@@ -252,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, fetchProfile, fetchRole, user]);
+  }, [authLoading, fetchProfile, fetchRole, fetchStaffMembership, user]);
 
   const userId = user?.id ?? null;
 
