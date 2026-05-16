@@ -30,9 +30,6 @@ const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] =
   { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
 
-const salespersonItems = ['Dashboard', 'Sales / POS', 'Customers', 'Orders', 'Announcements', 'Support'];
-const distributorItems = ['Dashboard', 'Inventory', 'Orders', 'Announcements', 'Support'];
-const managerItems = ['Dashboard', 'Sales / POS', 'Products', 'Inventory', 'Customers', 'Orders', 'Other Income', 'Expenses', 'Savings', 'Reports', 'Announcements', 'Support'];
 
 export function AppSidebar() {
   const { state } = useSidebar();
