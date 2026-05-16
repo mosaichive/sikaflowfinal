@@ -6,27 +6,28 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Logo } from '@/components/Logo';
+import type { ModuleKey } from '@/lib/permissions';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-const allItems = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Sales / POS', url: '/sales', icon: ShoppingCart },
-  { title: 'Products', url: '/products', icon: Package },
-  { title: 'Inventory', url: '/inventory', icon: Boxes },
-  { title: 'Customers', url: '/customers', icon: Users },
-  { title: 'Orders', url: '/orders', icon: ClipboardList },
-  { title: 'Other Income', url: '/other-income', icon: Banknote },
-  { title: 'Expenses', url: '/expenses', icon: Receipt },
-  { title: 'Savings', url: '/savings', icon: PiggyBank },
-  { title: 'Reports', url: '/reports', icon: BarChart3 },
-  { title: 'Staff / Users', url: '/staff', icon: Shield },
-  { title: 'Announcements', url: '/announcements', icon: Megaphone },
-  { title: 'Support', url: '/support', icon: LifeBuoy },
-  { title: 'Settings', url: '/settings', icon: Settings },
+const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] = [
+  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { title: 'Sales / POS', url: '/sales', icon: ShoppingCart, module: 'sales' },
+  { title: 'Products', url: '/products', icon: Package, module: 'products' },
+  { title: 'Inventory', url: '/inventory', icon: Boxes, module: 'inventory' },
+  { title: 'Customers', url: '/customers', icon: Users, module: 'customers' },
+  { title: 'Orders', url: '/orders', icon: ClipboardList, module: 'orders' },
+  { title: 'Other Income', url: '/other-income', icon: Banknote, module: 'other_income' },
+  { title: 'Expenses', url: '/expenses', icon: Receipt, module: 'expenses' },
+  { title: 'Savings', url: '/savings', icon: PiggyBank, module: 'savings' },
+  { title: 'Reports', url: '/reports', icon: BarChart3, module: 'reports' },
+  { title: 'Staff / Users', url: '/staff', icon: Shield, module: 'staff' },
+  { title: 'Announcements', url: '/announcements', icon: Megaphone, module: 'announcements' },
+  { title: 'Support', url: '/support', icon: LifeBuoy, module: 'dashboard' },
+  { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
 
 const salespersonItems = ['Dashboard', 'Sales / POS', 'Customers', 'Orders', 'Announcements', 'Support'];
