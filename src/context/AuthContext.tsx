@@ -3,8 +3,16 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
+import { ALL_MODULES, modulesForRole, type ModuleKey } from '@/lib/permissions';
 
 export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor' | 'business_owner';
+
+export interface StaffMembership {
+  business_owner_id: string;
+  role: string;
+  modules: ModuleKey[];
+  active: boolean;
+}
 
 interface ProfileData {
   display_name: string;
