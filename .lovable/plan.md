@@ -1,84 +1,76 @@
-# SikaFlow Platform Features Plan
 
-This is a large set of changes touching the header, super admin tools, realtime sync, and the Paystack payment flow. Below is the scoped plan grouped by feature.
+# Team Invitation & Permission System
 
-## 1. Ads in Top Header
+Your project already has a working team foundation (`staff_members`, `staff_invites`, `user_roles`, `accept_staff_invite` RPC, `manage-business-user` edge function, role-aware sidebar). Rather than build a parallel `team_invitations` / `business_members` system that would conflict with existing data, this plan **extends what's there** to meet every requirement you listed.
 
-**Where:** `src/components/AppLayout.tsx` (top bar) — currently shows page title and notification/avatar.
+## What changes
 
-**Build:**
-- New component `src/components/HeaderAdsTicker.tsx` that:
-  - Loads `platform_ads` where `active = true`, ordered by `sort_order`.
-  - Subscribes to realtime changes on `platform_ads` so toggles by super admin appear instantly.
-  - Rotates one ad at a time every ~6s with a fade transition.
-  - Renders as a clickable pill (link opens external in new tab; in-app paths use `<Link>`).
-  - Hidden on `<sm` screens (collapses gracefully) — title + bell stay intact on mobile.
-- Insert between title and the right-side action cluster in `AppLayout` top bar.
+### 1. Permissions model
+Add a structured `permissions` JSON to `staff_members` and `staff_invites`:
+```json
+{ "role": "manager", "modules": ["dashboard","sales","customers","orders"] }
+```
+Available modules: dashboard, sales, products, inventory, customers, orders, other_income, expenses, savings, reports, staff, announcements, settings.
 
-## 2. Super Admin Delete User
+### 2. Invite flow (link-based, no email infra yet)
+- New page `/invite/:token` — public route.
+- "Copy invite link" + "Send via email" buttons in Team page (email uses `mailto:` or existing Lovable email if you want — ask separately).
+- Token already exists on `staff_invites`; expires in 7 days (already default 14, will tighten to 7); single-use enforced by existing `accept_staff_invite` RPC.
 
-**Where:** `src/pages/platform/BusinessesPage.tsx`.
+### 3. Invite acceptance page (`/invite/:token`)
+- If **not logged in**: show Full Name + Job Title + Password fields, plus "Continue with Google". After signup/login, auto-call `accept_staff_invite(token)`.
+- If **already logged in** with matching email: one-click "Join {Business}" → calls RPC → redirect to `/dashboard`.
+- **Bypass onboarding**: set `profiles.onboarding_completed = true` and skip `BusinessOnboardingDialog` / business creation for invited users (detected via `staff_members.business_owner_id != user.id`).
 
-**Build:**
-- New edge function `supabase/functions/admin-delete-user` (service role) that:
-  - Requires caller to have `super_admin` role.
-  - Calls `supabase.auth.admin.deleteUser(userId)` — cascades remove auth user; `profiles` and tenant tables (which reference `user_id`) get cleaned via explicit `DELETE` per table OR rely on auth cascade where present. We'll explicitly delete from: `sales`, `sale_items`, `sale_documents`, `products`, `restocks`, `stock_movements`, `customers`, `expenses`, `other_income`, `savings`, `investments`, `investor_funding`, `bank_accounts`, `staff_invites`, `staff_members`, `subscription_payments`, `support_messages`, `audit_log`, `user_roles`, `profiles`, then auth user.
-  - Allows the same email to sign up again afterward.
-- Add "Delete user" button in BusinessesPage row with confirm dialog (typed email confirmation).
+### 4. Owner business context for staff
+`BusinessContext` already loads the user's own business. Extend it: if the user is a staff member (has a row in `staff_members` where `staff_user_id = auth.uid()`), load the **owner's** business profile/products/sales instead. This is the "see business data immediately" requirement.
 
-## 3. Realtime Admin → User
+### 5. Permission enforcement
+- `AuthContext` exposes `hasModule(module)` derived from `staff_members.permissions.modules` (owner/admin sees all).
+- `AppSidebar` filters menu by `hasModule`.
+- New `<RequireModule module="...">` route guard in `AppLayout` redirects unauthorized routes to `/dashboard`.
+- RLS already enforces data isolation per `business_owner_id`; module gating is UI + route level.
 
-**Where:** `src/context/AuthContext.tsx` (or `SubscriptionContext.tsx`).
+### 6. Team management UI (`/staff` page)
+Add tabs: **Members** | **Pending Invites** | **Expired**.
+- Per-member: edit role + module checkboxes, suspend (set `active=false`), reactivate, remove (existing edge function).
+- Per-invite: copy link, resend, revoke (delete row).
+- Realtime channel on `staff_members` + `staff_invites` so changes apply without refresh.
 
-**Build:**
-- Subscribe to `postgres_changes` on `profiles` filtered by `id=eq.<user.id>` and on `user_roles` filtered by `user_id=eq.<user.id>`.
-- On any UPDATE/DELETE, refetch profile and roles. On profile DELETE → sign user out and redirect to `/sign-in`.
-- Subscribe to `platform_ads` in the ads ticker (already in #1) so visibility is live.
-- Subscribe to `subscription_payments` where `user_id=eq.<user.id>` to pop a toast when a payment is approved/rejected and refresh subscription status.
+### 7. Notifications
+Insert into existing `audit_log` on invite accepted / expired / revoked. Show a bell badge in header reading recent audit entries for the owner.
 
-## 4 + 5 + 6. Paystack Auto-Activation, Security, Fallback
+## Database migration (small)
+```sql
+ALTER TABLE staff_invites
+  ALTER COLUMN expires_at SET DEFAULT (now() + interval '7 days');
 
-**Existing:** `supabase/functions/paystack-webhook` and `supabase/functions/paystack-payment` and `_shared/payment-utils.ts` (`activateSubscriptionForPayment`).
+-- Tighten accept_staff_invite to also stamp position + onboarding_completed
+-- (rewrite the function; same signature)
+```
+No new tables. Existing `staff_members` already has `permissions jsonb` and `active` (suspend/reactivate). Existing `staff_invites` already has `token`, `status`, `expires_at`, `accepted_at`.
 
-**Build:**
-- Webhook (server-side trust):
-  - Already verifies HMAC signature.
-  - Add amount check: load `payment` row, compare event amount (GHS) to expected plan price; if mismatch → mark `failed` with note, do NOT activate.
-  - Confirm metadata `user_id` matches payment row `user_id` (anti-tamper).
-- New verification function `supabase/functions/paystack-verify` (called from frontend) that:
-  - Accepts `reference`, calls Paystack `/transaction/verify/:reference` with secret key.
-  - On `status=success` runs the same `activateSubscriptionForPayment` path (idempotent — checks if already activated).
-  - Returns `{ status: 'pending' | 'active' | 'failed', expires_at }`.
-- Frontend (`src/pages/BillingPage.tsx`):
-  - After Paystack popup `onSuccess`, do NOT mark active locally. Show "Verifying payment…".
-  - Poll `paystack-verify` every 3s up to 30s. Stop early when status is final.
-  - Subscribe to realtime `subscription_payments` for instant flip via webhook.
+## Files I'll create/edit
 
-## 7. Super Admin Payments View
+**New**
+- `src/pages/InviteAcceptPage.tsx` — `/invite/:token`
+- `src/components/PermissionsEditor.tsx` — module checkbox grid
+- `src/components/RequireModule.tsx` — route guard
+- `src/lib/permissions.ts` — module list + helpers
 
-**Where:** `src/pages/platform/PaymentsPage.tsx` (already exists).
+**Edit**
+- `src/App.tsx` — add `/invite/:token` route
+- `src/context/AuthContext.tsx` — load staff membership + `hasModule`
+- `src/context/BusinessContext.tsx` — resolve owner business for staff users
+- `src/components/AppSidebar.tsx` — module-based filter
+- `src/components/AppLayout.tsx` — wrap protected routes with `RequireModule`
+- `src/components/BusinessOnboardingDialog.tsx` — skip when user is staff
+- `src/pages/StaffUsersPage.tsx` — invite-by-link UI + permissions editor + tabs
+- `supabase/functions/manage-business-user/index.ts` — accept `permissions.modules`, support `update_permissions` and `set_active` actions
 
-**Build:**
-- Ensure columns: business name, plan, amount, status badge (pending/success/failed), Paystack reference, created/reviewed at.
-- Filter tabs: All / Pending / Successful / Failed.
-- Realtime subscription on `subscription_payments` so admin view is live.
+## Scope notes
+- **Email delivery**: this plan uses copy-link + mailto. If you want branded transactional emails (Lovable Email infra), say so and I'll add it after — it's a separate ~3-step setup with a domain.
+- **Custom roles**: built-in roles only (owner/admin/manager/salesperson/distributor/staff). "Custom permissions per user" is achieved via the module checkboxes, not by creating new role names.
+- **Decline invite**: added as "Revoke" by owner; invitee-side decline = ignore the link.
 
-## Database changes
-
-- Add `paystack_reference` column to `subscription_payments` if missing (the webhook reads it).
-- Add `network` column if missing (used by webhook).
-- Add an `email` column to `subscription_payments` only if needed for verify flow (skip if not).
-
-## Technical notes (for implementation)
-
-- Edge functions called from client: `admin-delete-user`, `paystack-verify`. Both require auth header validation (super_admin for delete; logged-in user for verify own payment).
-- Use `supabaseAdmin` (service role) inside edge functions.
-- Realtime: ensure the publication includes `profiles`, `user_roles`, `subscription_payments`, `platform_ads` (add via migration if not).
-- Keep `verify_jwt = false` only for `paystack-webhook`; `admin-delete-user` and `paystack-verify` must verify JWT.
-
-## Out of scope
-
-- Existing UI of BillingPage stays; only the activation/verification flow changes.
-- No changes to non-Paystack payment methods.
-
-Confirm and I'll implement.
+Reply **yes** to build, or tell me what to adjust (e.g. "add Lovable Email", "add Cashier role", "skip realtime").

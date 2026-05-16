@@ -35,6 +35,7 @@ import AdsPage from "./pages/platform/AdsPage";
 import ReferralsPage from "./pages/platform/ReferralsPage";
 import PlatformSupportPage from "./pages/platform/PlatformSupportPage";
 import NotFound from "./pages/NotFound";
+import InviteAcceptPage from "./pages/InviteAcceptPage";
 import { BrandLoader } from "./components/BrandLoader";
 
 const queryClient = new QueryClient();
@@ -118,6 +119,7 @@ const App = () => (
                 <Route path="/sign-up/*" element={<AuthRoute><SignUpPage /></AuthRoute>} />
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
                 <Route path="/auth/*" element={<Navigate to="/sign-in" replace />} />
+                <Route path="/invite/:token" element={<InviteAcceptPage />} />
                 <Route path="/reset-password" element={<Navigate to="/sign-in" replace />} />
                 <Route path="/change-password" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/verify" element={<Navigate to="/dashboard" replace />} />

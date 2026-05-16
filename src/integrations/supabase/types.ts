@@ -1287,7 +1287,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_staff_invite: { Args: { _token: string }; Returns: Json }
+      accept_staff_invite:
+        | { Args: { _token: string }; Returns: Json }
+        | {
+            Args: { _full_name?: string; _position?: string; _token: string }
+            Returns: Json
+          }
       admin_platform_stats: { Args: never; Returns: Json }
       get_table_columns: {
         Args: { _table_name: string }
@@ -1303,6 +1308,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_business_member: { Args: { _owner_id: string }; Returns: boolean }
+      preview_staff_invite: { Args: { _token: string }; Returns: Json }
       recompute_product_stock: {
         Args: never
         Returns: {

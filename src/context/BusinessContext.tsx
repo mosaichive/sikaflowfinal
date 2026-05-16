@@ -31,37 +31,34 @@ interface BusinessContextType {
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
 export function BusinessProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, staffMembership } = useAuth();
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const hasLoadedOnceRef = useRef(false);
   const inFlightRef = useRef<Promise<void> | null>(null);
 
+  const ownerUserId = staffMembership?.business_owner_id ?? user?.id ?? null;
+
   const load = useCallback(async (showLoading = false) => {
-    // Reuse in-flight request to prevent duplicate concurrent loads
     if (inFlightRef.current) return inFlightRef.current;
 
     const run = (async () => {
-      if (!user) {
+      if (!user || !ownerUserId) {
         setBusiness(null);
         setLoading(false);
         hasLoadedOnceRef.current = true;
         return;
       }
-      // Only flip the global loading flag on the very first load (or when explicitly asked).
-      // Background refreshes must NOT toggle loading or every consumer (route guards) will
-      // unmount their children — that was causing the verify page to "reload" repeatedly.
       if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
       try {
         const db = supabase as any;
-        // The current schema is single-tenant: each user IS their own workspace.
-        // Read the business profile straight from the `profiles` row (matched
-        // by `id` = auth user id, since `profiles.id` is the PK in this schema).
+        // For team members, ownerUserId points at the inviting business owner.
+        // For owners themselves, it points at their own user id.
         const { data: profile } = await db
           .from('profiles')
-          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed')
-          .eq('id', user.id)
+          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email')
+          .eq('id', ownerUserId)
           .maybeSingle();
 
         if (!profile) {
@@ -70,25 +67,22 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         }
 
         const p = profile as any;
-        // Treat the business as "set up" once a name has been saved during
-        // onboarding. Until then, leave `business` null so the setup dialog
-        // can prompt the user.
         if (!p.business_name) {
           setBusiness(null);
           return;
         }
 
         setBusiness({
-          id: user.id,
+          id: ownerUserId,
           name: p.business_name,
           slug: null,
           logo_light_url: p.logo_url ?? null,
           logo_dark_url: p.logo_url ?? null,
-          email: user.email ?? null,
+          email: p.email ?? user.email ?? null,
           phone: p.phone ?? null,
           location: p.location ?? null,
           number_of_employees: null,
-          owner_user_id: user.id,
+          owner_user_id: ownerUserId,
           status: 'active',
           email_verified: true,
           phone_verified: false,
@@ -101,7 +95,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
     inFlightRef.current = run.finally(() => { inFlightRef.current = null; });
     return inFlightRef.current;
-  }, [user]);
+  }, [user, ownerUserId]);
 
   useEffect(() => {
     // Reset on user change so a sign-out / sign-in shows the loader once.

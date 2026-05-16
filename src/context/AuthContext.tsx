@@ -3,8 +3,16 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
+import { ALL_MODULES, modulesForRole, type ModuleKey } from '@/lib/permissions';
 
 export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor' | 'business_owner';
+
+export interface StaffMembership {
+  business_owner_id: string;
+  role: string;
+  modules: ModuleKey[];
+  active: boolean;
+}
 
 interface ProfileData {
   display_name: string;
@@ -57,6 +65,10 @@ interface AuthContextType {
   isDistributor: boolean;
   isSuperAdmin: boolean;
   onboardingCompleted: boolean;
+  staffMembership: StaffMembership | null;
+  isStaffMember: boolean;
+  effectiveBusinessOwnerId: string | null;
+  hasModule: (m: ModuleKey) => boolean;
 }
 
 const emptyProfile: ProfileData = {
@@ -76,6 +88,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [role, setRole] = useState<AppRole | null>(null);
   const [profile, setProfile] = useState<ProfileData>(emptyProfile);
+  const [staffMembership, setStaffMembership] = useState<StaffMembership | null>(null);
+
+  const fetchStaffMembership = useCallback(async (userId: string) => {
+    const { data } = await (supabase as any)
+      .from('staff_members')
+      .select('business_owner_id, permissions, active')
+      .eq('staff_user_id', userId)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (!data) {
+      setStaffMembership(null);
+      return null;
+    }
+    const perms = (data.permissions || {}) as { role?: string; modules?: ModuleKey[] };
+    const membership: StaffMembership = {
+      business_owner_id: data.business_owner_id,
+      role: perms.role || 'staff',
+      modules: Array.isArray(perms.modules) && perms.modules.length > 0 ? perms.modules : modulesForRole(perms.role || 'staff'),
+      active: data.active,
+    };
+    setStaffMembership(membership);
+    return membership;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -185,14 +221,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setRole(null);
         setProfile(emptyProfile);
+        setStaffMembership(null);
         setProfileLoading(false);
         return;
       }
 
       setProfileLoading(true);
-      const [nextRole, profileResult] = await Promise.all([fetchRole(user.id), fetchProfile(user.id)]);
+      const [nextRole, profileResult, membership] = await Promise.all([
+        fetchRole(user.id),
+        fetchProfile(user.id),
+        fetchStaffMembership(user.id),
+      ]);
 
-      if (!cancelled && profileResult && !profileResult.found && !profileResult.error && !nextRole) {
+      // A genuinely missing profile + no role + no staff membership means
+      // the account was deleted. Otherwise (team member just signed in)
+      // keep them signed in.
+      if (!cancelled && profileResult && !profileResult.found && !profileResult.error && !nextRole && !membership) {
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
           window.location.replace('/#/sign-in?reason=removed');
@@ -208,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, fetchProfile, fetchRole, user]);
+  }, [authLoading, fetchProfile, fetchRole, fetchStaffMembership, user]);
 
   const userId = user?.id ?? null;
 
@@ -282,6 +326,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const displayName = profile.display_name || user?.user_metadata.display_name || '';
   const avatarUrl = profile.avatar_url || user?.user_metadata.avatar_url || '';
 
+  const isAdmin = role === 'admin' || role === 'business_owner' || (staffMembership?.role === 'admin');
+  const isSuperAdmin = role === 'super_admin';
+  const isStaffMember = !!staffMembership;
+  const effectiveBusinessOwnerId = staffMembership ? staffMembership.business_owner_id : (user?.id ?? null);
+
+  const hasModule = useCallback((m: ModuleKey) => {
+    if (isSuperAdmin || isAdmin) return true;
+    // Owners (no staff membership) get everything; staff get only their listed modules.
+    if (!staffMembership) return true;
+    return staffMembership.modules.includes(m);
+  }, [isAdmin, isSuperAdmin, staffMembership]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -296,14 +352,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshProfile: async () => {
         if (!user?.id) return;
-        await Promise.all([fetchProfile(user.id), fetchRole(user.id)]);
+        await Promise.all([fetchProfile(user.id), fetchRole(user.id), fetchStaffMembership(user.id)]);
       },
-      isAdmin: role === 'admin' || role === 'business_owner',
-      isManager: role === 'manager',
-      isSalesperson: role === 'salesperson',
-      isDistributor: role === 'distributor',
-      isSuperAdmin: role === 'super_admin',
-      onboardingCompleted: profile.onboarding_completed,
+      isAdmin,
+      isManager: role === 'manager' || staffMembership?.role === 'manager',
+      isSalesperson: role === 'salesperson' || staffMembership?.role === 'salesperson',
+      isDistributor: role === 'distributor' || staffMembership?.role === 'distributor',
+      isSuperAdmin,
+      onboardingCompleted: profile.onboarding_completed || isStaffMember,
+      staffMembership,
+      isStaffMember,
+      effectiveBusinessOwnerId,
+      hasModule,
     }}>
       {children}
     </AuthContext.Provider>
