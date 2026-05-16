@@ -326,6 +326,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const displayName = profile.display_name || user?.user_metadata.display_name || '';
   const avatarUrl = profile.avatar_url || user?.user_metadata.avatar_url || '';
 
+  const isAdmin = role === 'admin' || role === 'business_owner' || (staffMembership?.role === 'admin');
+  const isSuperAdmin = role === 'super_admin';
+  const isStaffMember = !!staffMembership;
+  const effectiveBusinessOwnerId = staffMembership ? staffMembership.business_owner_id : (user?.id ?? null);
+
+  const hasModule = useCallback((m: ModuleKey) => {
+    if (isSuperAdmin || isAdmin) return true;
+    // Owners (no staff membership) get everything; staff get only their listed modules.
+    if (!staffMembership) return true;
+    return staffMembership.modules.includes(m);
+  }, [isAdmin, isSuperAdmin, staffMembership]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -340,14 +352,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshProfile: async () => {
         if (!user?.id) return;
-        await Promise.all([fetchProfile(user.id), fetchRole(user.id)]);
+        await Promise.all([fetchProfile(user.id), fetchRole(user.id), fetchStaffMembership(user.id)]);
       },
-      isAdmin: role === 'admin' || role === 'business_owner',
-      isManager: role === 'manager',
-      isSalesperson: role === 'salesperson',
-      isDistributor: role === 'distributor',
-      isSuperAdmin: role === 'super_admin',
-      onboardingCompleted: profile.onboarding_completed,
+      isAdmin,
+      isManager: role === 'manager' || staffMembership?.role === 'manager',
+      isSalesperson: role === 'salesperson' || staffMembership?.role === 'salesperson',
+      isDistributor: role === 'distributor' || staffMembership?.role === 'distributor',
+      isSuperAdmin,
+      onboardingCompleted: profile.onboarding_completed || isStaffMember,
+      staffMembership,
+      isStaffMember,
+      effectiveBusinessOwnerId,
+      hasModule,
     }}>
       {children}
     </AuthContext.Provider>
