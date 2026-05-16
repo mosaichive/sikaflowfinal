@@ -221,14 +221,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setRole(null);
         setProfile(emptyProfile);
+        setStaffMembership(null);
         setProfileLoading(false);
         return;
       }
 
       setProfileLoading(true);
-      const [nextRole, profileResult] = await Promise.all([fetchRole(user.id), fetchProfile(user.id)]);
+      const [nextRole, profileResult, membership] = await Promise.all([
+        fetchRole(user.id),
+        fetchProfile(user.id),
+        fetchStaffMembership(user.id),
+      ]);
 
-      if (!cancelled && profileResult && !profileResult.found && !profileResult.error && !nextRole) {
+      // A genuinely missing profile + no role + no staff membership means
+      // the account was deleted. Otherwise (team member just signed in)
+      // keep them signed in.
+      if (!cancelled && profileResult && !profileResult.found && !profileResult.error && !nextRole && !membership) {
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
           window.location.replace('/#/sign-in?reason=removed');
