@@ -65,6 +65,10 @@ interface AuthContextType {
   isDistributor: boolean;
   isSuperAdmin: boolean;
   onboardingCompleted: boolean;
+  staffMembership: StaffMembership | null;
+  isStaffMember: boolean;
+  effectiveBusinessOwnerId: string | null;
+  hasModule: (m: ModuleKey) => boolean;
 }
 
 const emptyProfile: ProfileData = {
