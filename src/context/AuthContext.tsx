@@ -88,6 +88,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [role, setRole] = useState<AppRole | null>(null);
   const [profile, setProfile] = useState<ProfileData>(emptyProfile);
+  const [staffMembership, setStaffMembership] = useState<StaffMembership | null>(null);
+
+  const fetchStaffMembership = useCallback(async (userId: string) => {
+    const { data } = await (supabase as any)
+      .from('staff_members')
+      .select('business_owner_id, permissions, active')
+      .eq('staff_user_id', userId)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (!data) {
+      setStaffMembership(null);
+      return null;
+    }
+    const perms = (data.permissions || {}) as { role?: string; modules?: ModuleKey[] };
+    const membership: StaffMembership = {
+      business_owner_id: data.business_owner_id,
+      role: perms.role || 'staff',
+      modules: Array.isArray(perms.modules) && perms.modules.length > 0 ? perms.modules : modulesForRole(perms.role || 'staff'),
+      active: data.active,
+    };
+    setStaffMembership(membership);
+    return membership;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
