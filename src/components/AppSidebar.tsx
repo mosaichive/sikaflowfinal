@@ -37,19 +37,11 @@ const managerItems = ['Dashboard', 'Sales / POS', 'Products', 'Inventory', 'Cust
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { isAdmin, isManager, isSalesperson, isDistributor, displayName, avatarUrl, profileTitle, signOut } = useAuth();
+  const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
   const { business } = useBusiness();
   const { isDark, toggle } = useTheme();
 
-  const items = isAdmin
-    ? allItems
-    : isManager
-      ? allItems.filter((item) => managerItems.includes(item.title))
-      : isSalesperson
-        ? allItems.filter((item) => salespersonItems.includes(item.title))
-        : isDistributor
-          ? allItems.filter((item) => distributorItems.includes(item.title))
-          : allItems.filter((item) => salespersonItems.includes(item.title));
+  const items = allItems.filter((item) => hasModule(item.module));
 
   const tenantName = business?.name || 'SikaFlow';
 
