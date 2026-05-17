@@ -885,6 +885,25 @@ export default function SavingsPage() {
           </Card>
         ) : null}
       </div>
+
+      <AlertDialog open={!!negativeConfirm} onOpenChange={(open) => !open && setNegativeConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Available business money will go negative</AlertDialogTitle>
+            <AlertDialogDescription>
+              This savings transaction will reduce your available business money to{' '}
+              <span className="font-semibold">
+                {negativeConfirm ? formatCurrency(negativeConfirm.projected) : ''}
+              </span>
+              . Savings are still allowed — they move money into a savings destination rather than spending it. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void persistSaving(); }}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
