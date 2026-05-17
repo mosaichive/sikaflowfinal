@@ -38,7 +38,7 @@ import NotFound from "./pages/NotFound";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
-import type { ModuleKey } from "./lib/permissions";
+
 
 const queryClient = new QueryClient();
 
