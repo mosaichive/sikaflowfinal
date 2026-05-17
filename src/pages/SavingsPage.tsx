@@ -253,15 +253,24 @@ export default function SavingsPage() {
 
     const currentRow = editSavingId ? savings.find((row) => row.id === editSavingId) : null;
     const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
+    const projected = availableBusinessMoney - netAmount;
 
-    if (netAmount > availableBusinessMoney) {
-      toast({
-        title: 'Insufficient available business money',
-        description: 'Insufficient available business money.',
-        variant: 'destructive',
-      });
+    if (projected < 0) {
+      setNegativeConfirm({ projected });
       return;
     }
+
+    await persistSaving();
+  }
+
+  async function persistSaving() {
+    if (!user || !businessId) return;
+
+    const currentRow = editSavingId ? savings.find((row) => row.id === editSavingId) : null;
+    const previousBalance = availableBusinessMoney;
+    const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
+    const newBalance = previousBalance - netAmount;
+    const destination = destinations.find((d) => d.id === savingForm.bank_account_id);
 
     const payload: any = {
       user_id: user.id,
@@ -284,9 +293,28 @@ export default function SavingsPage() {
       return;
     }
 
-    toast({ title: editSavingId ? 'Savings updated' : 'Savings recorded' });
+    // Audit trail
+    try {
+      const destLabel = destination
+        ? `${destination.bank_name || destination.mobile_money_name || destination.account_type} • ${destination.account_name}`
+        : 'Unknown destination';
+      await supabase.from('audit_log').insert({
+        user_id: user.id,
+        action: editSavingId ? 'savings_updated' : 'savings_recorded',
+        details: `Amount ${savingForm.amount}; previous balance ${previousBalance.toFixed(2)}; new balance ${newBalance.toFixed(2)}; destination: ${destLabel}`,
+        performed_by: user.id,
+      });
+    } catch (err) {
+      console.warn('audit log failed', err);
+    }
+
+    toast({
+      title: editSavingId ? 'Savings updated' : 'Savings recorded',
+      description: newBalance < 0 ? `Available business money is now ${formatCurrency(newBalance)}.` : undefined,
+    });
     resetSavingDialog();
     setSavingOpen(false);
+    setNegativeConfirm(null);
     await fetchAll();
   }
 
