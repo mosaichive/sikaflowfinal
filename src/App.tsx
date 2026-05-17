@@ -37,6 +37,8 @@ import PlatformSupportPage from "./pages/platform/PlatformSupportPage";
 import NotFound from "./pages/NotFound";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import { BrandLoader } from "./components/BrandLoader";
+import { RequireModule } from "./components/RequireModule";
+
 
 const queryClient = new QueryClient();
 
@@ -140,20 +142,20 @@ const App = () => (
 
                 {/* Tenant app */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<ProtectedRoute allowReadOnly allowOnboarding><Dashboard /></ProtectedRoute>} />
-                <Route path="/sales" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><SalesPage /></ProtectedRoute>} />
-                <Route path="/products" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ProductsPage /></ProtectedRoute>} />
-                <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'distributor']}><InventoryPage /></ProtectedRoute>} />
-                <Route path="/customers" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><CustomersPage /></ProtectedRoute>} />
-                <Route path="/orders" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson', 'distributor']}><OrdersPage /></ProtectedRoute>} />
-                <Route path="/other-income" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><OtherIncomePage /></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ExpensesPage /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ReportsPage /></ProtectedRoute>} />
-                <Route path="/staff" element={<ProtectedRoute adminOnly><StaffUsersPage /></ProtectedRoute>} />
-                <Route path="/announcements" element={<ProtectedRoute allowReadOnly allowOnboarding><TenantAnnouncementsPage /></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="dashboard"><Dashboard /></RequireModule></ProtectedRoute>} />
+                <Route path="/sales" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'distributor']}><RequireModule module="inventory"><InventoryPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/customers" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><RequireModule module="customers"><CustomersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/orders" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson', 'distributor']}><RequireModule module="orders"><OrdersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/other-income" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="other_income"><OtherIncomePage /></RequireModule></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="expenses"><ExpensesPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="reports"><ReportsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/staff" element={<ProtectedRoute adminOnly><RequireModule module="staff"><StaffUsersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/announcements" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="announcements"><TenantAnnouncementsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/support" element={<ProtectedRoute allowReadOnly allowOnboarding><SupportPage /></ProtectedRoute>} />
-                <Route path="/savings" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><SavingsPage /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute adminOnly allowReadOnly><SettingsPage /></ProtectedRoute>} />
+                <Route path="/savings" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="savings"><SavingsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute adminOnly allowReadOnly><RequireModule module="settings"><SettingsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/billing" element={<ProtectedRoute adminOnly allowReadOnly><BillingPage /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
                 </Routes>
