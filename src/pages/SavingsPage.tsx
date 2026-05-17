@@ -139,6 +139,7 @@ export default function SavingsPage() {
   const [savingOpen, setSavingOpen] = useState(false);
   const [savingForm, setSavingForm] = useState(emptySavingForm);
   const [editSavingId, setEditSavingId] = useState<string | null>(null);
+  const [negativeConfirm, setNegativeConfirm] = useState<{ projected: number } | null>(null);
 
   const [destinationOpen, setDestinationOpen] = useState(false);
   const [destinationForm, setDestinationForm] = useState(emptyDestinationForm);
