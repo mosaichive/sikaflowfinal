@@ -8,6 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/constants';
@@ -129,6 +139,7 @@ export default function SavingsPage() {
   const [savingOpen, setSavingOpen] = useState(false);
   const [savingForm, setSavingForm] = useState(emptySavingForm);
   const [editSavingId, setEditSavingId] = useState<string | null>(null);
+  const [negativeConfirm, setNegativeConfirm] = useState<{ projected: number } | null>(null);
 
   const [destinationOpen, setDestinationOpen] = useState(false);
   const [destinationForm, setDestinationForm] = useState(emptyDestinationForm);
@@ -242,15 +253,24 @@ export default function SavingsPage() {
 
     const currentRow = editSavingId ? savings.find((row) => row.id === editSavingId) : null;
     const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
+    const projected = availableBusinessMoney - netAmount;
 
-    if (netAmount > availableBusinessMoney) {
-      toast({
-        title: 'Insufficient available business money',
-        description: 'Insufficient available business money.',
-        variant: 'destructive',
-      });
+    if (projected < 0) {
+      setNegativeConfirm({ projected });
       return;
     }
+
+    await persistSaving();
+  }
+
+  async function persistSaving() {
+    if (!user || !businessId) return;
+
+    const currentRow = editSavingId ? savings.find((row) => row.id === editSavingId) : null;
+    const previousBalance = availableBusinessMoney;
+    const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
+    const newBalance = previousBalance - netAmount;
+    const destination = destinations.find((d) => d.id === savingForm.bank_account_id);
 
     const payload: any = {
       user_id: user.id,
@@ -273,9 +293,28 @@ export default function SavingsPage() {
       return;
     }
 
-    toast({ title: editSavingId ? 'Savings updated' : 'Savings recorded' });
+    // Audit trail
+    try {
+      const destLabel = destination
+        ? `${destination.bank_name || destination.mobile_money_name || destination.account_type} • ${destination.account_name}`
+        : 'Unknown destination';
+      await supabase.from('audit_log').insert({
+        user_id: user.id,
+        action: editSavingId ? 'savings_updated' : 'savings_recorded',
+        details: `Amount ${savingForm.amount}; previous balance ${previousBalance.toFixed(2)}; new balance ${newBalance.toFixed(2)}; destination: ${destLabel}`,
+        performed_by: user.id,
+      });
+    } catch (err) {
+      console.warn('audit log failed', err);
+    }
+
+    toast({
+      title: editSavingId ? 'Savings updated' : 'Savings recorded',
+      description: newBalance < 0 ? `Available business money is now ${formatCurrency(newBalance)}.` : undefined,
+    });
     resetSavingDialog();
     setSavingOpen(false);
+    setNegativeConfirm(null);
     await fetchAll();
   }
 
@@ -846,6 +885,25 @@ export default function SavingsPage() {
           </Card>
         ) : null}
       </div>
+
+      <AlertDialog open={!!negativeConfirm} onOpenChange={(open) => !open && setNegativeConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Available business money will go negative</AlertDialogTitle>
+            <AlertDialogDescription>
+              This savings transaction will reduce your available business money to{' '}
+              <span className="font-semibold">
+                {negativeConfirm ? formatCurrency(negativeConfirm.projected) : ''}
+              </span>
+              . Savings are still allowed — they move money into a savings destination rather than spending it. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void persistSaving(); }}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
