@@ -305,14 +305,17 @@ export default function Dashboard() {
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(String(currentYear));
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [dateState, setDateState] = useState<DashboardDateState>(() => defaultDateState());
 
-  const year = Number(selectedYear);
-  const month = selectedMonth === null ? null : Number(selectedMonth);
-  const dateRange = month === null
-    ? { from: startOfYear(year), to: endOfYear(year), label: String(year) }
-    : { from: startOfMonth(year, month), to: endOfMonth(year, month), label: `${new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' })}` };
+  const dateRangeObj = useMemo(() => buildDateRange(dateState), [dateState]);
+  const dateRange = {
+    from: dateRangeObj.from.toISOString(),
+    to: dateRangeObj.to.toISOString(),
+    label: describeRange(dateState),
+  };
+  // Used by the legacy sales chart (kept as year/month buckets)
+  const year = dateState.year;
+  const month = dateState.mode === 'month' ? dateState.month : (dateState.mode === 'day' ? dateState.day.getMonth() : null);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
