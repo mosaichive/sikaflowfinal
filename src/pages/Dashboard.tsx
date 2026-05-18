@@ -499,45 +499,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {selectedMonth === null ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(String(currentMonth))}>
-                Add month
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(null)}>
-                Year only
-              </Button>
-            )}
-
-            {selectedMonth !== null ? (
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[170px]">
-                  <SelectValue placeholder="Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }).map((_, index) => (
-                    <SelectItem key={index} value={String(index)}>
-                      {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map((availableYear) => (
-                  <SelectItem key={availableYear} value={String(availableYear)}>
-                    {availableYear}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <DateRangeFilter value={dateState} onChange={setDateState} availableYears={availableYears} />
         </section>
 
         {negativeStockProducts.length > 0 ? (
