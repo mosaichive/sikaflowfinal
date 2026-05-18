@@ -18,6 +18,8 @@ import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { DateRangeFilter, buildDateRange, defaultDateState, describeRange, type DashboardDateState } from '@/components/dashboard/DateRangeFilter';
+import { sumSalesInRange, inDateRange } from '@/lib/financial-filters';
 
 type SaleRow = {
   id: string;
