@@ -18,8 +18,6 @@ import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
-import { DateRangeFilter, buildDateRange, defaultDateState, describeRange, type DashboardDateState } from '@/components/dashboard/DateRangeFilter';
-import { sumSalesInRange, inDateRange } from '@/lib/financial-filters';
 
 type SaleRow = {
   id: string;
@@ -305,17 +303,14 @@ export default function Dashboard() {
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
-  const [dateState, setDateState] = useState<DashboardDateState>(() => defaultDateState());
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  const dateRangeObj = useMemo(() => buildDateRange(dateState), [dateState]);
-  const dateRange = {
-    from: dateRangeObj.from.toISOString(),
-    to: dateRangeObj.to.toISOString(),
-    label: describeRange(dateState),
-  };
-  // Used by the legacy sales chart (kept as year/month buckets)
-  const year = dateState.year;
-  const month = dateState.mode === 'month' ? dateState.month : (dateState.mode === 'day' ? dateState.day.getMonth() : null);
+  const year = Number(selectedYear);
+  const month = selectedMonth === null ? null : Number(selectedMonth);
+  const dateRange = month === null
+    ? { from: startOfYear(year), to: endOfYear(year), label: String(year) }
+    : { from: startOfMonth(year, month), to: endOfMonth(year, month), label: `${new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' })}` };
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -499,7 +494,45 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <DateRangeFilter value={dateState} onChange={setDateState} availableYears={availableYears} />
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedMonth === null ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(String(currentMonth))}>
+                Add month
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(null)}>
+                Year only
+              </Button>
+            )}
+
+            {selectedMonth !== null ? (
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }).map((_, index) => (
+                    <SelectItem key={index} value={String(index)}>
+                      {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((availableYear) => (
+                  <SelectItem key={availableYear} value={String(availableYear)}>
+                    {availableYear}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </section>
 
         {negativeStockProducts.length > 0 ? (
@@ -515,64 +548,47 @@ export default function Dashboard() {
           </div>
         ) : null}
 
-        {financials.availableBusinessMoney < 0 ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-            <div className="space-y-1">
-              <p className="font-medium text-amber-200">Available Business Money is negative.</p>
-              <p className="text-xs text-amber-100/80">
-                New daily sales ({formatCurrency(dailySales)} today) are being used to gradually offset negative cash flow.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(metrics.availableBusinessMoney)}
+            value={formatCurrency(financials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={
-              metrics.availableBusinessMoney < 0
-                ? 'Negative — incoming sales will gradually offset this balance'
-                : `As of ${dateRange.label}`
-            }
+            helper={AVAILABLE_BUSINESS_MONEY_FORMULA}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
-            valueClassName={metrics.availableBusinessMoney < 0 ? 'text-amber-500' : undefined}
           />
           <MetricCard
             title="Daily Sales"
-            value={formatCurrency(metrics.salesIncome)}
+            value={formatCurrency(dailySales)}
             icon={ShoppingCart}
-            helper={dateState.mode === 'day' ? dailyDelta.label : `Paid sales in ${dateRange.label}`}
-            valueClassName={dateState.mode === 'day' && dailyDelta.tone === 'up' ? 'text-emerald-500' : dateState.mode === 'day' && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
+            helper={dailyDelta.label}
+            valueClassName={dailyDelta.tone === 'up' ? 'text-emerald-500' : dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
-            value={formatCurrency(metrics.totalProfit)}
+            value={formatCurrency(financials.profit)}
             icon={TrendingUp}
-            helper={`Revenue - COGS - expenses in ${dateRange.label}`}
+            helper="Paid sales revenue - COGS - expenses"
             tooltip={SIKAFLOW_TOOLTIPS.profit}
           />
           <MetricCard
             title="Stock Left"
-            value={metrics.stockLeft.toLocaleString('en-GH')}
+            value={financials.stockLeft.toLocaleString('en-GH')}
             icon={Boxes}
             helper="Current inventory quantity across active products"
           />
           <MetricCard
             title="Other Income"
-            value={formatCurrency(metrics.otherIncome)}
+            value={formatCurrency(financials.otherIncome)}
             icon={HandCoins}
-            helper={`Within ${dateRange.label}`}
+            helper="Service, delivery fee, commission, and miscellaneous income"
             tooltip={SIKAFLOW_TOOLTIPS.otherIncome}
           />
           <MetricCard
             title="Low Stock Alerts"
-            value={metrics.lowStockCount.toLocaleString('en-GH')}
+            value={financials.lowStockCount.toLocaleString('en-GH')}
             icon={AlertTriangle}
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((product) => product.name).join(', ') : 'No low stock products right now'}
-            valueClassName={metrics.lowStockCount > 0 ? 'text-amber-500' : undefined}
+            valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
           />
         </div>
 
