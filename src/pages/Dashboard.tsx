@@ -515,47 +515,64 @@ export default function Dashboard() {
           </div>
         ) : null}
 
+        {financials.availableBusinessMoney < 0 ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="space-y-1">
+              <p className="font-medium text-amber-200">Available Business Money is negative.</p>
+              <p className="text-xs text-amber-100/80">
+                New daily sales ({formatCurrency(dailySales)} today) are being used to gradually offset negative cash flow.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(financials.availableBusinessMoney)}
+            value={formatCurrency(metrics.availableBusinessMoney)}
             icon={WalletCards}
-            helper={AVAILABLE_BUSINESS_MONEY_FORMULA}
+            helper={
+              metrics.availableBusinessMoney < 0
+                ? 'Negative — incoming sales will gradually offset this balance'
+                : `As of ${dateRange.label}`
+            }
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
+            valueClassName={metrics.availableBusinessMoney < 0 ? 'text-amber-500' : undefined}
           />
           <MetricCard
             title="Daily Sales"
-            value={formatCurrency(dailySales)}
+            value={formatCurrency(metrics.salesIncome)}
             icon={ShoppingCart}
-            helper={dailyDelta.label}
-            valueClassName={dailyDelta.tone === 'up' ? 'text-emerald-500' : dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
+            helper={dateState.mode === 'day' ? dailyDelta.label : `Paid sales in ${dateRange.label}`}
+            valueClassName={dateState.mode === 'day' && dailyDelta.tone === 'up' ? 'text-emerald-500' : dateState.mode === 'day' && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
-            value={formatCurrency(financials.profit)}
+            value={formatCurrency(metrics.totalProfit)}
             icon={TrendingUp}
-            helper="Paid sales revenue - COGS - expenses"
+            helper={`Revenue - COGS - expenses in ${dateRange.label}`}
             tooltip={SIKAFLOW_TOOLTIPS.profit}
           />
           <MetricCard
             title="Stock Left"
-            value={financials.stockLeft.toLocaleString('en-GH')}
+            value={metrics.stockLeft.toLocaleString('en-GH')}
             icon={Boxes}
             helper="Current inventory quantity across active products"
           />
           <MetricCard
             title="Other Income"
-            value={formatCurrency(financials.otherIncome)}
+            value={formatCurrency(metrics.otherIncome)}
             icon={HandCoins}
-            helper="Service, delivery fee, commission, and miscellaneous income"
+            helper={`Within ${dateRange.label}`}
             tooltip={SIKAFLOW_TOOLTIPS.otherIncome}
           />
           <MetricCard
             title="Low Stock Alerts"
-            value={financials.lowStockCount.toLocaleString('en-GH')}
+            value={metrics.lowStockCount.toLocaleString('en-GH')}
             icon={AlertTriangle}
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((product) => product.name).join(', ') : 'No low stock products right now'}
-            valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
+            valueClassName={metrics.lowStockCount > 0 ? 'text-amber-500' : undefined}
           />
         </div>
 
