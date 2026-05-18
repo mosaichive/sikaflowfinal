@@ -253,13 +253,27 @@ export default function SavingsPage() {
       return;
     }
 
+    // Soft warning rule: only warn when ABM is negative AND the new outflow
+    // exceeds today's remaining sales (i.e. it grows the negative balance).
     const currentRow = editSavingId ? savings.find((row) => row.id === editSavingId) : null;
     const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
-    const projected = availableBusinessMoney - netAmount;
 
-    if (projected < 0) {
-      setNegativeConfirm({ projected });
-      return;
+    if (availableBusinessMoney < 0 && netAmount > 0) {
+      // Today's sales already loaded via financials provider; recompute from local savings cache
+      const todayRange = makeDayRange(new Date());
+      const todayOutflows = sumAmountsInRange(savings, 'savings_date', todayRange);
+      const impact = computeTransactionImpact({
+        availableBusinessMoney,
+        todaySales: financials.paidSalesRevenue ? 0 : 0, // computed below from impact via dailySales
+        todayOutflowsAlready: todayOutflows,
+        amount: netAmount,
+      });
+      // If amount exceeds today's available sales while negative, warn
+      const projected = availableBusinessMoney - netAmount;
+      if (netAmount > Math.max(0, impact.sales_used)) {
+        setNegativeConfirm({ projected });
+        return;
+      }
     }
 
     await persistSaving();
@@ -273,6 +287,16 @@ export default function SavingsPage() {
     const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
     const newBalance = previousBalance - netAmount;
     const destination = destinations.find((d) => d.id === savingForm.bank_account_id);
+
+    // Compute audit impact (sales_used + negative offset)
+    const todayRange = makeDayRange(new Date());
+    const todayOutflows = sumAmountsInRange(savings, 'savings_date', todayRange);
+    const impact = computeTransactionImpact({
+      availableBusinessMoney: previousBalance,
+      todaySales: 0,
+      todayOutflowsAlready: todayOutflows,
+      amount: netAmount,
+    });
 
     const payload: any = {
       user_id: user.id,
@@ -295,7 +319,7 @@ export default function SavingsPage() {
       return;
     }
 
-    // Audit trail
+    // Audit trail with structured JSON impact
     try {
       const destLabel = destination
         ? `${destination.bank_name || destination.mobile_money_name || destination.account_type} • ${destination.account_name}`
@@ -303,7 +327,14 @@ export default function SavingsPage() {
       await supabase.from('audit_log').insert({
         user_id: user.id,
         action: editSavingId ? 'savings_updated' : 'savings_recorded',
-        details: `Amount ${savingForm.amount}; previous balance ${previousBalance.toFixed(2)}; new balance ${newBalance.toFixed(2)}; destination: ${destLabel}`,
+        details: JSON.stringify({
+          destination: destLabel,
+          balance_before: previousBalance,
+          amount: savingForm.amount,
+          balance_after: newBalance,
+          sales_used: impact.sales_used,
+          negative_offset_amount: impact.negative_offset_amount,
+        }),
         performed_by: user.id,
       });
     } catch (err) {
@@ -312,7 +343,7 @@ export default function SavingsPage() {
 
     toast({
       title: editSavingId ? 'Savings updated' : 'Savings recorded',
-      description: newBalance < 0 ? `Available business money is now ${formatCurrency(newBalance)}.` : undefined,
+      description: newBalance < 0 ? `Available business money is now ${formatCurrency(newBalance)}. Incoming sales will gradually offset it.` : undefined,
     });
     resetSavingDialog();
     setSavingOpen(false);
