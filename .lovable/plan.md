@@ -1,76 +1,84 @@
+# Plan: Negative Cash-Flow Logic + Date-Filtered Dashboard
 
-# Team Invitation & Permission System
+This is a substantial change that touches the accounting engine, the savings/expenses/investments flows, and the entire Dashboard. I'll split it into two coherent phases.
 
-Your project already has a working team foundation (`staff_members`, `staff_invites`, `user_roles`, `accept_staff_invite` RPC, `manage-business-user` edge function, role-aware sidebar). Rather than build a parallel `team_invitations` / `business_members` system that would conflict with existing data, this plan **extends what's there** to meet every requirement you listed.
+---
 
-## What changes
+## PART 1 — Negative Available Business Money handling
 
-### 1. Permissions model
-Add a structured `permissions` JSON to `staff_members` and `staff_invites`:
-```json
-{ "role": "manager", "modules": ["dashboard","sales","customers","orders"] }
-```
-Available modules: dashboard, sales, products, inventory, customers, orders, other_income, expenses, savings, reports, staff, announcements, settings.
+### 1.1 Accounting engine (`src/lib/sales-inventory.ts`, `src/lib/business-money.ts`)
+Extend `calculateFinancialSnapshot` with a new derived block:
 
-### 2. Invite flow (link-based, no email infra yet)
-- New page `/invite/:token` — public route.
-- "Copy invite link" + "Send via email" buttons in Team page (email uses `mailto:` or existing Lovable email if you want — ask separately).
-- Token already exists on `staff_invites`; expires in 7 days (already default 14, will tighten to 7); single-use enforced by existing `accept_staff_invite` RPC.
+- `todaySales` — paid sales recognized today
+- `todayOutflows` — today's expenses + savings + investments
+- `negativeOffsetToday` — `max(0, todaySales - todayOutflows)` applied against a negative balance
+- `effectiveAvailableBusinessMoney` — when base ABM < 0, equals `base + negativeOffsetToday`; otherwise equals base
 
-### 3. Invite acceptance page (`/invite/:token`)
-- If **not logged in**: show Full Name + Job Title + Password fields, plus "Continue with Google". After signup/login, auto-call `accept_staff_invite(token)`.
-- If **already logged in** with matching email: one-click "Join {Business}" → calls RPC → redirect to `/dashboard`.
-- **Bypass onboarding**: set `profiles.onboarding_completed = true` and skip `BusinessOnboardingDialog` / business creation for invited users (detected via `staff_members.business_owner_id != user.id`).
+Expose helpers:
+- `computeTransactionImpact({ availableBusinessMoney, todaySales, todayOutflows, amount, kind })` returning `{ balance_before, balance_after, sales_used, negative_offset_amount }`. Used by Savings/Expenses/Investments forms for audit logging and UI warning.
 
-### 4. Owner business context for staff
-`BusinessContext` already loads the user's own business. Extend it: if the user is a staff member (has a row in `staff_members` where `staff_user_id = auth.uid()`), load the **owner's** business profile/products/sales instead. This is the "see business data immediately" requirement.
+### 1.2 Remove blocking errors
+- `SavingsPage.tsx` — already non-blocking, switch the AlertDialog to fire only when `amount > todaySalesRemaining` AND ABM is negative ("exceeds today's sales while negative").
+- `ExpensesPage.tsx` — remove any "insufficient funds" blocker; add the same soft warning.
+- `SavingsInvestmentsPage.tsx` (investments) — same treatment.
 
-### 5. Permission enforcement
-- `AuthContext` exposes `hasModule(module)` derived from `staff_members.permissions.modules` (owner/admin sees all).
-- `AppSidebar` filters menu by `hasModule`.
-- New `<RequireModule module="...">` route guard in `AppLayout` redirects unauthorized routes to `/dashboard`.
-- RLS already enforces data isolation per `business_owner_id`; module gating is UI + route level.
+### 1.3 Transaction audit fields
+Add a migration: new columns on `audit_log` are not needed — store the impact JSON in `audit_log.details` as a serialized JSON object containing `balance_before`, `amount`, `balance_after`, `sales_used`, `negative_offset_amount`. (No schema change required; just standardize the payload.)
 
-### 6. Team management UI (`/staff` page)
-Add tabs: **Members** | **Pending Invites** | **Expired**.
-- Per-member: edit role + module checkboxes, suspend (set `active=false`), reactivate, remove (existing edge function).
-- Per-invite: copy link, resend, revoke (delete row).
-- Realtime channel on `staff_members` + `staff_invites` so changes apply without refresh.
+### 1.4 UI helper text
+- `Dashboard.tsx` Available Business Money card — when negative, show:
+  > "New daily sales are being used to gradually offset negative cash flow."
+- Color the card amber instead of red when offset is active.
 
-### 7. Notifications
-Insert into existing `audit_log` on invite accepted / expired / revoked. Show a bell badge in header reading recent audit entries for the owner.
+---
 
-## Database migration (small)
-```sql
-ALTER TABLE staff_invites
-  ALTER COLUMN expires_at SET DEFAULT (now() + interval '7 days');
+## PART 2 — Date-Filtered Dashboard
 
--- Tighten accept_staff_invite to also stamp position + onboarding_completed
--- (rewrite the function; same signature)
-```
-No new tables. Existing `staff_members` already has `permissions jsonb` and `active` (suspend/reactivate). Existing `staff_invites` already has `token`, `status`, `expires_at`, `accepted_at`.
+### 2.1 New filter component (`src/components/dashboard/DateRangeFilter.tsx`)
+Tabs: **Day · Month · Year · Custom Range**. Defaults to today. Persists in `useState` at Dashboard level; no URL state for now.
 
-## Files I'll create/edit
+Uses shadcn `Popover` + `Calendar` (with `pointer-events-auto`) for day/range, native month/year selects for month/year tabs.
+
+### 2.2 Dashboard wiring (`src/pages/Dashboard.tsx`)
+- Add `dateRange: { from: Date; to: Date }` state.
+- Derive `filteredFinancials` by passing the range into a new `calculateFinancialSnapshotInRange(args, range)` that filters `sales`, `saleItems` (via sale_id map), `expenses`, `other_income`, `savings`, `investments`, `investor_funds`, `restocks` by their date columns before delegating to the existing snapshot calculator.
+- Stocks Left / Low Stock are point-in-time: when `range.to < today`, recompute from `stock_movements` up to `range.to` (sum of `change` per product). For today/future ranges, use current `products.stock`.
+- Available Business Money for a past period = same snapshot formula on filtered data.
+
+### 2.3 Cards reflect filter
+Update these dashboard cards to read from `filteredFinancials`:
+Available Business Money · Daily Sales · Total Profit · Stocks Left · Other Income · Low Stock Alerts.
+
+### 2.4 Charts
+The sales/profit chart already buckets by date — clip its domain to the selected range.
+
+### 2.5 Exports
+Pass the active range into the existing PDF/Excel report builders so exports match what's shown.
+
+### 2.6 Realtime
+Keep `BusinessFinancialsContext` realtime listeners; they trigger a recompute and the derived `filteredFinancials` reactively updates — no page refresh.
+
+---
+
+## Technical notes
+
+- **No new DB tables.** All logic is client-side derived from existing rows. Audit metadata goes into `audit_log.details` as JSON.
+- **Performance:** memoize `filteredFinancials` with `useMemo` keyed on raw arrays + range. Avoid extra round-trips.
+- **Backwards compatible:** when `range = all-time`, results equal current behavior.
+
+---
+
+## Files touched
 
 **New**
-- `src/pages/InviteAcceptPage.tsx` — `/invite/:token`
-- `src/components/PermissionsEditor.tsx` — module checkbox grid
-- `src/components/RequireModule.tsx` — route guard
-- `src/lib/permissions.ts` — module list + helpers
+- `src/components/dashboard/DateRangeFilter.tsx`
+- `src/lib/financial-filters.ts` (range-filtering helpers + `computeTransactionImpact`)
 
-**Edit**
-- `src/App.tsx` — add `/invite/:token` route
-- `src/context/AuthContext.tsx` — load staff membership + `hasModule`
-- `src/context/BusinessContext.tsx` — resolve owner business for staff users
-- `src/components/AppSidebar.tsx` — module-based filter
-- `src/components/AppLayout.tsx` — wrap protected routes with `RequireModule`
-- `src/components/BusinessOnboardingDialog.tsx` — skip when user is staff
-- `src/pages/StaffUsersPage.tsx` — invite-by-link UI + permissions editor + tabs
-- `supabase/functions/manage-business-user/index.ts` — accept `permissions.modules`, support `update_permissions` and `set_active` actions
+**Edited**
+- `src/lib/sales-inventory.ts`, `src/lib/business-money.ts` — extended snapshot fields
+- `src/context/BusinessFinancialsContext.tsx` — expose raw arrays for client-side filtering
+- `src/pages/Dashboard.tsx` — filter UI + cards + helper text + charts
+- `src/pages/SavingsPage.tsx`, `src/pages/ExpensesPage.tsx`, `src/pages/SavingsInvestmentsPage.tsx` — remove blockers, add soft warning + audit payload
+- Report export utilities — accept range
 
-## Scope notes
-- **Email delivery**: this plan uses copy-link + mailto. If you want branded transactional emails (Lovable Email infra), say so and I'll add it after — it's a separate ~3-step setup with a domain.
-- **Custom roles**: built-in roles only (owner/admin/manager/salesperson/distributor/staff). "Custom permissions per user" is achieved via the module checkboxes, not by creating new role names.
-- **Decline invite**: added as "Revoke" by owner; invitee-side decline = ignore the link.
-
-Reply **yes** to build, or tell me what to adjust (e.g. "add Lovable Email", "add Cashier role", "skip realtime").
+Approve and I'll build it in this order: engine → savings/expenses/investments unblock → dashboard filter → charts/exports.
