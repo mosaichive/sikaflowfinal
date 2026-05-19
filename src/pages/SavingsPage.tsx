@@ -907,13 +907,27 @@ export default function SavingsPage() {
       <AlertDialog open={!!negativeConfirm} onOpenChange={(open) => !open && setNegativeConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Available business money will go negative</AlertDialogTitle>
-            <AlertDialogDescription>
-              This savings transaction will reduce your available business money to{' '}
-              <span className="font-semibold">
-                {negativeConfirm ? formatCurrency(negativeConfirm.projected) : ''}
-              </span>
-              . Savings are still allowed — they move money into a savings destination rather than spending it. Continue?
+            <AlertDialogTitle>Using daily sales to offset negative cash flow</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  This savings transaction will be deducted from today&apos;s daily sales before
+                  offsetting your negative business balance. Savings are allocations from revenue,
+                  not direct losses.
+                </p>
+                {negativeConfirm ? (
+                  <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-1">
+                    <div className="flex justify-between"><span>Today&apos;s sales</span><span className="font-medium">{formatCurrency(negativeConfirm.todaySales)}</span></div>
+                    <div className="flex justify-between"><span>Savings amount</span><span className="font-medium">{formatCurrency(negativeConfirm.amount)}</span></div>
+                    <div className="flex justify-between"><span>Remaining sales to offset deficit</span><span className="font-medium">{formatCurrency(negativeConfirm.remainingSales)}</span></div>
+                    <div className="flex justify-between border-t border-border/60 pt-1 mt-1">
+                      <span>Projected business balance</span>
+                      <span className="font-semibold">{formatCurrency(negativeConfirm.projected)}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <p className="text-xs text-muted-foreground">Continue with this savings transaction?</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
