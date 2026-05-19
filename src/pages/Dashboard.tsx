@@ -548,6 +548,15 @@ export default function Dashboard() {
           </div>
         ) : null}
 
+        {financials.availableBusinessMoney < 0 ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <p className="text-amber-200">
+              Negative cash-flow mode active. Daily sales are being used to offset the deficit — savings and expenses deduct from today's sales first before deepening the negative balance.
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
