@@ -369,8 +369,25 @@ export function calculateStockValue(products: ProductLike[], mode: 'cost' | 'sel
   }, 0);
 }
 
-export function getIsoDate(value: string | Date) {
+export const BUSINESS_TIMEZONE = 'Africa/Accra';
+
+export function getIsoDate(value: string | Date, timeZone: string = BUSINESS_TIMEZONE) {
   const date = value instanceof Date ? value : new Date(value);
+  // Use business-local date (default Africa/Accra) instead of blind UTC.
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const y = parts.find((p) => p.type === 'year')?.value;
+    const m = parts.find((p) => p.type === 'month')?.value;
+    const d = parts.find((p) => p.type === 'day')?.value;
+    if (y && m && d) return `${y}-${m}-${d}`;
+  } catch {
+    // fallthrough to UTC
+  }
   return date.toISOString().slice(0, 10);
 }
 
@@ -381,6 +398,42 @@ export function sumTodaySales(sales: SaleLike[], date = new Date()) {
     return sum + getPaidAmount(sale);
   }, 0);
 }
+
+/**
+ * Centralized helper: total recognized sales income for "today" in the
+ * business timezone (Africa/Accra). Reads live from the `sales` table and
+ * applies the same recognition rules used elsewhere — excludes cancelled,
+ * unpaid, pending, and refunded; only counts paid / partial amounts on
+ * completed/delivered sales. `businessId` is the business owner's user_id;
+ * both owners and staff can read via RLS team policies.
+ */
+export async function getTodaySalesTotal(
+  client: any,
+  businessId: string | null | undefined,
+  date: Date = new Date(),
+): Promise<number> {
+  if (!client || !businessId) return 0;
+  const day = getIsoDate(date);
+  const from = new Date(`${day}T00:00:00Z`);
+  from.setUTCDate(from.getUTCDate() - 1);
+  const to = new Date(`${day}T00:00:00Z`);
+  to.setUTCDate(to.getUTCDate() + 2);
+  const { data, error } = await client
+    .from('sales')
+    .select('total,amount_paid,payment_status,status,sale_date')
+    .eq('user_id', businessId)
+    .gte('sale_date', from.toISOString())
+    .lt('sale_date', to.toISOString());
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[getTodaySalesTotal] query failed', error);
+    return 0;
+  }
+  return sumTodaySales((data as any[]) ?? [], date);
+}
+
+/** Finance-engine alias. */
+export const calculateTodaySalesPool = getTodaySalesTotal;
 
 export function getCreditStatus(paymentStatus: string | null | undefined, dueDate: string | null | undefined) {
   const normalized = normalizeText(paymentStatus);
