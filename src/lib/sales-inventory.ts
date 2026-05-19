@@ -242,6 +242,13 @@ export function calculateFinancialSnapshot({
     totalSavings,
     totalInvestments,
     totalMoneyOut,
+    // Accounting note: this single formula is correct in both positive and
+    // negative cash-flow modes. Algebraically it equals
+    //   old_balance + (today_sales - today_savings - today_expenses - ...)
+    // so when the balance is negative, daily sales naturally absorb today's
+    // savings/expenses first and only the *remaining* daily pool reduces the
+    // deficit. Savings/expenses never "worsen" a negative balance beyond what
+    // they actually cost — there is no need for a separate negative-mode branch.
     availableBusinessMoney:
       opening + totalIncome - operatingExpenses - totalRestockSpending - totalSavings - totalInvestments,
     profit: paidSalesRevenue - cogs - operatingExpenses,
