@@ -29,7 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Banknote, Landmark, PiggyBank, Plus, Pencil, Smartphone, Trash2, WalletCards } from 'lucide-react';
 import { logSupabaseError } from '@/lib/workspace';
-import { sumTodaySales } from '@/lib/sales-inventory';
+import { getTodaySalesTotal } from '@/lib/sales-inventory';
 
 type DestinationType = 'bank' | 'mobile_money' | 'susu';
 
@@ -263,17 +263,23 @@ export default function SavingsPage() {
     const projected = availableBusinessMoney - netAmount;
 
     if (projected < 0) {
-      // Fetch today's recognized sales to show negative-cash-flow allocation breakdown.
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: todayRows } = await supabase
-        .from('sales')
-        .select('total,amount_paid,payment_status,status,sale_date')
-        .eq('user_id', user.id)
-        .gte('sale_date', `${today}T00:00:00`)
-        .lte('sale_date', `${today}T23:59:59.999`);
-      const todaySales = sumTodaySales((todayRows as any[]) ?? []);
+      // Fetch today's recognized sales (business-local timezone) via the
+      // centralized helper. Use the business owner id so staff members see
+      // the same pool as the owner.
+      const todaySales = await getTodaySalesTotal(supabase, businessId);
       const remainingSales = Math.max(0, todaySales - netAmount);
       const deficitBefore = availableBusinessMoney - todaySales; // ABM before today's sales contribution
+      // Debug trace — remove once verified.
+      // eslint-disable-next-line no-console
+      console.log('[savings:negative-mode]', {
+        businessId,
+        availableBusinessMoney,
+        todaySales,
+        savingsAmount: netAmount,
+        remainingSales,
+        projectedBalance: projected,
+        deficitBefore,
+      });
       setNegativeConfirm({ projected, amount: netAmount, todaySales, remainingSales, deficitBefore });
       return;
     }
