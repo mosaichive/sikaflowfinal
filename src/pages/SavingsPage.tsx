@@ -263,7 +263,18 @@ export default function SavingsPage() {
     const projected = availableBusinessMoney - netAmount;
 
     if (projected < 0) {
-      setNegativeConfirm({ projected });
+      // Fetch today's recognized sales to show negative-cash-flow allocation breakdown.
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: todayRows } = await supabase
+        .from('sales')
+        .select('total,amount_paid,payment_status,status,sale_date')
+        .eq('user_id', user.id)
+        .gte('sale_date', `${today}T00:00:00`)
+        .lte('sale_date', `${today}T23:59:59.999`);
+      const todaySales = sumTodaySales((todayRows as any[]) ?? []);
+      const remainingSales = Math.max(0, todaySales - netAmount);
+      const deficitBefore = availableBusinessMoney - todaySales; // ABM before today's sales contribution
+      setNegativeConfirm({ projected, amount: netAmount, todaySales, remainingSales, deficitBefore });
       return;
     }
 
