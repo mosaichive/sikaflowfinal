@@ -29,7 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Banknote, Landmark, PiggyBank, Plus, Pencil, Smartphone, Trash2, WalletCards } from 'lucide-react';
 import { logSupabaseError } from '@/lib/workspace';
-import { sumTodaySales } from '@/lib/sales-inventory';
+import { getTodaySalesTotal } from '@/lib/sales-inventory';
 
 type DestinationType = 'bank' | 'mobile_money' | 'susu';
 
