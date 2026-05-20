@@ -111,14 +111,13 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     setError('');
     setSubmitting(true);
     try {
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectTo,
-          queryParams: { prompt: 'select_account' },
-        },
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: redirectTo,
+        extraParams: { prompt: 'select_account' },
       });
-      if (oauthError) throw oauthError;
+      if (result.error) throw result.error;
+      if (result.redirected) return;
+      navigate(afterAuthPath, { replace: true });
     } catch (authError: unknown) {
       setError(friendlyAuthError(authError));
       setSubmitting(false);
