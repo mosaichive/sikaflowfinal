@@ -444,12 +444,39 @@ export default function Dashboard() {
   }, [data, dateRange.from, dateRange.to]);
 
   const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
-  const dailySales = useMemo(() => sumTodaySales(data.sales), [data.sales]);
+
+  // Filtered financials — respects the selected month/year filter for every
+  // money card on the dashboard. Stock Left + Low Stock still use the full
+  // product list (real-time inventory, not historical).
+  const filteredFinancials = useMemo(
+    () =>
+      calculateBusinessFinancials({
+        sales: filtered.sales as any,
+        saleItems: filtered.saleItems as any,
+        products: data.products as any,
+        otherIncome: filtered.otherIncome as any,
+        expenses: filtered.expenses as any,
+        savings: filtered.savings as any,
+        investments: filtered.investments as any,
+        investorFunds: filtered.investorFunds as any,
+        restocks: data.restocks as any,
+        openingCashBalance: financials.openingCash,
+      }),
+    [filtered, data.products, data.restocks, financials.openingCash],
+  );
+
+  const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
+  const dailySales = useMemo(() => {
+    if (todayInRange) return sumTodaySales(data.sales);
+    // Past/future period selected — show that period's total paid sales.
+    return filteredFinancials.paidSalesRevenue;
+  }, [todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
   const yesterdaySales = useMemo(() => {
+    if (!todayInRange) return 0;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return sumTodaySales(data.sales, yesterday);
-  }, [data.sales]);
+  }, [todayInRange, data.sales]);
   const dailyDelta = useMemo(() => buildDailyDelta(dailySales, yesterdaySales), [dailySales, yesterdaySales]);
 
   const salesChartData = useMemo(() => buildSalesChart(filtered.sales, year, month), [filtered.sales, month, year]);
