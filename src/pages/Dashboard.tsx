@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
-import { AVAILABLE_BUSINESS_MONEY_FORMULA, calculateBusinessFinancials } from '@/lib/business-money';
+import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
@@ -444,39 +444,12 @@ export default function Dashboard() {
   }, [data, dateRange.from, dateRange.to]);
 
   const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
-
-  // Filtered financials — respects the selected month/year filter for every
-  // money card on the dashboard. Stock Left + Low Stock still use the full
-  // product list (real-time inventory, not historical).
-  const filteredFinancials = useMemo(
-    () =>
-      calculateBusinessFinancials({
-        sales: filtered.sales as any,
-        saleItems: filtered.saleItems as any,
-        products: data.products as any,
-        otherIncome: filtered.otherIncome as any,
-        expenses: filtered.expenses as any,
-        savings: filtered.savings as any,
-        investments: filtered.investments as any,
-        investorFunds: filtered.investorFunds as any,
-        restocks: data.restocks as any,
-        openingCashBalance: financials.openingCash,
-      }),
-    [filtered, data.products, data.restocks, financials.openingCash],
-  );
-
-  const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
-  const dailySales = useMemo(() => {
-    if (todayInRange) return sumTodaySales(data.sales);
-    // Past/future period selected — show that period's total paid sales.
-    return filteredFinancials.paidSalesRevenue;
-  }, [todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
+  const dailySales = useMemo(() => sumTodaySales(data.sales), [data.sales]);
   const yesterdaySales = useMemo(() => {
-    if (!todayInRange) return 0;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return sumTodaySales(data.sales, yesterday);
-  }, [todayInRange, data.sales]);
+  }, [data.sales]);
   const dailyDelta = useMemo(() => buildDailyDelta(dailySales, yesterdaySales), [dailySales, yesterdaySales]);
 
   const salesChartData = useMemo(() => buildSalesChart(filtered.sales, year, month), [filtered.sales, month, year]);
@@ -587,36 +560,36 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(filteredFinancials.availableBusinessMoney)}
+            value={formatCurrency(financials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={`${AVAILABLE_BUSINESS_MONEY_FORMULA} — ${dateRange.label}`}
+            helper={AVAILABLE_BUSINESS_MONEY_FORMULA}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
           />
           <MetricCard
             title="Daily Sales"
             value={formatCurrency(dailySales)}
             icon={ShoppingCart}
-            helper={todayInRange ? dailyDelta.label : `Total paid sales in ${dateRange.label}`}
-            valueClassName={todayInRange && dailyDelta.tone === 'up' ? 'text-emerald-500' : todayInRange && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
+            helper={dailyDelta.label}
+            valueClassName={dailyDelta.tone === 'up' ? 'text-emerald-500' : dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
-            value={formatCurrency(filteredFinancials.profit)}
+            value={formatCurrency(financials.profit)}
             icon={TrendingUp}
-            helper={`Paid sales revenue - COGS - expenses (${dateRange.label})`}
+            helper="Paid sales revenue - COGS - expenses"
             tooltip={SIKAFLOW_TOOLTIPS.profit}
           />
           <MetricCard
             title="Stock Left"
             value={financials.stockLeft.toLocaleString('en-GH')}
             icon={Boxes}
-            helper="Current inventory quantity across active products (live)"
+            helper="Current inventory quantity across active products"
           />
           <MetricCard
             title="Other Income"
-            value={formatCurrency(filteredFinancials.otherIncome)}
+            value={formatCurrency(financials.otherIncome)}
             icon={HandCoins}
-            helper={`Service, delivery fee, commission, and miscellaneous income (${dateRange.label})`}
+            helper="Service, delivery fee, commission, and miscellaneous income"
             tooltip={SIKAFLOW_TOOLTIPS.otherIncome}
           />
           <MetricCard
@@ -626,26 +599,7 @@ export default function Dashboard() {
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((product) => product.name).join(', ') : 'No low stock products right now'}
             valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
           />
-          <MetricCard
-            title="Expenses"
-            value={formatCurrency(filteredFinancials.expenses)}
-            icon={Receipt}
-            helper={`Operating expenses in ${dateRange.label}`}
-          />
-          <MetricCard
-            title="Savings"
-            value={formatCurrency(filteredFinancials.savings)}
-            icon={WalletCards}
-            helper={`Savings transfers in ${dateRange.label}`}
-          />
-          <MetricCard
-            title="Investments"
-            value={formatCurrency(filteredFinancials.investments)}
-            icon={TrendingUp}
-            helper={`Investments made in ${dateRange.label}`}
-          />
         </div>
-
 
         {setupRequired ? (
           <EmptyState
