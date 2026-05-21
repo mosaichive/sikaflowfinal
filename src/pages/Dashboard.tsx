@@ -305,12 +305,30 @@ export default function Dashboard() {
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
-  const dateRange = month === null
-    ? { from: startOfYear(year), to: endOfYear(year), label: String(year) }
-    : { from: startOfMonth(year, month), to: endOfMonth(year, month), label: `${new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' })}` };
+  const day = selectedDay === null ? null : Number(selectedDay);
+  const daysInSelectedMonth = month === null ? 31 : new Date(year, month + 1, 0).getDate();
+  const dateRange = (() => {
+    if (month === null) {
+      return { from: startOfYear(year), to: endOfYear(year), label: String(year) };
+    }
+    if (day === null) {
+      return {
+        from: startOfMonth(year, month),
+        to: endOfMonth(year, month),
+        label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
+      };
+    }
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return {
+      from: iso,
+      to: iso,
+      label: new Date(year, month, day).toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+  })();
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
