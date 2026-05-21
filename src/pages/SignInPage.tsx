@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
