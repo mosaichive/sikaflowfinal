@@ -663,8 +663,8 @@ export default function Dashboard() {
             title="Daily Sales"
             value={formatCurrency(dailySales)}
             icon={ShoppingCart}
-            helper={todayInRange ? dailyDelta.label : `Total paid sales in ${dateRange.label}`}
-            valueClassName={todayInRange && dailyDelta.tone === 'up' ? 'text-emerald-500' : todayInRange && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
+            helper={day !== null ? `Paid sales on ${dateRange.label}` : todayInRange ? dailyDelta.label : `Total paid sales in ${dateRange.label}`}
+            valueClassName={day === null && todayInRange && dailyDelta.tone === 'up' ? 'text-emerald-500' : day === null && todayInRange && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
