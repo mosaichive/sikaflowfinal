@@ -1,6 +1,6 @@
 # Auth And Data Safety Notes
 
-SikaFlow uses Supabase Auth as the application identity provider. Existing production data is keyed to Supabase Auth UUIDs through `profiles.user_id`, `user_roles.user_id`, `sales.staff_id`, `expenses.recorded_by`, `payments.submitted_by`, and related foreign keys.
+KudiTrack uses Supabase Auth as the application identity provider. Existing production data is keyed to Supabase Auth UUIDs through `profiles.user_id`, `user_roles.user_id`, `sales.staff_id`, `expenses.recorded_by`, `payments.submitted_by`, and related foreign keys.
 
 ## Preservation Rules
 

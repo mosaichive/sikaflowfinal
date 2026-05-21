@@ -142,8 +142,8 @@ export function ReferralProgramCard() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join SikaFlow',
-          text: `Use my SikaFlow referral link to get started with ${business?.name ?? 'my business'}.`,
+          title: 'Join KudiTrack',
+          text: `Use my KudiTrack referral link to get started with ${business?.name ?? 'my business'}.`,
           url: referralLink,
         });
         return;

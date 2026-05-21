@@ -151,7 +151,7 @@ export default function AnnouncementsPage() {
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight">Announcements</h1>
             <p className="text-sm text-muted-foreground">
-              Platform notices from SikaFlow for your workspace. This page is read-only for {role === 'admin' ? 'tenant admins' : 'team members'}.
+              Platform notices from KudiTrack for your workspace. This page is read-only for {role === 'admin' ? 'tenant admins' : 'team members'}.
             </p>
           </div>
         </section>
@@ -197,7 +197,7 @@ export default function AnnouncementsPage() {
               <EmptyState
                 icon={<Bell className="h-7 w-7 text-muted-foreground" />}
                 title="No announcements right now"
-                description="When SikaFlow sends updates for your workspace, they will appear here."
+                description="When KudiTrack sends updates for your workspace, they will appear here."
               />
             )}
           </CardContent>

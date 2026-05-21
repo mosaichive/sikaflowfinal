@@ -1,4 +1,4 @@
-# SikaFlow
+# KudiTrack
 
 A Vite, React, TypeScript, and Supabase production app for sales, inventory, expenses, savings, investments, investor funding, reports, subscriptions, and platform administration.
 

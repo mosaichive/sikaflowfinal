@@ -447,8 +447,8 @@ export default function ReportsPage() {
     setPdfLoading(true);
     try {
       await downloadReportSlipPdf({
-        businessName: business?.name || 'SikaFlow Business',
-        generatedFor: displayName || user?.email || 'SikaFlow User',
+        businessName: business?.name || 'KudiTrack Business',
+        generatedFor: displayName || user?.email || 'KudiTrack User',
         dateFrom: from,
         dateTo: to,
         rows: statement.rows,

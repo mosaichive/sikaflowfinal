@@ -38,7 +38,7 @@ function AuthShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-3">
               <Logo className="h-11 w-11" />
               <div>
-                <p className="text-sm font-semibold tracking-tight">SikaFlow</p>
+                <p className="text-sm font-semibold tracking-tight">KudiTrack</p>
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Sales tally system</p>
               </div>
             </div>
@@ -57,7 +57,7 @@ function AuthShell({ children }: { children: ReactNode }) {
             <div className="mb-5 flex items-center gap-3 lg:hidden">
               <Logo className="h-10 w-10" />
               <div>
-                <p className="text-sm font-semibold">SikaFlow</p>
+                <p className="text-sm font-semibold">KudiTrack</p>
                 <p className="text-xs text-muted-foreground">Sales tally system</p>
               </div>
             </div>
@@ -185,7 +185,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
           {mode === 'sign-in' ? 'Welcome back' : 'Start free'}
         </p>
         <h2 className="mt-2 text-2xl font-bold tracking-normal">
-          {mode === 'sign-in' ? 'Sign in to SikaFlow' : 'Create your account'}
+          {mode === 'sign-in' ? 'Sign in to KudiTrack' : 'Create your account'}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {mode === 'sign-in'
@@ -225,7 +225,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       {location.search.includes('reason=removed') && (
         <Alert className="mt-4">
           <AlertDescription>
-            This account was removed from SikaFlow. Sign up again, or ask an admin to invite you back.
+            This account was removed from KudiTrack. Sign up again, or ask an admin to invite you back.
           </AlertDescription>
         </Alert>
       )}

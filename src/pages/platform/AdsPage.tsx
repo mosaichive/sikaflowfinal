@@ -297,7 +297,7 @@ export default function AdsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Ads</h1>
-          <p className="text-sm text-muted-foreground">Manage the dashboard banner ads shown to tenant users across SikaFlow.</p>
+          <p className="text-sm text-muted-foreground">Manage the dashboard banner ads shown to tenant users across KudiTrack.</p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-1.5 h-4 w-4" /> New Ad

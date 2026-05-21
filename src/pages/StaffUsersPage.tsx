@@ -86,7 +86,7 @@ export default function StaffUsersPage() {
   };
 
   const sendEmail = (row: InviteRow) => {
-    const subject = encodeURIComponent(`You're invited to join ${displayName || 'our team'} on SikaFlow`);
+    const subject = encodeURIComponent(`You're invited to join ${displayName || 'our team'} on KudiTrack`);
     const body = encodeURIComponent(`Hi${row.display_name ? ' ' + row.display_name : ''},\n\nYou've been invited to join as ${row.permissions?.role || 'staff'}.\n\nAccept here: ${inviteLink(row.token)}\n\nThis link expires on ${new Date(row.expires_at).toLocaleDateString()}.`);
     window.location.href = `mailto:${row.email}?subject=${subject}&body=${body}`;
   };

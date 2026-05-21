@@ -40,7 +40,7 @@ export function AppSidebar() {
 
   const items = allItems.filter((item) => hasModule(item.module));
 
-  const tenantName = business?.name || 'SikaFlow';
+  const tenantName = business?.name || 'KudiTrack';
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -49,7 +49,7 @@ export function AppSidebar() {
         {!collapsed && (
           <div>
             <h2 className="text-base font-bold text-foreground tracking-tight">{tenantName}</h2>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">SikaFlow</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">KudiTrack</p>
           </div>
         )}
       </div>

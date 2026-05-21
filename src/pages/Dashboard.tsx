@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
-import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
+import { AVAILABLE_BUSINESS_MONEY_FORMULA, calculateBusinessFinancials } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
@@ -305,12 +305,30 @@ export default function Dashboard() {
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
-  const dateRange = month === null
-    ? { from: startOfYear(year), to: endOfYear(year), label: String(year) }
-    : { from: startOfMonth(year, month), to: endOfMonth(year, month), label: `${new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' })}` };
+  const day = selectedDay === null ? null : Number(selectedDay);
+  const daysInSelectedMonth = month === null ? 31 : new Date(year, month + 1, 0).getDate();
+  const dateRange = (() => {
+    if (month === null) {
+      return { from: startOfYear(year), to: endOfYear(year), label: String(year) };
+    }
+    if (day === null) {
+      return {
+        from: startOfMonth(year, month),
+        to: endOfMonth(year, month),
+        label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
+      };
+    }
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return {
+      from: iso,
+      to: iso,
+      label: new Date(year, month, day).toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+  })();
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -444,12 +462,50 @@ export default function Dashboard() {
   }, [data, dateRange.from, dateRange.to]);
 
   const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
-  const dailySales = useMemo(() => sumTodaySales(data.sales), [data.sales]);
+
+  // Filtered financials — respects the selected month/year filter for every
+  // money card on the dashboard. Stock Left + Low Stock still use the full
+  // product list (real-time inventory, not historical).
+  const filteredFinancials = useMemo(
+    () =>
+      calculateBusinessFinancials({
+        sales: filtered.sales as any,
+        saleItems: filtered.saleItems as any,
+        products: data.products as any,
+        otherIncome: filtered.otherIncome as any,
+        expenses: filtered.expenses as any,
+        savings: filtered.savings as any,
+        investments: filtered.investments as any,
+        investorFunds: filtered.investorFunds as any,
+        restocks: data.restocks as any,
+        openingCashBalance: financials.openingCash,
+      }),
+    [filtered, data.products, data.restocks, financials.openingCash],
+  );
+
+  const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
+  const dailySales = useMemo(() => {
+    // Specific day selected → exact-day total
+    if (day !== null && month !== null) {
+      const target = new Date(year, month, day);
+      return sumTodaySales(data.sales, target);
+    }
+    // Today falls within the selected month/year → live today's sales
+    if (todayInRange) return sumTodaySales(data.sales);
+    // Past/future period → period total
+    return filteredFinancials.paidSalesRevenue;
+  }, [day, month, year, todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
   const yesterdaySales = useMemo(() => {
+    if (day !== null && month !== null) {
+      const target = new Date(year, month, day);
+      target.setDate(target.getDate() - 1);
+      return sumTodaySales(data.sales, target);
+    }
+    if (!todayInRange) return 0;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return sumTodaySales(data.sales, yesterday);
-  }, [data.sales]);
+  }, [day, month, year, todayInRange, data.sales]);
   const dailyDelta = useMemo(() => buildDailyDelta(dailySales, yesterdaySales), [dailySales, yesterdaySales]);
 
   const salesChartData = useMemo(() => buildSalesChart(filtered.sales, year, month), [filtered.sales, month, year]);
@@ -500,13 +556,32 @@ export default function Dashboard() {
                 Add month
               </Button>
             ) : (
-              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedMonth(null);
+                  setSelectedDay(null);
+                }}
+              >
                 Year only
               </Button>
             )}
 
             {selectedMonth !== null ? (
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <Select
+                value={selectedMonth}
+                onValueChange={(value) => {
+                  setSelectedMonth(value);
+                  // Clamp day if it exceeds new month's days
+                  if (selectedDay !== null) {
+                    const m = Number(value);
+                    const max = new Date(year, m + 1, 0).getDate();
+                    if (Number(selectedDay) > max) setSelectedDay(String(max));
+                  }
+                }}
+              >
                 <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
@@ -514,6 +589,25 @@ export default function Dashboard() {
                   {Array.from({ length: 12 }).map((_, index) => (
                     <SelectItem key={index} value={String(index)}>
                       {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
+            {selectedMonth !== null ? (
+              <Select
+                value={selectedDay ?? 'all'}
+                onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}
+              >
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All days</SelectItem>
+                  {Array.from({ length: daysInSelectedMonth }).map((_, index) => (
+                    <SelectItem key={index + 1} value={String(index + 1)}>
+                      {index + 1}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -560,36 +654,36 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(financials.availableBusinessMoney)}
+            value={formatCurrency(filteredFinancials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={AVAILABLE_BUSINESS_MONEY_FORMULA}
+            helper={`${AVAILABLE_BUSINESS_MONEY_FORMULA} — ${dateRange.label}`}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
           />
           <MetricCard
             title="Daily Sales"
             value={formatCurrency(dailySales)}
             icon={ShoppingCart}
-            helper={dailyDelta.label}
-            valueClassName={dailyDelta.tone === 'up' ? 'text-emerald-500' : dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
+            helper={day !== null ? `Paid sales on ${dateRange.label}` : todayInRange ? dailyDelta.label : `Total paid sales in ${dateRange.label}`}
+            valueClassName={day === null && todayInRange && dailyDelta.tone === 'up' ? 'text-emerald-500' : day === null && todayInRange && dailyDelta.tone === 'down' ? 'text-rose-500' : undefined}
           />
           <MetricCard
             title="Total Profit"
-            value={formatCurrency(financials.profit)}
+            value={formatCurrency(filteredFinancials.profit)}
             icon={TrendingUp}
-            helper="Paid sales revenue - COGS - expenses"
+            helper={`Paid sales revenue - COGS - expenses (${dateRange.label})`}
             tooltip={SIKAFLOW_TOOLTIPS.profit}
           />
           <MetricCard
             title="Stock Left"
             value={financials.stockLeft.toLocaleString('en-GH')}
             icon={Boxes}
-            helper="Current inventory quantity across active products"
+            helper="Current inventory quantity across active products (live)"
           />
           <MetricCard
             title="Other Income"
-            value={formatCurrency(financials.otherIncome)}
+            value={formatCurrency(filteredFinancials.otherIncome)}
             icon={HandCoins}
-            helper="Service, delivery fee, commission, and miscellaneous income"
+            helper={`Service, delivery fee, commission, and miscellaneous income (${dateRange.label})`}
             tooltip={SIKAFLOW_TOOLTIPS.otherIncome}
           />
           <MetricCard
@@ -599,7 +693,26 @@ export default function Dashboard() {
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((product) => product.name).join(', ') : 'No low stock products right now'}
             valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
           />
+          <MetricCard
+            title="Expenses"
+            value={formatCurrency(filteredFinancials.expenses)}
+            icon={Receipt}
+            helper={`Operating expenses in ${dateRange.label}`}
+          />
+          <MetricCard
+            title="Savings"
+            value={formatCurrency(filteredFinancials.savings)}
+            icon={WalletCards}
+            helper={`Savings transfers in ${dateRange.label}`}
+          />
+          <MetricCard
+            title="Investments"
+            value={formatCurrency(filteredFinancials.investments)}
+            icon={TrendingUp}
+            helper={`Investments made in ${dateRange.label}`}
+          />
         </div>
+
 
         {setupRequired ? (
           <EmptyState

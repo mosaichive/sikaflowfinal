@@ -44,7 +44,7 @@ export function SaleDocumentViewerDialog({
     if (!opened) {
       toast({
         title: 'Could not open print window',
-        description: 'Allow pop-ups for SikaFlow to print or save this document as PDF.',
+        description: 'Allow pop-ups for KudiTrack to print or save this document as PDF.',
         variant: 'destructive',
       });
     }

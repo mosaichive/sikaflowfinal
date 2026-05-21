@@ -1,8 +1,8 @@
-# Product Requirements Document: SikaFlow Production Refactor
+# Product Requirements Document: KudiTrack Production Refactor
 
 ## Product Goal
 
-SikaFlow helps small business owners and managers track daily sales, inventory, expenses, savings, investments, investor funding, reports, and subscription status from one clean web app. The production refactor keeps existing Supabase data intact while removing Lovable-specific assumptions and preparing the app for normal GitHub plus Vercel development.
+KudiTrack helps small business owners and managers track daily sales, inventory, expenses, savings, investments, investor funding, reports, and subscription status from one clean web app. The production refactor keeps existing Supabase data intact while removing Lovable-specific assumptions and preparing the app for normal GitHub plus Vercel development.
 
 ## Non-Negotiable Data Rules
 
