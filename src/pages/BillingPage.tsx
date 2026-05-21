@@ -197,7 +197,7 @@ export default function BillingPage() {
       return;
     }
 
-    toast({ title: 'Payment submitted', description: 'Sika Flow can now review and activate your plan.' });
+    toast({ title: 'Payment submitted', description: 'KudiTrack can now review and activate your plan.' });
     setPayOpen(null);
     setReference('');
     setNote('');
@@ -414,7 +414,7 @@ export default function BillingPage() {
           <DialogHeader>
             <DialogTitle>Submit payment for {payOpen ? PLAN_LABELS[payOpen.plan] : ''}</DialogTitle>
             <DialogDescription>
-              {payOpen && `Sent GH₵${PLAN_PRICES[payOpen.plan]} via ${payOpen.method.label}? Submit the reference here so Sika Flow can verify it.`}
+              {payOpen && `Sent GH₵${PLAN_PRICES[payOpen.plan]} via ${payOpen.method.label}? Submit the reference here so KudiTrack can verify it.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

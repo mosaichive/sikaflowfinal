@@ -782,7 +782,7 @@ export default function SettingsPage() {
                   Allow sales without stock?
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  When off, SikaFlow blocks sales if stock is zero or insufficient. When on, staff can continue with negative stock and backorder sales.
+                  When off, KudiTrack blocks sales if stock is zero or insufficient. When on, staff can continue with negative stock and backorder sales.
                 </p>
               </div>
               <div className="flex items-center gap-3">

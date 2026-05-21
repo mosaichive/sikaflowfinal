@@ -120,10 +120,10 @@ export function InstallPrompt() {
         <SheetHeader className="text-left">
           <div className="flex items-center gap-3 mb-1">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <img src="/icon-192.png" alt="SikaFlow" className="h-9 w-9 object-contain" />
+              <img src="/icon-192.png" alt="KudiTrack" className="h-9 w-9 object-contain" />
             </div>
             <div className="flex-1">
-              <SheetTitle className="text-base font-bold">Install SikaFlow</SheetTitle>
+              <SheetTitle className="text-base font-bold">Install KudiTrack</SheetTitle>
               <SheetDescription className="text-xs">Add to your home screen for an app-like experience.</SheetDescription>
             </div>
             <button onClick={dismiss} className="p-2 rounded-lg text-muted-foreground hover:bg-secondary" aria-label="Close">

@@ -42,8 +42,8 @@ export function buildReferralSignupLink(code: string) {
 export function buildReferralWhatsappLink(link: string, businessName?: string) {
   if (!link) return '';
   const intro = businessName
-    ? `Join me on SikaFlow for ${businessName}.`
-    : 'Join me on SikaFlow.';
+    ? `Join me on KudiTrack for ${businessName}.`
+    : 'Join me on KudiTrack.';
   return `https://wa.me/?text=${encodeURIComponent(`${intro} Use my referral link to get started: ${link}`)}`;
 }
 

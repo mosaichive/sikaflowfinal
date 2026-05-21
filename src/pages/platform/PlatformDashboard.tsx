@@ -54,7 +54,7 @@ export default function PlatformDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Platform Overview</h1>
-        <p className="text-sm text-muted-foreground">High-level health of every business on SikaFlow.</p>
+        <p className="text-sm text-muted-foreground">High-level health of every business on KudiTrack.</p>
       </div>
 
       {loading ? (

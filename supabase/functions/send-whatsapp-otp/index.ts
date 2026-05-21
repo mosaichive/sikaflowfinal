@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       body: new URLSearchParams({
         To: `whatsapp:${whatsappTo}`,
         From: TWILIO_WHATSAPP_FROM,
-        Body: `Your SikaFlow password reset code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
+        Body: `Your KudiTrack password reset code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
       }),
     })
 

@@ -607,7 +607,7 @@ async function maybeSendPaymentConfirmation(
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !phone) return false;
 
   const body = [
-    "SikaFlow payment confirmed.",
+    "KudiTrack payment confirmed.",
     `${planLabel(resolvedPlan)} plan activated for GH₵${amountPaidGhs.toFixed(2)}.`,
     `Access valid until ${new Date(expiresAt).toLocaleDateString("en-GB")}.`,
     `Reference: ${reference}.`,

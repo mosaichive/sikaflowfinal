@@ -73,9 +73,9 @@ https://hhgnriavkqdnjmmpklbw.supabase.co/functions/v1/paystack-webhook
 
 1. Tenant picks a paid plan.
 2. Tenant enters phone number + network.
-3. SikaFlow calls Paystack Charge API.
+3. KudiTrack calls Paystack Charge API.
 4. User confirms on phone.
-5. SikaFlow verifies through:
+5. KudiTrack verifies through:
    - Paystack webhook for successful charges
    - charge-status polling for pending / failed / timeout outcomes
 6. Subscription updates instantly without page refresh.

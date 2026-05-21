@@ -60,7 +60,7 @@ export const STOCK_MOVEMENT_TYPES = [
 ] as const;
 
 export const SIKAFLOW_TOOLTIPS = {
-  openingStock: 'Opening Stock is the inventory you already have on hand when you start using SikaFlow. It affects stock and profit cost basis, but it is not income or cash.',
+  openingStock: 'Opening Stock is the inventory you already have on hand when you start using KudiTrack. It affects stock and profit cost basis, but it is not income or cash.',
   otherIncome: 'Other Income is business income that does not come from product sales, like services, delivery fees, commissions, or miscellaneous charges.',
   availableBusinessMoney: 'Available Business Money shows liquid cash available now. Money used for restocking is converted into inventory assets and may reduce cash balance without reducing historical profit. Opening Stock is excluded.',
   inventoryAssetValue: 'Inventory Asset Value is the monetary worth of all current stock at cost price (cost × quantity). It rises when you restock and falls when products are sold.',

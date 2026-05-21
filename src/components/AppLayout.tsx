@@ -70,7 +70,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
               <div className="flex items-center gap-2 md:hidden">
                 <Logo className="h-6 w-6 object-contain" />
                 <span className="text-sm font-semibold text-foreground truncate max-w-[140px]">
-                  {business?.name || 'SikaFlow'}
+                  {business?.name || 'KudiTrack'}
                 </span>
               </div>
               {title && <h1 className="text-lg font-semibold text-foreground hidden md:block">{title}</h1>}

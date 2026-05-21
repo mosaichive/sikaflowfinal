@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </h1>
           <p style={{ fontSize: 14, opacity: 0.7, margin: '0 0 24px', lineHeight: 1.55 }}>
             {this.state.error?.message ||
-              'An unexpected error occurred while starting SikaFlow.'}
+              'An unexpected error occurred while starting KudiTrack.'}
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button

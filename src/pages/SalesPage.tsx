@@ -555,7 +555,7 @@ export default function SalesPage() {
         sale,
         items,
         issuedBy: {
-          name: displayName || sale.staff_name || user.email || 'SikaFlow User',
+          name: displayName || sale.staff_name || user.email || 'KudiTrack User',
           email: user.email,
         },
       });

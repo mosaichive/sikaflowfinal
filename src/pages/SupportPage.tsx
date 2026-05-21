@@ -166,7 +166,7 @@ export default function SupportPage() {
         <section className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">Support</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">Need help with your SikaFlow workspace?</h2>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight">Need help with your KudiTrack workspace?</h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Reach support directly using the contact details below or send a message from inside the app.
             </p>

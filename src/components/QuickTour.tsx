@@ -34,7 +34,7 @@ const STEPS: Step[] = [
     icon: Sparkles,
     title: 'Welcome aboard',
     description:
-      'SikaFlow helps you run the day-to-day of your business — from selling and stocking, to tracking spending and profit. Here is a 60-second tour.',
+      'KudiTrack helps you run the day-to-day of your business — from selling and stocking, to tracking spending and profit. Here is a 60-second tour.',
     bullets: [
       'Built for Ghanaian SMEs',
       'Realtime numbers across every page',

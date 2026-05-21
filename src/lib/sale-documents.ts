@@ -246,7 +246,7 @@ export function buildSaleDocumentSnapshot({
 }): SaleDocumentSnapshot {
   return {
     business: {
-      name: stringValue(business?.name, 'SikaFlow Business'),
+      name: stringValue(business?.name, 'KudiTrack Business'),
       logo_url: business?.logo_light_url ?? business?.logo_dark_url ?? null,
       email: business?.email ?? null,
       phone: business?.phone ?? null,
@@ -268,7 +268,7 @@ export function buildSaleDocumentSnapshot({
       notes: sale.notes ?? null,
     },
     seller: {
-      name: stringValue(issuedBy.name, 'SikaFlow User'),
+      name: stringValue(issuedBy.name, 'KudiTrack User'),
       email: issuedBy.email ?? null,
     },
     items: items.map((item) => ({
@@ -294,7 +294,7 @@ export function normalizeSaleDocument(row: any): SaleDocumentRecord {
   const snapshot = (row?.snapshot ?? {}) as Partial<SaleDocumentSnapshot>;
   const normalizedSnapshot: SaleDocumentSnapshot = {
     business: {
-      name: stringValue(snapshot.business?.name, 'SikaFlow Business'),
+      name: stringValue(snapshot.business?.name, 'KudiTrack Business'),
       logo_url: snapshot.business?.logo_url ?? null,
       email: snapshot.business?.email ?? null,
       phone: snapshot.business?.phone ?? null,
@@ -316,7 +316,7 @@ export function normalizeSaleDocument(row: any): SaleDocumentRecord {
       notes: snapshot.sale?.notes ?? null,
     },
     seller: {
-      name: stringValue(snapshot.seller?.name, row?.seller_name ?? 'SikaFlow User'),
+      name: stringValue(snapshot.seller?.name, row?.seller_name ?? 'KudiTrack User'),
       email: snapshot.seller?.email ?? null,
     },
     items: Array.isArray(snapshot.items)
@@ -712,12 +712,12 @@ export function renderSaleDocumentHtml(document: SaleDocumentRecord) {
             ${
               snapshot.business.logo_url
                 ? `<img src="${escapeHtml(snapshot.business.logo_url)}" alt="${escapeHtml(snapshot.business.name)} logo" />`
-                : `<img src="${escapeHtml(sikaflowLogo)}" alt="SikaFlow logo" />`
+                : `<img src="${escapeHtml(sikaflowLogo)}" alt="KudiTrack logo" />`
             }
           </div>
           <div>
             <p class="brand-name">${escapeHtml(snapshot.business.name)}</p>
-            <div class="brand-tag">SikaFlow Document</div>
+            <div class="brand-tag">KudiTrack Document</div>
             <div class="business-lines">
               ${snapshot.business.location ? `${escapeHtml(snapshot.business.location)}<br />` : ''}
               ${snapshot.business.phone ? `${escapeHtml(snapshot.business.phone)}<br />` : ''}
@@ -783,7 +783,7 @@ export function renderSaleDocumentHtml(document: SaleDocumentRecord) {
             <div class="box" style="margin-top:20px;">
               <div class="section-label">Terms &amp; Notes</div>
               <div class="notes-lines">
-                ${snapshot.sale.notes ? escapeHtml(snapshot.sale.notes) : 'Thank you for choosing SikaFlow. Please keep this document for your records.'}
+                ${snapshot.sale.notes ? escapeHtml(snapshot.sale.notes) : 'Thank you for choosing KudiTrack. Please keep this document for your records.'}
               </div>
             </div>
           </div>
@@ -795,7 +795,7 @@ export function renderSaleDocumentHtml(document: SaleDocumentRecord) {
 
       <div class="footer">
         <div class="footer-block">${escapeHtml(snapshot.business.phone ?? 'Business phone available in profile')}</div>
-        <div class="footer-block">${escapeHtml(snapshot.business.email ?? 'Managed with SikaFlow')}</div>
+        <div class="footer-block">${escapeHtml(snapshot.business.email ?? 'Managed with KudiTrack')}</div>
         <div class="footer-block">${escapeHtml(snapshot.business.location ?? 'Ghana')}</div>
       </div>
     </div>
@@ -1020,7 +1020,7 @@ export async function downloadSaleDocument(document: SaleDocumentRecord) {
   doc.text('TERMS & NOTES', marginX, notesY + 18);
   doc.setFont('NotoSans', 'normal');
   doc.setFontSize(10);
-  const notesText = document.snapshot.sale.notes || 'Thank you for choosing SikaFlow. Please keep this document for your records.';
+  const notesText = document.snapshot.sale.notes || 'Thank you for choosing KudiTrack. Please keep this document for your records.';
   const wrappedNotes = doc.splitTextToSize(notesText, paymentBoxWidth);
   doc.setTextColor(...PDF_COLORS.ink);
   doc.text(wrappedNotes, marginX, notesY + 38);
@@ -1058,7 +1058,7 @@ export async function downloadSaleDocument(document: SaleDocumentRecord) {
   doc.setFontSize(9);
   doc.setTextColor(255, 255, 255);
   doc.text(document.snapshot.business.phone || 'Business phone available in profile', marginX + 14, pageHeight - 46);
-  doc.text(document.snapshot.business.email || 'Managed with SikaFlow', pageWidth / 2, pageHeight - 46, { align: 'center' });
+  doc.text(document.snapshot.business.email || 'Managed with KudiTrack', pageWidth / 2, pageHeight - 46, { align: 'center' });
   doc.text(document.snapshot.business.location || 'Ghana', pageWidth - marginX - 14, pageHeight - 46, { align: 'right' });
 
   const totalPages = doc.getNumberOfPages();

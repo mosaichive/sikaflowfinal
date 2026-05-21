@@ -1066,7 +1066,7 @@ export function getErrorMessage(error: unknown, fallback = 'Please try again.') 
 
 export function logSupabaseError(context: string, error: unknown, extra?: Record<string, unknown>) {
   const normalized = (error ?? {}) as SupabaseErrorLike;
-  console.error(`[SikaFlow:${context}]`, {
+  console.error(`[KudiTrack:${context}]`, {
     message: normalized.message ?? (error instanceof Error ? error.message : 'Unknown error'),
     details: normalized.details ?? null,
     code: normalized.code ?? null,

@@ -34,7 +34,7 @@ export default function PlatformLayout() {
         <div className="p-4 flex items-center gap-3 border-b border-border">
           <Logo className="h-9 w-9" />
           <div>
-            <h2 className="text-sm font-bold tracking-tight">SikaFlow</h2>
+            <h2 className="text-sm font-bold tracking-tight">KudiTrack</h2>
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Platform Admin</p>
           </div>
         </div>
