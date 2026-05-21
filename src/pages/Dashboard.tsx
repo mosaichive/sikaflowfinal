@@ -556,13 +556,32 @@ export default function Dashboard() {
                 Add month
               </Button>
             ) : (
-              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedMonth(null);
+                  setSelectedDay(null);
+                }}
+              >
                 Year only
               </Button>
             )}
 
             {selectedMonth !== null ? (
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <Select
+                value={selectedMonth}
+                onValueChange={(value) => {
+                  setSelectedMonth(value);
+                  // Clamp day if it exceeds new month's days
+                  if (selectedDay !== null) {
+                    const m = Number(value);
+                    const max = new Date(year, m + 1, 0).getDate();
+                    if (Number(selectedDay) > max) setSelectedDay(String(max));
+                  }
+                }}
+              >
                 <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
@@ -570,6 +589,25 @@ export default function Dashboard() {
                   {Array.from({ length: 12 }).map((_, index) => (
                     <SelectItem key={index} value={String(index)}>
                       {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
+            {selectedMonth !== null ? (
+              <Select
+                value={selectedDay ?? 'all'}
+                onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}
+              >
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All days</SelectItem>
+                  {Array.from({ length: daysInSelectedMonth }).map((_, index) => (
+                    <SelectItem key={index + 1} value={String(index + 1)}>
+                      {index + 1}
                     </SelectItem>
                   ))}
                 </SelectContent>
