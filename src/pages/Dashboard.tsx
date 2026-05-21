@@ -485,16 +485,27 @@ export default function Dashboard() {
 
   const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
   const dailySales = useMemo(() => {
+    // Specific day selected → exact-day total
+    if (day !== null && month !== null) {
+      const target = new Date(year, month, day);
+      return sumTodaySales(data.sales, target);
+    }
+    // Today falls within the selected month/year → live today's sales
     if (todayInRange) return sumTodaySales(data.sales);
-    // Past/future period selected — show that period's total paid sales.
+    // Past/future period → period total
     return filteredFinancials.paidSalesRevenue;
-  }, [todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
+  }, [day, month, year, todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
   const yesterdaySales = useMemo(() => {
+    if (day !== null && month !== null) {
+      const target = new Date(year, month, day);
+      target.setDate(target.getDate() - 1);
+      return sumTodaySales(data.sales, target);
+    }
     if (!todayInRange) return 0;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return sumTodaySales(data.sales, yesterday);
-  }, [todayInRange, data.sales]);
+  }, [day, month, year, todayInRange, data.sales]);
   const dailyDelta = useMemo(() => buildDailyDelta(dailySales, yesterdaySales), [dailySales, yesterdaySales]);
 
   const salesChartData = useMemo(() => buildSalesChart(filtered.sales, year, month), [filtered.sales, month, year]);
