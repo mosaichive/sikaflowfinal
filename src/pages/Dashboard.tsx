@@ -342,7 +342,7 @@ export default function Dashboard() {
         supabase.from('savings').select('id,amount,savings_date,source,note,reference'),
         supabase.from('investments').select('amount,investment_date'),
         supabase.from('investor_funding').select('amount,date_received,investor_name,reference').order('date_received', { ascending: false }),
-        supabase.from('restocks').select('total_cost,status,restock_date').order('restock_date', { ascending: false }),
+        supabase.from('restocks').select('total_cost,status,restock_date,is_opening_stock').order('restock_date', { ascending: false }),
       ]);
 
       if (salesRes.status === 'rejected') logSupabaseError('dashboard.load.sales', salesRes.reason);
