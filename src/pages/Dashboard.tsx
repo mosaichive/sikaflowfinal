@@ -483,6 +483,33 @@ export default function Dashboard() {
     [filtered, data.products, data.restocks, financials.openingCash],
   );
 
+  // Cumulative financials — running balance UP TO the end of the selected
+  // period. Used for "Available Business Money" so the card represents the
+  // business cash position as of the selected date, not just transactions
+  // inside the filter window.
+  const cumulativeFinancials = useMemo(() => {
+    const toMs = new Date(`${dateRange.to}T23:59:59`).getTime();
+    const upTo = (value: string | null | undefined) => {
+      if (!value) return false;
+      const t = new Date(value).getTime();
+      return !Number.isNaN(t) && t <= toMs;
+    };
+    const sales = data.sales.filter((row) => upTo(row.sale_date));
+    const saleIds = new Set(sales.map((row) => row.id));
+    return calculateBusinessFinancials({
+      sales: sales as any,
+      saleItems: data.saleItems.filter((item) => saleIds.has(item.sale_id)) as any,
+      products: data.products as any,
+      otherIncome: data.otherIncome.filter((row) => upTo(row.income_date)) as any,
+      expenses: data.expenses.filter((row) => upTo(row.expense_date)) as any,
+      savings: data.savings.filter((row) => upTo(row.savings_date)) as any,
+      investments: data.investments.filter((row) => upTo(row.investment_date)) as any,
+      investorFunds: data.investorFunds.filter((row) => upTo(row.date_received)) as any,
+      restocks: data.restocks.filter((row: any) => upTo(row.restock_date)) as any,
+      openingCashBalance: financials.openingCash,
+    });
+  }, [data, dateRange.to, financials.openingCash]);
+
   const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
   const dailySales = useMemo(() => {
     // Specific day selected → exact-day total
@@ -654,9 +681,9 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(filteredFinancials.availableBusinessMoney)}
+            value={formatCurrency(cumulativeFinancials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={`${AVAILABLE_BUSINESS_MONEY_FORMULA} — ${dateRange.label}`}
+            helper={`Business cash position as of ${dateRange.label}`}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
           />
           <MetricCard
