@@ -342,7 +342,7 @@ export default function Dashboard() {
         supabase.from('savings').select('id,amount,savings_date,source,note,reference'),
         supabase.from('investments').select('amount,investment_date'),
         supabase.from('investor_funding').select('amount,date_received,investor_name,reference').order('date_received', { ascending: false }),
-        supabase.from('restocks').select('total_cost,status,restock_date').order('restock_date', { ascending: false }),
+        supabase.from('restocks').select('total_cost,status,restock_date,is_opening_stock').order('restock_date', { ascending: false }),
       ]);
 
       if (salesRes.status === 'rejected') logSupabaseError('dashboard.load.sales', salesRes.reason);
@@ -679,13 +679,24 @@ export default function Dashboard() {
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <MetricCard
-            title="Available Business Money"
-            value={formatCurrency(cumulativeFinancials.availableBusinessMoney)}
-            icon={WalletCards}
-            helper={`Business cash position as of ${dateRange.label}`}
-            tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
-          />
+          {(() => {
+            const isDefaultLiveView = month === null && day === null && year === currentYear;
+            const value = isDefaultLiveView
+              ? financials.availableBusinessMoney
+              : cumulativeFinancials.availableBusinessMoney;
+            const helper = isDefaultLiveView
+              ? 'Live business cash position'
+              : `Business cash position as of ${dateRange.label}`;
+            return (
+              <MetricCard
+                title="Available Business Money"
+                value={formatCurrency(value)}
+                icon={WalletCards}
+                helper={helper}
+                tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
+              />
+            );
+          })()}
           <MetricCard
             title="Daily Sales"
             value={formatCurrency(dailySales)}
