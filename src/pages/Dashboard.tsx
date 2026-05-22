@@ -679,13 +679,24 @@ export default function Dashboard() {
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <MetricCard
-            title="Available Business Money"
-            value={formatCurrency(cumulativeFinancials.availableBusinessMoney)}
-            icon={WalletCards}
-            helper={`Business cash position as of ${dateRange.label}`}
-            tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
-          />
+          {(() => {
+            const isDefaultLiveView = month === null && day === null && year === currentYear;
+            const value = isDefaultLiveView
+              ? financials.availableBusinessMoney
+              : cumulativeFinancials.availableBusinessMoney;
+            const helper = isDefaultLiveView
+              ? 'Live business cash position'
+              : `Business cash position as of ${dateRange.label}`;
+            return (
+              <MetricCard
+                title="Available Business Money"
+                value={formatCurrency(value)}
+                icon={WalletCards}
+                helper={helper}
+                tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
+              />
+            );
+          })()}
           <MetricCard
             title="Daily Sales"
             value={formatCurrency(dailySales)}
