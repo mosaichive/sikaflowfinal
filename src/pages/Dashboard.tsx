@@ -681,9 +681,9 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title="Available Business Money"
-            value={formatCurrency(filteredFinancials.availableBusinessMoney)}
+            value={formatCurrency(cumulativeFinancials.availableBusinessMoney)}
             icon={WalletCards}
-            helper={`${AVAILABLE_BUSINESS_MONEY_FORMULA} — ${dateRange.label}`}
+            helper={`Business cash position as of ${dateRange.label}`}
             tooltip={SIKAFLOW_TOOLTIPS.availableBusinessMoney}
           />
           <MetricCard
