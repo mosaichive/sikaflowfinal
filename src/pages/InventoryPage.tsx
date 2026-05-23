@@ -671,7 +671,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Cost Per Unit (Buying Price)</Label>
-                  <Input type="number" min="0" step="0.01" value={form.unit_cost} onChange={(event) => setForm((current) => ({ ...current, unit_cost: event.target.value }))} />
+                  <Input type="number" min="0" step="0.001" value={form.unit_cost} onChange={(event) => setForm((current) => ({ ...current, unit_cost: event.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Selling Price (Customer Price)</Label>
