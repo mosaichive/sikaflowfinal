@@ -123,7 +123,7 @@ export default function SalesPage() {
   const profit = total - costTotal;
   const paymentStatus = balance <= 0 && total > 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
   const validLines = computed.filter((c) => c.product && c.qty > 0);
-  const canManageSales = isAdmin || isManager;
+  void isManager; // reserved for future per-row override permissions
   const allowSalesWithoutStock = Boolean(business?.allow_sales_without_stock);
 
   const updateLine = (key: string, patch: Partial<SaleLine>) => {
