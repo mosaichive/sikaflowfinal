@@ -61,37 +61,78 @@ export default function SalesPage() {
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [pendingStockOverrideAction, setPendingStockOverrideAction] = useState<'new' | 'edit' | null>(null);
 
-  // Form state (shared for new + edit)
-  const [productId, setProductId] = useState('');
-  const [size, setSize] = useState('');
-  const [color, setColor] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [discount, setDiscount] = useState(0);
+  // Multi-product line items. Each row stores strings so qty/discount/amount
+  // can stay empty by default (per spec). `amount` is the line total in GH₵;
+  // if blank, it auto-derives from qty × product price − discount.
+  type SaleLine = {
+    key: string;
+    product_id: string;
+    quantity: string;
+    discount: string;
+    amount: string;
+  };
+  const newLine = (): SaleLine => ({
+    key: Math.random().toString(36).slice(2),
+    product_id: '',
+    quantity: '',
+    discount: '',
+    amount: '',
+  });
+
+  const [lines, setLines] = useState<SaleLine[]>([newLine()]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountPaid, setAmountPaid] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState('');
-  const [overridePrice, setOverridePrice] = useState<number | null>(null);
-  const [priceNote, setPriceNote] = useState('');
   const [saleNotes, setSaleNotes] = useState('');
 
-  // For edit: track original values
-  const [editOriginal, setEditOriginal] = useState<{ productId: string; quantity: number } | null>(null);
+  // For edit: track original sale_items so we can compare stock deltas.
+  const [editOriginalLines, setEditOriginalLines] = useState<Array<{ productId: string; quantity: number }>>([]);
 
-  const selectedProduct = allProducts.find(p => p.id === productId);
-  const defaultPrice = selectedProduct ? Number(selectedProduct.selling_price) : 0;
-  const unitPrice = overridePrice !== null ? overridePrice : defaultPrice;
-  const costPrice = selectedProduct ? Number(selectedProduct.cost_price) : 0;
-  const subtotal = unitPrice * quantity;
-  const total = Math.max(0, subtotal - discount);
+  type ComputedLine = {
+    line: SaleLine;
+    product: any | null;
+    qty: number;
+    disc: number;
+    defaultPrice: number;
+    costPrice: number;
+    amount: number;
+    unitPrice: number;
+  };
+
+  const computeLine = (line: SaleLine): ComputedLine => {
+    const product = allProducts.find((p) => p.id === line.product_id) || null;
+    const qty = Number(line.quantity) || 0;
+    const disc = Number(line.discount) || 0;
+    const defaultPrice = Number(product?.selling_price) || 0;
+    const costPrice = Number(product?.cost_price) || 0;
+    const autoAmount = Math.max(0, qty * defaultPrice - disc);
+    const amount = line.amount === '' ? autoAmount : Math.max(0, Number(line.amount) || 0);
+    const unitPrice = qty > 0 ? (amount + disc) / qty : defaultPrice;
+    return { line, product, qty, disc, defaultPrice, costPrice, amount, unitPrice };
+  };
+
+  const computed = useMemo(() => lines.map(computeLine), [lines, allProducts]);
+  const subtotal = computed.reduce((s, c) => s + c.qty * c.defaultPrice, 0);
+  const discount = computed.reduce((s, c) => s + c.disc, 0);
+  const total = computed.reduce((s, c) => s + c.amount, 0);
+  const costTotal = computed.reduce((s, c) => s + c.qty * c.costPrice, 0);
   const balance = Math.max(0, total - amountPaid);
-  const profit = (unitPrice - costPrice) * quantity - discount;
-  const paymentStatus = balance <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
-  const isPriceOverridden = overridePrice !== null && overridePrice !== defaultPrice;
-  const canOverridePrice = isAdmin || isManager;
+  const profit = total - costTotal;
+  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+  const validLines = computed.filter((c) => c.product && c.qty > 0);
+  const canManageSales = isAdmin || isManager;
   const allowSalesWithoutStock = Boolean(business?.allow_sales_without_stock);
+
+  const updateLine = (key: string, patch: Partial<SaleLine>) => {
+    setLines((curr) => curr.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  };
+  const addLine = () => setLines((curr) => [...curr, newLine()]);
+  const removeLine = (key: string) => {
+    setLines((curr) => (curr.length <= 1 ? [newLine()] : curr.filter((l) => l.key !== key)));
+  };
 
   useEffect(() => {
     fetchData();
