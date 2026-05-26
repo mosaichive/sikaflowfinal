@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, ShoppingCart, Trash2, Eye, Info, Pencil, FileText, ReceiptText } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2, Eye, Pencil, FileText, ReceiptText, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SaleDocumentViewerDialog } from '@/components/sales/SaleDocumentViewerDialog';
@@ -61,37 +61,78 @@ export default function SalesPage() {
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [pendingStockOverrideAction, setPendingStockOverrideAction] = useState<'new' | 'edit' | null>(null);
 
-  // Form state (shared for new + edit)
-  const [productId, setProductId] = useState('');
-  const [size, setSize] = useState('');
-  const [color, setColor] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [discount, setDiscount] = useState(0);
+  // Multi-product line items. Each row stores strings so qty/discount/amount
+  // can stay empty by default (per spec). `amount` is the line total in GH₵;
+  // if blank, it auto-derives from qty × product price − discount.
+  type SaleLine = {
+    key: string;
+    product_id: string;
+    quantity: string;
+    discount: string;
+    amount: string;
+  };
+  const newLine = (): SaleLine => ({
+    key: Math.random().toString(36).slice(2),
+    product_id: '',
+    quantity: '',
+    discount: '',
+    amount: '',
+  });
+
+  const [lines, setLines] = useState<SaleLine[]>([newLine()]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountPaid, setAmountPaid] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState('');
-  const [overridePrice, setOverridePrice] = useState<number | null>(null);
-  const [priceNote, setPriceNote] = useState('');
   const [saleNotes, setSaleNotes] = useState('');
 
-  // For edit: track original values
-  const [editOriginal, setEditOriginal] = useState<{ productId: string; quantity: number } | null>(null);
+  // For edit: track original sale_items so we can compare stock deltas.
+  const [editOriginalLines, setEditOriginalLines] = useState<Array<{ productId: string; quantity: number }>>([]);
 
-  const selectedProduct = allProducts.find(p => p.id === productId);
-  const defaultPrice = selectedProduct ? Number(selectedProduct.selling_price) : 0;
-  const unitPrice = overridePrice !== null ? overridePrice : defaultPrice;
-  const costPrice = selectedProduct ? Number(selectedProduct.cost_price) : 0;
-  const subtotal = unitPrice * quantity;
-  const total = Math.max(0, subtotal - discount);
+  type ComputedLine = {
+    line: SaleLine;
+    product: any | null;
+    qty: number;
+    disc: number;
+    defaultPrice: number;
+    costPrice: number;
+    amount: number;
+    unitPrice: number;
+  };
+
+  const computeLine = (line: SaleLine): ComputedLine => {
+    const product = allProducts.find((p) => p.id === line.product_id) || null;
+    const qty = Number(line.quantity) || 0;
+    const disc = Number(line.discount) || 0;
+    const defaultPrice = Number(product?.selling_price) || 0;
+    const costPrice = Number(product?.cost_price) || 0;
+    const autoAmount = Math.max(0, qty * defaultPrice - disc);
+    const amount = line.amount === '' ? autoAmount : Math.max(0, Number(line.amount) || 0);
+    const unitPrice = qty > 0 ? (amount + disc) / qty : defaultPrice;
+    return { line, product, qty, disc, defaultPrice, costPrice, amount, unitPrice };
+  };
+
+  const computed = useMemo(() => lines.map(computeLine), [lines, allProducts]);
+  const subtotal = computed.reduce((s, c) => s + c.qty * c.defaultPrice, 0);
+  const discount = computed.reduce((s, c) => s + c.disc, 0);
+  const total = computed.reduce((s, c) => s + c.amount, 0);
+  const costTotal = computed.reduce((s, c) => s + c.qty * c.costPrice, 0);
   const balance = Math.max(0, total - amountPaid);
-  const profit = (unitPrice - costPrice) * quantity - discount;
-  const paymentStatus = balance <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
-  const isPriceOverridden = overridePrice !== null && overridePrice !== defaultPrice;
-  const canOverridePrice = isAdmin || isManager;
+  const profit = total - costTotal;
+  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+  const validLines = computed.filter((c) => c.product && c.qty > 0);
+  void isManager; // reserved for future per-row override permissions
   const allowSalesWithoutStock = Boolean(business?.allow_sales_without_stock);
+
+  const updateLine = (key: string, patch: Partial<SaleLine>) => {
+    setLines((curr) => curr.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  };
+  const addLine = () => setLines((curr) => [...curr, newLine()]);
+  const removeLine = (key: string) => {
+    setLines((curr) => (curr.length <= 1 ? [newLine()] : curr.filter((l) => l.key !== key)));
+  };
 
   useEffect(() => {
     fetchData();
@@ -161,13 +202,16 @@ export default function SalesPage() {
   };
 
   const resetForm = () => {
-    setProductId(''); setSize(''); setColor(''); setQuantity(1);
-    setDiscount(0); setPaymentMethod('cash'); setAmountPaid(0);
-    setCustomerName(''); setCustomerPhone('');
+    setLines([newLine()]);
+    setPaymentMethod('cash');
+    setAmountPaid(0);
+    setCustomerName('');
+    setCustomerPhone('');
     setSaleDate(new Date().toISOString().slice(0, 10));
     setDueDate('');
-    setOverridePrice(null); setPriceNote(''); setSaleNotes('');
-    setEditSaleId(null); setEditOriginal(null);
+    setSaleNotes('');
+    setEditSaleId(null);
+    setEditOriginalLines([]);
   };
 
   const createSaleMovement = async (_args: {
@@ -181,27 +225,32 @@ export default function SalesPage() {
   }) => {
     // no-op: log_stock_movement_on_sale_item DB trigger writes the
     // stock_movements row automatically when the sale_items row is inserted.
-    // Writing it again here would double the movement.
   };
 
-  const handleProductChange = (v: string) => {
-    setProductId(v);
-    setSize(''); setColor('');
-    setOverridePrice(null); setPriceNote('');
-  };
-
-  // Open edit dialog
+  // Open edit dialog — load all sale_items as line rows.
   const handleOpenEdit = async (sale: any) => {
     const items = await fetchSaleItems(sale.id);
-    const item = items[0]; // single-item sale
-    if (!item) { toast({ title: 'Cannot load sale items', variant: 'destructive' }); return; }
+    if (!items.length) {
+      toast({ title: 'Cannot load sale items', variant: 'destructive' });
+      return;
+    }
 
     setEditSaleId(sale.id);
-    setProductId(item.product_id || '');
-    setSize(item.size || '');
-    setColor(item.color || '');
-    setQuantity(item.quantity);
-    setDiscount(Number(sale.discount));
+    setLines(
+      items.map((item: any) => ({
+        key: Math.random().toString(36).slice(2),
+        product_id: item.product_id || '',
+        quantity: String(item.quantity ?? ''),
+        discount: '', // historical sale_items don't carry per-line discount
+        amount: String(Number(item.line_total ?? item.total ?? 0)),
+      })),
+    );
+    setEditOriginalLines(
+      items.map((item: any) => ({
+        productId: item.product_id || '',
+        quantity: Number(item.quantity) || 0,
+      })),
+    );
     setPaymentMethod(sale.payment_method);
     setAmountPaid(Number(sale.amount_paid));
     setCustomerName(sale.customer_name || '');
@@ -209,24 +258,16 @@ export default function SalesPage() {
     setSaleDate(new Date(sale.sale_date).toISOString().slice(0, 10));
     setDueDate(sale.due_date ? new Date(sale.due_date).toISOString().slice(0, 10) : '');
     setSaleNotes(sale.notes || '');
-
-    const dp = Number(item.default_price);
-    const up = Number(item.unit_price);
-    if (dp > 0 && up !== dp) {
-      setOverridePrice(up);
-    } else {
-      setOverridePrice(null);
-    }
-    setPriceNote(item.price_note || '');
-
-    setEditOriginal({ productId: item.product_id || '', quantity: item.quantity });
     setOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct || !user) return;
-
+    if (!user) return;
+    if (validLines.length === 0) {
+      toast({ title: 'Add at least one product', description: 'Pick a product and enter a quantity.', variant: 'destructive' });
+      return;
+    }
     if (editSaleId) {
       await handleSaveEdit();
     } else {
@@ -234,19 +275,34 @@ export default function SalesPage() {
     }
   };
 
-  const getSelectedProductQuantity = (product: any) => Number(product?.quantity ?? 0);
-  const getStockShortfall = (availableQuantity: number, requestedQuantity: number) =>
-    Math.max(0, requestedQuantity - Math.max(0, availableQuantity));
+  // Aggregate requested quantity per product (in case the same product
+  // appears on multiple rows) and compare to available stock.
+  const computeStockShortfall = (
+    rows: ComputedLine[],
+    offsets: Record<string, number> = {},
+  ) => {
+    const requested = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.product) continue;
+      requested.set(r.product.id, (requested.get(r.product.id) ?? 0) + r.qty);
+    }
+    let total = 0;
+    for (const [productId, qty] of requested) {
+      const prod = allProducts.find((p) => p.id === productId);
+      const available = Number(prod?.quantity ?? 0) + (offsets[productId] ?? 0);
+      total += Math.max(0, qty - Math.max(0, available));
+    }
+    return total;
+  };
 
   const handleNewSale = async (overrideStockCheck = false) => {
-    if (!selectedProduct || !user || !businessId) return;
-    const availableQuantity = getSelectedProductQuantity(selectedProduct);
-    const stockShortfall = getStockShortfall(availableQuantity, quantity);
+    if (!user || !businessId) return;
+    const stockShortfall = computeStockShortfall(validLines);
 
     if (stockShortfall > 0 && !allowSalesWithoutStock) {
       toast({
         title: 'Out of stock',
-        description: 'This product is out of stock. Please restock before selling.',
+        description: 'One or more items are out of stock. Please restock before selling.',
         variant: 'destructive',
       });
       return;
@@ -255,6 +311,7 @@ export default function SalesPage() {
       setPendingStockOverrideAction('new');
       return;
     }
+
     setLoading(true);
     try {
       const sale = await insertSaleRecord({
@@ -275,46 +332,31 @@ export default function SalesPage() {
         stock_status: stockShortfall > 0 ? 'negative_stock_sale' : 'in_stock',
         stock_shortfall: stockShortfall,
         notes: saleNotes,
-        cost_total: costPrice * quantity,
+        cost_total: costTotal,
       });
 
-      const saleItemPayload = {
-        user_id: user.id,
-        business_id: businessId,
-        sale_id: sale.id,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        sku: selectedProduct.sku,
-        size, color, quantity,
-        unit_price: unitPrice,
-        unit_cost: costPrice,
-        cost_price: costPrice,
-        line_total: subtotal,
-        default_price: defaultPrice,
-        price_note: isPriceOverridden ? priceNote : '',
-      };
-      const validation = validateSaleItemPayload(saleItemPayload);
-      if (validation.ok === false) {
-        toast({
-          title: 'Invalid sale item',
-          description: validation.message,
-          variant: 'destructive',
-        });
-        return;
+      for (const row of validLines) {
+        const payload = {
+          user_id: user.id,
+          business_id: businessId,
+          sale_id: sale.id,
+          product_id: row.product!.id,
+          product_name: row.product!.name,
+          sku: row.product!.sku,
+          quantity: row.qty,
+          unit_price: row.unitPrice,
+          unit_cost: row.costPrice,
+          cost_price: row.costPrice,
+          line_total: row.amount,
+          default_price: row.defaultPrice,
+        };
+        const validation = validateSaleItemPayload(payload);
+        if (validation.ok === false) {
+          toast({ title: 'Invalid sale item', description: validation.message, variant: 'destructive' });
+          continue;
+        }
+        await insertSaleItemRecord(payload);
       }
-      const saleItem = await insertSaleItemRecord(saleItemPayload);
-
-      await updateProductQuantity(selectedProduct.id, Number(selectedProduct.quantity ?? 0) - quantity);
-
-      await createSaleMovement({
-        saleItemId: saleItem.id,
-        product: selectedProduct,
-        soldQuantity: quantity,
-        unitCost: costPrice,
-        soldPrice: unitPrice,
-        note: saleNotes || 'POS sale',
-        isNegativeStockSale: stockShortfall > 0,
-      });
 
       if (customerName && customerName !== 'Walk-in') {
         const { data: existing } = await supabase.from('customers').select('id').eq('name', customerName).maybeSingle();
@@ -323,75 +365,50 @@ export default function SalesPage() {
         }
       }
 
-      toast({ title: 'Sale recorded!', description: `${selectedProduct.name} — ${formatCurrency(total)}` });
+      const summary = validLines
+        .map((r) => `${r.product!.name} × ${r.qty}`)
+        .join(', ');
+      toast({ title: 'Sale recorded!', description: `${summary} — ${formatCurrency(total)}` });
       setPendingStockOverrideAction(null);
-      resetForm(); setOpen(false); fetchData();
+      resetForm();
+      setOpen(false);
+      fetchData();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveEdit = async (overrideStockCheck = false) => {
-    if (!selectedProduct || !user || !editSaleId || !editOriginal) return;
+    if (!user || !editSaleId) return;
     setEditLoading(true);
     try {
-      // Stock correction logic
-      const oldProductId = editOriginal.productId;
-      const oldQty = editOriginal.quantity;
-      const newProductId = selectedProduct.id;
-      const newQty = quantity;
-      let stockShortfall = 0;
+      // Credit back the original quantities so the stock check reflects what's
+      // free after removing the prior version of this sale.
+      const offsets: Record<string, number> = {};
+      for (const orig of editOriginalLines) {
+        if (!orig.productId) continue;
+        offsets[orig.productId] = (offsets[orig.productId] ?? 0) + orig.quantity;
+      }
+      const stockShortfall = computeStockShortfall(validLines, offsets);
 
-      if (oldProductId === newProductId) {
-        // Same product — check stock for increase
-        const qtyDiff = newQty - oldQty;
-        if (qtyDiff > 0) {
-          const prod = allProducts.find(p => p.id === newProductId);
-          stockShortfall = Math.max(0, qtyDiff - getSelectedProductQuantity(prod));
-          if (stockShortfall > 0 && !allowSalesWithoutStock) {
-            toast({
-              title: 'Out of stock',
-              description: 'This product is out of stock. Please restock before selling.',
-              variant: 'destructive',
-            });
-            setEditLoading(false);
-            return;
-          }
-          if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
-            setPendingStockOverrideAction('edit');
-            setEditLoading(false);
-            return;
-          }
-        }
-      } else {
-        // Different product — check new product has enough stock
-        const newProd = allProducts.find(p => p.id === newProductId);
-        stockShortfall = Math.max(0, newQty - getSelectedProductQuantity(newProd));
-        if (stockShortfall > 0 && !allowSalesWithoutStock) {
-          toast({ title: 'Out of stock', description: 'This product is out of stock. Please restock before selling.', variant: 'destructive' });
-          setEditLoading(false);
-          return;
-        }
-        if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
-          setPendingStockOverrideAction('edit');
-          setEditLoading(false);
-          return;
-        }
+      if (stockShortfall > 0 && !allowSalesWithoutStock) {
+        toast({ title: 'Out of stock', description: 'One or more items are out of stock.', variant: 'destructive' });
+        setEditLoading(false);
+        return;
+      }
+      if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
+        setPendingStockOverrideAction('edit');
+        setEditLoading(false);
+        return;
       }
 
-      // Build previous values for audit
       const existingItems = saleItems[editSaleId] || [];
-      const oldItem = existingItems[0];
-      const oldSale = sales.find(s => s.id === editSaleId);
-      const prevValues = oldSale ? `Product: ${oldItem?.product_name}, Qty: ${oldQty}, Price: ${oldItem?.unit_price}, Total: ${oldSale.total}, Discount: ${oldSale.discount}` : '';
-
-      // 1. Delete old sale_items (triggers stock restore)
-      await applyEditStockAdjustments({
-        oldProductId,
-        oldQty,
-        newProduct: selectedProduct,
-        newQty,
-      });
+      const oldSale = sales.find((s) => s.id === editSaleId);
+      const prevValues = oldSale
+        ? `Items: ${existingItems.map((i: any) => `${i.product_name}×${i.quantity}`).join(', ')}, Total: ${oldSale.total}`
+        : '';
 
       const priorIds = existingItems.map((item: any) => item.id).filter(Boolean);
       if (priorIds.length > 0) {
@@ -399,7 +416,6 @@ export default function SalesPage() {
       }
       await supabase.from('sale_items').delete().eq('sale_id', editSaleId);
 
-      // 2. Update sale record
       await updateSaleRecord(editSaleId, {
         sale_date: new Date(saleDate).toISOString(),
         customer_name: customerName || 'Walk-in',
@@ -414,47 +430,33 @@ export default function SalesPage() {
         stock_status: stockShortfall > 0 ? 'negative_stock_sale' : 'in_stock',
         stock_shortfall: stockShortfall,
         notes: saleNotes,
+        cost_total: costTotal,
       });
 
-      // 3. Insert new sale_items (triggers stock deduction)
-      const editSaleItemPayload = {
-        user_id: user.id,
-        business_id: businessId!,
-        sale_id: editSaleId,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        sku: selectedProduct.sku,
-        size, color, quantity: newQty,
-        unit_price: unitPrice,
-        unit_cost: costPrice,
-        cost_price: costPrice,
-        line_total: subtotal,
-        default_price: defaultPrice,
-        price_note: isPriceOverridden ? priceNote : '',
-      };
-      const editValidation = validateSaleItemPayload(editSaleItemPayload);
-      if (editValidation.ok === false) {
-        toast({
-          title: 'Invalid sale item',
-          description: editValidation.message,
-          variant: 'destructive',
-        });
-        return;
+      for (const row of validLines) {
+        const payload = {
+          user_id: user.id,
+          business_id: businessId!,
+          sale_id: editSaleId,
+          product_id: row.product!.id,
+          product_name: row.product!.name,
+          sku: row.product!.sku,
+          quantity: row.qty,
+          unit_price: row.unitPrice,
+          unit_cost: row.costPrice,
+          cost_price: row.costPrice,
+          line_total: row.amount,
+          default_price: row.defaultPrice,
+        };
+        const v = validateSaleItemPayload(payload);
+        if (v.ok === false) {
+          toast({ title: 'Invalid sale item', description: v.message, variant: 'destructive' });
+          continue;
+        }
+        await insertSaleItemRecord(payload);
       }
-      const saleItem = await insertSaleItemRecord(editSaleItemPayload);
 
-      await createSaleMovement({
-        saleItemId: saleItem.id,
-        product: selectedProduct,
-        soldQuantity: newQty,
-        unitCost: costPrice,
-        soldPrice: unitPrice,
-        note: saleNotes || 'Edited POS sale',
-        isNegativeStockSale: stockShortfall > 0,
-      });
-
-      // 4. Audit log
-      const newValues = `Product: ${selectedProduct.name}, Qty: ${newQty}, Price: ${unitPrice}, Total: ${total}, Discount: ${discount}`;
+      const newValues = `Items: ${validLines.map((r) => `${r.product!.name}×${r.qty}`).join(', ')}, Total: ${total}`;
       await supabase.from('audit_log').insert({
         action: 'sale_edited',
         details: `Previous: [${prevValues}] → New: [${newValues}]`,
@@ -464,13 +466,17 @@ export default function SalesPage() {
 
       toast({ title: 'Sales transaction updated successfully' });
       setPendingStockOverrideAction(null);
-      resetForm(); setOpen(false);
-      setSaleItems(prev => { const next = { ...prev }; delete next[editSaleId]; return next; });
+      resetForm();
+      setOpen(false);
+      setSaleItems((prev) => { const next = { ...prev }; delete next[editSaleId]; return next; });
       fetchData();
     } catch (err: any) {
       toast({ title: 'Error updating sale', description: err.message, variant: 'destructive' });
-    } finally { setEditLoading(false); }
+    } finally {
+      setEditLoading(false);
+    }
   };
+
 
   const handleDeleteSale = async (saleId: string) => {
     setDeleting(true);
@@ -617,96 +623,100 @@ export default function SalesPage() {
 
         {/* New/Edit Sale Dialog */}
         <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm(); }}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>{editSaleId ? 'Edit Sale' : 'Record Sale'}</DialogTitle>
               {editSaleId && <Badge variant="outline" className="w-fit text-[10px]">Editing Transaction</Badge>}
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label>Product</Label>
-                <Select value={productId} onValueChange={handleProductChange}>
-                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                  <SelectContent>
-                    {formProducts.length === 0 && (
-                      <div className="p-3 text-sm text-muted-foreground text-center">No products available.</div>
-                    )}
-                    {formProducts.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {formatCurrency(Number(p.selling_price))} ({p.quantity} in stock)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedProduct && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(selectedProduct.sizes || []).length > 0 && (
-                      <div>
-                        <Label>Size</Label>
-                        <Select value={size} onValueChange={setSize}>
-                          <SelectTrigger><SelectValue placeholder="Size" /></SelectTrigger>
-                          <SelectContent>
-                            {(selectedProduct.sizes || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {(selectedProduct.colors || []).length > 0 && (
-                      <div>
-                        <Label>Color</Label>
-                        <Select value={color} onValueChange={setColor}>
-                          <SelectTrigger><SelectValue placeholder="Color" /></SelectTrigger>
-                          <SelectContent>
-                            {(selectedProduct.colors || []).map((c: string) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Flexible Pricing */}
-                  <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Default Price</Label>
-                      <span className="text-sm font-medium">{formatCurrency(defaultPrice)}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Label>Selling Price for this Sale</Label>
-                        {isPriceOverridden && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">Custom Price</Badge>
+              {/* Product line items */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Products</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
+                  </Button>
+                </div>
+                {computed.map((row, idx) => {
+                  const stockLabel = row.product ? `${Number(row.product.quantity ?? 0)} in stock` : '';
+                  const autoAmount = row.qty > 0 ? row.qty * row.defaultPrice - row.disc : 0;
+                  return (
+                    <div key={row.line.key} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Item {idx + 1}</span>
+                        {lines.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeLine(row.line.key)} aria-label="Remove item">
+                            <X className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                      {canOverridePrice ? (
-                        <Input type="number" min={0} step="0.01"
-                          value={overridePrice !== null ? overridePrice : defaultPrice}
-                          onChange={e => { const val = Number(e.target.value); setOverridePrice(val === defaultPrice ? null : val); }}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Input type="number" value={defaultPrice} disabled />
-                          <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground shrink-0" /></TooltipTrigger>
-                            <TooltipContent>Only Admin or Manager can override prices</TooltipContent></Tooltip></TooltipProvider>
+                      <div>
+                        <Label className="text-xs">Product</Label>
+                        <Select value={row.line.product_id} onValueChange={(v) => updateLine(row.line.key, { product_id: v, amount: '' })}>
+                          <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                          <SelectContent>
+                            {formProducts.length === 0 && (
+                              <div className="p-3 text-sm text-muted-foreground text-center">No products available.</div>
+                            )}
+                            {formProducts.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} — {formatCurrency(Number(p.selling_price))} ({Number(p.quantity ?? 0)} in stock)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {row.product && (
+                          <p className="mt-1 text-[10px] text-muted-foreground">Default price: {formatCurrency(row.defaultPrice)} · {stockLabel}</p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-xs">Quantity</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="1"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={row.line.quantity}
+                            onChange={(e) => updateLine(row.line.key, { quantity: e.target.value, amount: '' })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Discount</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={row.line.discount}
+                            onChange={(e) => updateLine(row.line.key, { discount: e.target.value, amount: '' })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Amount</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder={autoAmount > 0 ? autoAmount.toFixed(2) : '0.00'}
+                            value={row.line.amount}
+                            onChange={(e) => updateLine(row.line.key, { amount: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      {row.product && row.qty > 0 && (
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Unit price: {formatCurrency(row.unitPrice)}</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(row.amount)}</span>
                         </div>
                       )}
                     </div>
-                    {isPriceOverridden && (
-                      <div>
-                        <Label className="text-xs">Reason for price change</Label>
-                        <Input value={priceNote} onChange={e => setPriceNote(e.target.value)} placeholder="e.g. VIP customer, Special markup" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Quantity</Label><Input type="number" min={1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} /></div>
-                    <div><Label>Discount (GH₵)</Label><Input type="number" min={0} value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
-                  </div>
-                </>
-              )}
+                  );
+                })}
+              </div>
 
               <div>
                 <Label>Payment Method</Label>
@@ -716,7 +726,7 @@ export default function SalesPage() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><Label>Amount Paid (GH₵)</Label><Input type="number" min={0} value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} /></div>
                 <div><Label>Sale Date</Label><Input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></div>
               </div>
@@ -728,23 +738,19 @@ export default function SalesPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Customer Name</Label><Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
-                <div><Label>Phone</Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div><Label>Customer Name <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label><Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
+                <div><Label>Phone <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
               </div>
 
               <div>
-                <Label>Transaction Note</Label>
+                <Label>Transaction Note <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                 <Input value={saleNotes} onChange={e => setSaleNotes(e.target.value)} placeholder="Optional note" />
               </div>
 
               <Card className="bg-muted/50">
                 <CardContent className="p-4 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Unit Price {isPriceOverridden && <span className="text-primary text-[10px]">(custom)</span>}</span>
-                    <span>{formatCurrency(unitPrice)}</span>
-                  </div>
-                  <div className="flex justify-between"><span>Subtotal ({quantity}×)</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
+                  <div className="flex justify-between"><span>Subtotal</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
                   <div className="flex justify-between"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>
                   <div className="flex justify-between font-bold text-base border-t pt-2 mt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
                   <div className="flex justify-between"><span>Balance Due</span><span className="text-destructive font-semibold">{formatCurrency(balance)}</span></div>
@@ -752,7 +758,7 @@ export default function SalesPage() {
                 </CardContent>
               </Card>
 
-              <Button type="submit" className="w-full" disabled={loading || editLoading || !productId}>
+              <Button type="submit" className="w-full" disabled={loading || editLoading || validLines.length === 0}>
                 {editLoading ? 'Saving Changes...' : loading ? 'Saving...' : editSaleId ? 'Save Changes' : 'Record Sale'}
               </Button>
               {editSaleId && (
