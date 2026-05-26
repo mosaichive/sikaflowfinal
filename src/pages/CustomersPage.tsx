@@ -189,15 +189,15 @@ export default function CustomersPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Phone</Label>
+                  <Label>Phone <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                   <Input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>Email <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                   <Input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Notes</Label>
+                  <Label>Notes <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                   <Textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
                 </div>
               </div>
