@@ -623,96 +623,100 @@ export default function SalesPage() {
 
         {/* New/Edit Sale Dialog */}
         <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm(); }}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>{editSaleId ? 'Edit Sale' : 'Record Sale'}</DialogTitle>
               {editSaleId && <Badge variant="outline" className="w-fit text-[10px]">Editing Transaction</Badge>}
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label>Product</Label>
-                <Select value={productId} onValueChange={handleProductChange}>
-                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                  <SelectContent>
-                    {formProducts.length === 0 && (
-                      <div className="p-3 text-sm text-muted-foreground text-center">No products available.</div>
-                    )}
-                    {formProducts.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {formatCurrency(Number(p.selling_price))} ({p.quantity} in stock)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedProduct && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(selectedProduct.sizes || []).length > 0 && (
-                      <div>
-                        <Label>Size</Label>
-                        <Select value={size} onValueChange={setSize}>
-                          <SelectTrigger><SelectValue placeholder="Size" /></SelectTrigger>
-                          <SelectContent>
-                            {(selectedProduct.sizes || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {(selectedProduct.colors || []).length > 0 && (
-                      <div>
-                        <Label>Color</Label>
-                        <Select value={color} onValueChange={setColor}>
-                          <SelectTrigger><SelectValue placeholder="Color" /></SelectTrigger>
-                          <SelectContent>
-                            {(selectedProduct.colors || []).map((c: string) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Flexible Pricing */}
-                  <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Default Price</Label>
-                      <span className="text-sm font-medium">{formatCurrency(defaultPrice)}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Label>Selling Price for this Sale</Label>
-                        {isPriceOverridden && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">Custom Price</Badge>
+              {/* Product line items */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Products</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
+                  </Button>
+                </div>
+                {computed.map((row, idx) => {
+                  const stockLabel = row.product ? `${Number(row.product.quantity ?? 0)} in stock` : '';
+                  const autoAmount = row.qty > 0 ? row.qty * row.defaultPrice - row.disc : 0;
+                  return (
+                    <div key={row.line.key} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Item {idx + 1}</span>
+                        {lines.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeLine(row.line.key)} aria-label="Remove item">
+                            <X className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                      {canOverridePrice ? (
-                        <Input type="number" min={0} step="0.01"
-                          value={overridePrice !== null ? overridePrice : defaultPrice}
-                          onChange={e => { const val = Number(e.target.value); setOverridePrice(val === defaultPrice ? null : val); }}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Input type="number" value={defaultPrice} disabled />
-                          <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground shrink-0" /></TooltipTrigger>
-                            <TooltipContent>Only Admin or Manager can override prices</TooltipContent></Tooltip></TooltipProvider>
+                      <div>
+                        <Label className="text-xs">Product</Label>
+                        <Select value={row.line.product_id} onValueChange={(v) => updateLine(row.line.key, { product_id: v, amount: '' })}>
+                          <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                          <SelectContent>
+                            {formProducts.length === 0 && (
+                              <div className="p-3 text-sm text-muted-foreground text-center">No products available.</div>
+                            )}
+                            {formProducts.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} — {formatCurrency(Number(p.selling_price))} ({Number(p.quantity ?? 0)} in stock)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {row.product && (
+                          <p className="mt-1 text-[10px] text-muted-foreground">Default price: {formatCurrency(row.defaultPrice)} · {stockLabel}</p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-xs">Quantity</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="1"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={row.line.quantity}
+                            onChange={(e) => updateLine(row.line.key, { quantity: e.target.value, amount: '' })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Discount</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={row.line.discount}
+                            onChange={(e) => updateLine(row.line.key, { discount: e.target.value, amount: '' })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Amount</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder={autoAmount > 0 ? autoAmount.toFixed(2) : '0.00'}
+                            value={row.line.amount}
+                            onChange={(e) => updateLine(row.line.key, { amount: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      {row.product && row.qty > 0 && (
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Unit price: {formatCurrency(row.unitPrice)}</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(row.amount)}</span>
                         </div>
                       )}
                     </div>
-                    {isPriceOverridden && (
-                      <div>
-                        <Label className="text-xs">Reason for price change</Label>
-                        <Input value={priceNote} onChange={e => setPriceNote(e.target.value)} placeholder="e.g. VIP customer, Special markup" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Quantity</Label><Input type="number" min={1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} /></div>
-                    <div><Label>Discount (GH₵)</Label><Input type="number" min={0} value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
-                  </div>
-                </>
-              )}
+                  );
+                })}
+              </div>
 
               <div>
                 <Label>Payment Method</Label>
@@ -722,7 +726,7 @@ export default function SalesPage() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><Label>Amount Paid (GH₵)</Label><Input type="number" min={0} value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} /></div>
                 <div><Label>Sale Date</Label><Input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></div>
               </div>
@@ -734,23 +738,19 @@ export default function SalesPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Customer Name</Label><Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
-                <div><Label>Phone</Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div><Label>Customer Name <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label><Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
+                <div><Label>Phone <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
               </div>
 
               <div>
-                <Label>Transaction Note</Label>
+                <Label>Transaction Note <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                 <Input value={saleNotes} onChange={e => setSaleNotes(e.target.value)} placeholder="Optional note" />
               </div>
 
               <Card className="bg-muted/50">
                 <CardContent className="p-4 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Unit Price {isPriceOverridden && <span className="text-primary text-[10px]">(custom)</span>}</span>
-                    <span>{formatCurrency(unitPrice)}</span>
-                  </div>
-                  <div className="flex justify-between"><span>Subtotal ({quantity}×)</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
+                  <div className="flex justify-between"><span>Subtotal</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
                   <div className="flex justify-between"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>
                   <div className="flex justify-between font-bold text-base border-t pt-2 mt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
                   <div className="flex justify-between"><span>Balance Due</span><span className="text-destructive font-semibold">{formatCurrency(balance)}</span></div>
@@ -758,7 +758,7 @@ export default function SalesPage() {
                 </CardContent>
               </Card>
 
-              <Button type="submit" className="w-full" disabled={loading || editLoading || !productId}>
+              <Button type="submit" className="w-full" disabled={loading || editLoading || validLines.length === 0}>
                 {editLoading ? 'Saving Changes...' : loading ? 'Saving...' : editSaleId ? 'Save Changes' : 'Record Sale'}
               </Button>
               {editSaleId && (
