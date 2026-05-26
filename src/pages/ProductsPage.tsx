@@ -292,8 +292,8 @@ export default function ProductsPage() {
                   <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} required />
+                  <Label>Category <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
+                  <Input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Cost Price</Label>
@@ -344,7 +344,7 @@ export default function ProductsPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{row.category}</TableCell>
+                        <TableCell>{row.category || <span className="text-muted-foreground">—</span>}</TableCell>
                         <TableCell>{formatCurrency(Number(row.cost_price || 0))}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(Number(row.selling_price || 0))}</TableCell>
                         <TableCell>{row.low_stock_threshold ?? row.reorder_level ?? 0}</TableCell>

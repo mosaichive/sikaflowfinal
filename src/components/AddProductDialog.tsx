@@ -116,7 +116,7 @@ export function AddProductDialog({ open, onOpenChange, onCreated, offerRestockNe
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <Label>Category</Label>
+                  <Label>Category <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                   <Input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
                 </div>
                 <div>

@@ -630,7 +630,7 @@ export default function InventoryPage() {
         ) : null}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>{editingRestock ? 'Edit Restock' : 'Add Restock'}</DialogTitle>
             </DialogHeader>
