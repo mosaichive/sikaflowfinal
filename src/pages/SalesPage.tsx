@@ -202,13 +202,16 @@ export default function SalesPage() {
   };
 
   const resetForm = () => {
-    setProductId(''); setSize(''); setColor(''); setQuantity(1);
-    setDiscount(0); setPaymentMethod('cash'); setAmountPaid(0);
-    setCustomerName(''); setCustomerPhone('');
+    setLines([newLine()]);
+    setPaymentMethod('cash');
+    setAmountPaid(0);
+    setCustomerName('');
+    setCustomerPhone('');
     setSaleDate(new Date().toISOString().slice(0, 10));
     setDueDate('');
-    setOverridePrice(null); setPriceNote(''); setSaleNotes('');
-    setEditSaleId(null); setEditOriginal(null);
+    setSaleNotes('');
+    setEditSaleId(null);
+    setEditOriginalLines([]);
   };
 
   const createSaleMovement = async (_args: {
@@ -222,27 +225,32 @@ export default function SalesPage() {
   }) => {
     // no-op: log_stock_movement_on_sale_item DB trigger writes the
     // stock_movements row automatically when the sale_items row is inserted.
-    // Writing it again here would double the movement.
   };
 
-  const handleProductChange = (v: string) => {
-    setProductId(v);
-    setSize(''); setColor('');
-    setOverridePrice(null); setPriceNote('');
-  };
-
-  // Open edit dialog
+  // Open edit dialog — load all sale_items as line rows.
   const handleOpenEdit = async (sale: any) => {
     const items = await fetchSaleItems(sale.id);
-    const item = items[0]; // single-item sale
-    if (!item) { toast({ title: 'Cannot load sale items', variant: 'destructive' }); return; }
+    if (!items.length) {
+      toast({ title: 'Cannot load sale items', variant: 'destructive' });
+      return;
+    }
 
     setEditSaleId(sale.id);
-    setProductId(item.product_id || '');
-    setSize(item.size || '');
-    setColor(item.color || '');
-    setQuantity(item.quantity);
-    setDiscount(Number(sale.discount));
+    setLines(
+      items.map((item: any) => ({
+        key: Math.random().toString(36).slice(2),
+        product_id: item.product_id || '',
+        quantity: String(item.quantity ?? ''),
+        discount: '', // historical sale_items don't carry per-line discount
+        amount: String(Number(item.line_total ?? item.total ?? 0)),
+      })),
+    );
+    setEditOriginalLines(
+      items.map((item: any) => ({
+        productId: item.product_id || '',
+        quantity: Number(item.quantity) || 0,
+      })),
+    );
     setPaymentMethod(sale.payment_method);
     setAmountPaid(Number(sale.amount_paid));
     setCustomerName(sale.customer_name || '');
@@ -250,24 +258,16 @@ export default function SalesPage() {
     setSaleDate(new Date(sale.sale_date).toISOString().slice(0, 10));
     setDueDate(sale.due_date ? new Date(sale.due_date).toISOString().slice(0, 10) : '');
     setSaleNotes(sale.notes || '');
-
-    const dp = Number(item.default_price);
-    const up = Number(item.unit_price);
-    if (dp > 0 && up !== dp) {
-      setOverridePrice(up);
-    } else {
-      setOverridePrice(null);
-    }
-    setPriceNote(item.price_note || '');
-
-    setEditOriginal({ productId: item.product_id || '', quantity: item.quantity });
     setOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct || !user) return;
-
+    if (!user) return;
+    if (validLines.length === 0) {
+      toast({ title: 'Add at least one product', description: 'Pick a product and enter a quantity.', variant: 'destructive' });
+      return;
+    }
     if (editSaleId) {
       await handleSaveEdit();
     } else {
@@ -275,19 +275,34 @@ export default function SalesPage() {
     }
   };
 
-  const getSelectedProductQuantity = (product: any) => Number(product?.quantity ?? 0);
-  const getStockShortfall = (availableQuantity: number, requestedQuantity: number) =>
-    Math.max(0, requestedQuantity - Math.max(0, availableQuantity));
+  // Aggregate requested quantity per product (in case the same product
+  // appears on multiple rows) and compare to available stock.
+  const computeStockShortfall = (
+    rows: ComputedLine[],
+    offsets: Record<string, number> = {},
+  ) => {
+    const requested = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.product) continue;
+      requested.set(r.product.id, (requested.get(r.product.id) ?? 0) + r.qty);
+    }
+    let total = 0;
+    for (const [productId, qty] of requested) {
+      const prod = allProducts.find((p) => p.id === productId);
+      const available = Number(prod?.quantity ?? 0) + (offsets[productId] ?? 0);
+      total += Math.max(0, qty - Math.max(0, available));
+    }
+    return total;
+  };
 
   const handleNewSale = async (overrideStockCheck = false) => {
-    if (!selectedProduct || !user || !businessId) return;
-    const availableQuantity = getSelectedProductQuantity(selectedProduct);
-    const stockShortfall = getStockShortfall(availableQuantity, quantity);
+    if (!user || !businessId) return;
+    const stockShortfall = computeStockShortfall(validLines);
 
     if (stockShortfall > 0 && !allowSalesWithoutStock) {
       toast({
         title: 'Out of stock',
-        description: 'This product is out of stock. Please restock before selling.',
+        description: 'One or more items are out of stock. Please restock before selling.',
         variant: 'destructive',
       });
       return;
@@ -296,6 +311,7 @@ export default function SalesPage() {
       setPendingStockOverrideAction('new');
       return;
     }
+
     setLoading(true);
     try {
       const sale = await insertSaleRecord({
@@ -316,46 +332,31 @@ export default function SalesPage() {
         stock_status: stockShortfall > 0 ? 'negative_stock_sale' : 'in_stock',
         stock_shortfall: stockShortfall,
         notes: saleNotes,
-        cost_total: costPrice * quantity,
+        cost_total: costTotal,
       });
 
-      const saleItemPayload = {
-        user_id: user.id,
-        business_id: businessId,
-        sale_id: sale.id,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        sku: selectedProduct.sku,
-        size, color, quantity,
-        unit_price: unitPrice,
-        unit_cost: costPrice,
-        cost_price: costPrice,
-        line_total: subtotal,
-        default_price: defaultPrice,
-        price_note: isPriceOverridden ? priceNote : '',
-      };
-      const validation = validateSaleItemPayload(saleItemPayload);
-      if (validation.ok === false) {
-        toast({
-          title: 'Invalid sale item',
-          description: validation.message,
-          variant: 'destructive',
-        });
-        return;
+      for (const row of validLines) {
+        const payload = {
+          user_id: user.id,
+          business_id: businessId,
+          sale_id: sale.id,
+          product_id: row.product!.id,
+          product_name: row.product!.name,
+          sku: row.product!.sku,
+          quantity: row.qty,
+          unit_price: row.unitPrice,
+          unit_cost: row.costPrice,
+          cost_price: row.costPrice,
+          line_total: row.amount,
+          default_price: row.defaultPrice,
+        };
+        const validation = validateSaleItemPayload(payload);
+        if (validation.ok === false) {
+          toast({ title: 'Invalid sale item', description: validation.message, variant: 'destructive' });
+          continue;
+        }
+        await insertSaleItemRecord(payload);
       }
-      const saleItem = await insertSaleItemRecord(saleItemPayload);
-
-      await updateProductQuantity(selectedProduct.id, Number(selectedProduct.quantity ?? 0) - quantity);
-
-      await createSaleMovement({
-        saleItemId: saleItem.id,
-        product: selectedProduct,
-        soldQuantity: quantity,
-        unitCost: costPrice,
-        soldPrice: unitPrice,
-        note: saleNotes || 'POS sale',
-        isNegativeStockSale: stockShortfall > 0,
-      });
 
       if (customerName && customerName !== 'Walk-in') {
         const { data: existing } = await supabase.from('customers').select('id').eq('name', customerName).maybeSingle();
@@ -364,75 +365,50 @@ export default function SalesPage() {
         }
       }
 
-      toast({ title: 'Sale recorded!', description: `${selectedProduct.name} — ${formatCurrency(total)}` });
+      const summary = validLines
+        .map((r) => `${r.product!.name} × ${r.qty}`)
+        .join(', ');
+      toast({ title: 'Sale recorded!', description: `${summary} — ${formatCurrency(total)}` });
       setPendingStockOverrideAction(null);
-      resetForm(); setOpen(false); fetchData();
+      resetForm();
+      setOpen(false);
+      fetchData();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveEdit = async (overrideStockCheck = false) => {
-    if (!selectedProduct || !user || !editSaleId || !editOriginal) return;
+    if (!user || !editSaleId) return;
     setEditLoading(true);
     try {
-      // Stock correction logic
-      const oldProductId = editOriginal.productId;
-      const oldQty = editOriginal.quantity;
-      const newProductId = selectedProduct.id;
-      const newQty = quantity;
-      let stockShortfall = 0;
+      // Credit back the original quantities so the stock check reflects what's
+      // free after removing the prior version of this sale.
+      const offsets: Record<string, number> = {};
+      for (const orig of editOriginalLines) {
+        if (!orig.productId) continue;
+        offsets[orig.productId] = (offsets[orig.productId] ?? 0) + orig.quantity;
+      }
+      const stockShortfall = computeStockShortfall(validLines, offsets);
 
-      if (oldProductId === newProductId) {
-        // Same product — check stock for increase
-        const qtyDiff = newQty - oldQty;
-        if (qtyDiff > 0) {
-          const prod = allProducts.find(p => p.id === newProductId);
-          stockShortfall = Math.max(0, qtyDiff - getSelectedProductQuantity(prod));
-          if (stockShortfall > 0 && !allowSalesWithoutStock) {
-            toast({
-              title: 'Out of stock',
-              description: 'This product is out of stock. Please restock before selling.',
-              variant: 'destructive',
-            });
-            setEditLoading(false);
-            return;
-          }
-          if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
-            setPendingStockOverrideAction('edit');
-            setEditLoading(false);
-            return;
-          }
-        }
-      } else {
-        // Different product — check new product has enough stock
-        const newProd = allProducts.find(p => p.id === newProductId);
-        stockShortfall = Math.max(0, newQty - getSelectedProductQuantity(newProd));
-        if (stockShortfall > 0 && !allowSalesWithoutStock) {
-          toast({ title: 'Out of stock', description: 'This product is out of stock. Please restock before selling.', variant: 'destructive' });
-          setEditLoading(false);
-          return;
-        }
-        if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
-          setPendingStockOverrideAction('edit');
-          setEditLoading(false);
-          return;
-        }
+      if (stockShortfall > 0 && !allowSalesWithoutStock) {
+        toast({ title: 'Out of stock', description: 'One or more items are out of stock.', variant: 'destructive' });
+        setEditLoading(false);
+        return;
+      }
+      if (stockShortfall > 0 && allowSalesWithoutStock && !overrideStockCheck) {
+        setPendingStockOverrideAction('edit');
+        setEditLoading(false);
+        return;
       }
 
-      // Build previous values for audit
       const existingItems = saleItems[editSaleId] || [];
-      const oldItem = existingItems[0];
-      const oldSale = sales.find(s => s.id === editSaleId);
-      const prevValues = oldSale ? `Product: ${oldItem?.product_name}, Qty: ${oldQty}, Price: ${oldItem?.unit_price}, Total: ${oldSale.total}, Discount: ${oldSale.discount}` : '';
-
-      // 1. Delete old sale_items (triggers stock restore)
-      await applyEditStockAdjustments({
-        oldProductId,
-        oldQty,
-        newProduct: selectedProduct,
-        newQty,
-      });
+      const oldSale = sales.find((s) => s.id === editSaleId);
+      const prevValues = oldSale
+        ? `Items: ${existingItems.map((i: any) => `${i.product_name}×${i.quantity}`).join(', ')}, Total: ${oldSale.total}`
+        : '';
 
       const priorIds = existingItems.map((item: any) => item.id).filter(Boolean);
       if (priorIds.length > 0) {
@@ -440,7 +416,6 @@ export default function SalesPage() {
       }
       await supabase.from('sale_items').delete().eq('sale_id', editSaleId);
 
-      // 2. Update sale record
       await updateSaleRecord(editSaleId, {
         sale_date: new Date(saleDate).toISOString(),
         customer_name: customerName || 'Walk-in',
@@ -455,47 +430,33 @@ export default function SalesPage() {
         stock_status: stockShortfall > 0 ? 'negative_stock_sale' : 'in_stock',
         stock_shortfall: stockShortfall,
         notes: saleNotes,
+        cost_total: costTotal,
       });
 
-      // 3. Insert new sale_items (triggers stock deduction)
-      const editSaleItemPayload = {
-        user_id: user.id,
-        business_id: businessId!,
-        sale_id: editSaleId,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        sku: selectedProduct.sku,
-        size, color, quantity: newQty,
-        unit_price: unitPrice,
-        unit_cost: costPrice,
-        cost_price: costPrice,
-        line_total: subtotal,
-        default_price: defaultPrice,
-        price_note: isPriceOverridden ? priceNote : '',
-      };
-      const editValidation = validateSaleItemPayload(editSaleItemPayload);
-      if (editValidation.ok === false) {
-        toast({
-          title: 'Invalid sale item',
-          description: editValidation.message,
-          variant: 'destructive',
-        });
-        return;
+      for (const row of validLines) {
+        const payload = {
+          user_id: user.id,
+          business_id: businessId!,
+          sale_id: editSaleId,
+          product_id: row.product!.id,
+          product_name: row.product!.name,
+          sku: row.product!.sku,
+          quantity: row.qty,
+          unit_price: row.unitPrice,
+          unit_cost: row.costPrice,
+          cost_price: row.costPrice,
+          line_total: row.amount,
+          default_price: row.defaultPrice,
+        };
+        const v = validateSaleItemPayload(payload);
+        if (v.ok === false) {
+          toast({ title: 'Invalid sale item', description: v.message, variant: 'destructive' });
+          continue;
+        }
+        await insertSaleItemRecord(payload);
       }
-      const saleItem = await insertSaleItemRecord(editSaleItemPayload);
 
-      await createSaleMovement({
-        saleItemId: saleItem.id,
-        product: selectedProduct,
-        soldQuantity: newQty,
-        unitCost: costPrice,
-        soldPrice: unitPrice,
-        note: saleNotes || 'Edited POS sale',
-        isNegativeStockSale: stockShortfall > 0,
-      });
-
-      // 4. Audit log
-      const newValues = `Product: ${selectedProduct.name}, Qty: ${newQty}, Price: ${unitPrice}, Total: ${total}, Discount: ${discount}`;
+      const newValues = `Items: ${validLines.map((r) => `${r.product!.name}×${r.qty}`).join(', ')}, Total: ${total}`;
       await supabase.from('audit_log').insert({
         action: 'sale_edited',
         details: `Previous: [${prevValues}] → New: [${newValues}]`,
@@ -505,13 +466,17 @@ export default function SalesPage() {
 
       toast({ title: 'Sales transaction updated successfully' });
       setPendingStockOverrideAction(null);
-      resetForm(); setOpen(false);
-      setSaleItems(prev => { const next = { ...prev }; delete next[editSaleId]; return next; });
+      resetForm();
+      setOpen(false);
+      setSaleItems((prev) => { const next = { ...prev }; delete next[editSaleId]; return next; });
       fetchData();
     } catch (err: any) {
       toast({ title: 'Error updating sale', description: err.message, variant: 'destructive' });
-    } finally { setEditLoading(false); }
+    } finally {
+      setEditLoading(false);
+    }
   };
+
 
   const handleDeleteSale = async (saleId: string) => {
     setDeleting(true);
