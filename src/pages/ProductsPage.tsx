@@ -344,7 +344,7 @@ export default function ProductsPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{row.category}</TableCell>
+                        <TableCell>{row.category || <span className="text-muted-foreground">—</span>}</TableCell>
                         <TableCell>{formatCurrency(Number(row.cost_price || 0))}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(Number(row.selling_price || 0))}</TableCell>
                         <TableCell>{row.low_stock_threshold ?? row.reorder_level ?? 0}</TableCell>
