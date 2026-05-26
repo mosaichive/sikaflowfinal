@@ -292,8 +292,8 @@ export default function ProductsPage() {
                   <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} required />
+                  <Label>Category <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
+                  <Input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Cost Price</Label>
