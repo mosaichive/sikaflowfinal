@@ -1,76 +1,45 @@
+## KudiTrack — 12-Item Rollout Plan
 
-# Team Invitation & Permission System
+This request spans data model changes, auth flows, new subsystems (referrals, OTP), and UI fixes. Shipping all 12 in a single pass would be risky for your live data. I propose splitting into **4 phases**, each independently shippable and verifiable.
 
-Your project already has a working team foundation (`staff_members`, `staff_invites`, `user_roles`, `accept_staff_invite` RPC, `manage-business-user` edge function, role-aware sidebar). Rather than build a parallel `team_invitations` / `business_members` system that would conflict with existing data, this plan **extends what's there** to meet every requirement you listed.
+Please confirm the phasing (or tell me to reorder / drop items) before I start.
 
-## What changes
+---
 
-### 1. Permissions model
-Add a structured `permissions` JSON to `staff_members` and `staff_invites`:
-```json
-{ "role": "manager", "modules": ["dashboard","sales","customers","orders"] }
-```
-Available modules: dashboard, sales, products, inventory, customers, orders, other_income, expenses, savings, reports, staff, announcements, settings.
+### Phase 1 — Safe UI & form fixes (low risk, no schema change)
+Ship first, verify visually, then move on.
 
-### 2. Invite flow (link-based, no email infra yet)
-- New page `/invite/:token` — public route.
-- "Copy invite link" + "Send via email" buttons in Team page (email uses `mailto:` or existing Lovable email if you want — ask separately).
-- Token already exists on `staff_invites`; expires in 7 days (already default 14, will tighten to 7); single-use enforced by existing `accept_staff_invite` RPC.
+1. **#3 Customers** — make Email + Note optional, add "(Optional)" labels.
+2. **#4 Products** — make Category optional; persist + display when set.
+3. **#5 Sales form** — multi-product rows (product / qty / discount / amount), empty defaults, dynamic per-row totals.
+4. **#9 Add Stock form** — responsive layout, no overflow on mobile.
+5. **#12 Calendar icon theming** — adapt to dark/light via `text-foreground` / semantic tokens.
 
-### 3. Invite acceptance page (`/invite/:token`)
-- If **not logged in**: show Full Name + Job Title + Password fields, plus "Continue with Google". After signup/login, auto-call `accept_staff_invite(token)`.
-- If **already logged in** with matching email: one-click "Join {Business}" → calls RPC → redirect to `/dashboard`.
-- **Bypass onboarding**: set `profiles.onboarding_completed = true` and skip `BusinessOnboardingDialog` / business creation for invited users (detected via `staff_members.business_owner_id != user.id`).
+### Phase 2 — Inventory ↔ Expenses + Opening Stock edit (DB + logic)
+6. **#1 Restock → Expense** — DB trigger on `restocks` insert/update/delete that mirrors the cost into `expenses` with category `"Restock"`. Idempotent via `reference_id`. Flows automatically into Dashboard, Reports, cashflow (they already read `expenses`).
+7. **#2 Opening Stock edit** — edit dialog on opening-stock rows; existing `handle_restock_stock_ledger` already recomputes stock on UPDATE, so past sales are untouched.
 
-### 4. Owner business context for staff
-`BusinessContext` already loads the user's own business. Extend it: if the user is a staff member (has a row in `staff_members` where `staff_user_id = auth.uid()`), load the **owner's** business profile/products/sales instead. This is the "see business data immediately" requirement.
+### Phase 3 — Team invite bug + permission gating (critical)
+8. **#10 Team invite blank dashboard** — invited users currently get bounced because `BusinessContext` looks for a business they don't own. Fix `BusinessContext` / `ProtectedRoute` to resolve the business via `staff_members.business_owner_id`, then gate sidebar + routes by `staff_members.permissions.modules`.
 
-### 5. Permission enforcement
-- `AuthContext` exposes `hasModule(module)` derived from `staff_members.permissions.modules` (owner/admin sees all).
-- `AppSidebar` filters menu by `hasModule`.
-- New `<RequireModule module="...">` route guard in `AppLayout` redirects unauthorized routes to `/dashboard`.
-- RLS already enforces data isolation per `business_owner_id`; module gating is UI + route level.
+### Phase 4 — Auth, phone verification, referrals (largest, needs decisions)
+9. **#6 Forgot password** — email reset via Supabase (works today, just needs UI). Phone reset requires an SMS provider.
+10. **#7 Phone verification in Settings** — needs SMS OTP provider.
+11. **#8 Phone login** — same dependency.
+12. **#11 Referral system** — new tables (`referrals`, `referral_rewards`), edge function to validate + extend `subscription_end_date` by 1 month per successful referral (cap 3), super-admin view on the existing `ReferralsPage`.
 
-### 6. Team management UI (`/staff` page)
-Add tabs: **Members** | **Pending Invites** | **Expired**.
-- Per-member: edit role + module checkboxes, suspend (set `active=false`), reactivate, remove (existing edge function).
-- Per-invite: copy link, resend, revoke (delete row).
-- Realtime channel on `staff_members` + `staff_invites` so changes apply without refresh.
+---
 
-### 7. Notifications
-Insert into existing `audit_log` on invite accepted / expired / revoked. Show a bell badge in header reading recent audit entries for the owner.
+### Decisions I need from you before Phase 4
 
-## Database migration (small)
-```sql
-ALTER TABLE staff_invites
-  ALTER COLUMN expires_at SET DEFAULT (now() + interval '7 days');
+- **SMS provider for OTP** (#6 phone reset, #7 verify, #8 phone login): Twilio? Termii? Arkesel (popular in Ghana)? Or skip phone entirely and keep email-only?
+- **Referral attribution** (#11): track by `?ref=CODE` link + signup, or also require the referred user to complete a paid annual subscription before the reward triggers? (I'd recommend the latter — otherwise it's gameable.)
+- **Reward application** (#11): extend `subscription_end_date` immediately on qualifying event, or queue for super-admin approval?
 
--- Tighten accept_staff_invite to also stamp position + onboarding_completed
--- (rewrite the function; same signature)
-```
-No new tables. Existing `staff_members` already has `permissions jsonb` and `active` (suspend/reactivate). Existing `staff_invites` already has `token`, `status`, `expires_at`, `accepted_at`.
+---
 
-## Files I'll create/edit
+### Suggested next step
 
-**New**
-- `src/pages/InviteAcceptPage.tsx` — `/invite/:token`
-- `src/components/PermissionsEditor.tsx` — module checkbox grid
-- `src/components/RequireModule.tsx` — route guard
-- `src/lib/permissions.ts` — module list + helpers
+Reply with: **"Start Phase 1"** (or pick a different starting set), and answer the Phase 4 questions whenever you're ready — I don't need them to start.
 
-**Edit**
-- `src/App.tsx` — add `/invite/:token` route
-- `src/context/AuthContext.tsx` — load staff membership + `hasModule`
-- `src/context/BusinessContext.tsx` — resolve owner business for staff users
-- `src/components/AppSidebar.tsx` — module-based filter
-- `src/components/AppLayout.tsx` — wrap protected routes with `RequireModule`
-- `src/components/BusinessOnboardingDialog.tsx` — skip when user is staff
-- `src/pages/StaffUsersPage.tsx` — invite-by-link UI + permissions editor + tabs
-- `supabase/functions/manage-business-user/index.ts` — accept `permissions.modules`, support `update_permissions` and `set_active` actions
-
-## Scope notes
-- **Email delivery**: this plan uses copy-link + mailto. If you want branded transactional emails (Lovable Email infra), say so and I'll add it after — it's a separate ~3-step setup with a domain.
-- **Custom roles**: built-in roles only (owner/admin/manager/salesperson/distributor/staff). "Custom permissions per user" is achieved via the module checkboxes, not by creating new role names.
-- **Decline invite**: added as "Revoke" by owner; invitee-side decline = ignore the link.
-
-Reply **yes** to build, or tell me what to adjust (e.g. "add Lovable Email", "add Cashier role", "skip realtime").
+If you'd rather I just blast through everything in one go knowing some items (phone OTP, referrals) will be partial without your answers, say **"do it all"** and I'll make reasonable defaults (Arkesel for SMS, reward on paid signup, auto-apply).
