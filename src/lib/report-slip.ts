@@ -46,6 +46,13 @@ type ReportSourceArgs = {
   from: string;
   to: string;
   availableBusinessMoneyOverride?: number;
+  /**
+   * Profile opening cash balance. MUST be added so the period openingBalance
+   * and closingBalance reconcile with the Available Business Money card on
+   * the dashboard. Without it the ledger drifts for businesses that hold
+   * any starting cash.
+   */
+  openingCashBalance?: number;
 };
 
 type BaseTransaction = Omit<ReportStatementRow, 'runningBalance'> & { timestamp: number };
