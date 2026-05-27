@@ -286,7 +286,7 @@ export default function Dashboard() {
   const currentMonth = now.getMonth();
   const { business } = useBusiness();
   const businessId = business?.id ?? null;
-  const { isAdmin, isManager, displayName, onboardingCompleted, user } = useAuth();
+  const { isAdmin, isManager, displayName, onboardingCompleted, user, isStaffMember } = useAuth();
   const { financials, loading: financialsLoading } = useBusinessFinancials();
   const [data, setData] = useState<DashboardData>({
     sales: [],
