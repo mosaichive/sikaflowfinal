@@ -44,7 +44,7 @@ const settingsSubItems: { title: string; section: string; icon: any }[] = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
+  const { displayName, avatarUrl, profileTitle, signOut, hasModule, isAdmin, isStaffMember } = useAuth();
   const { business } = useBusiness();
   const { isDark, toggle } = useTheme();
   const location = useLocation();
@@ -54,7 +54,12 @@ export function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(onSettings);
 
 
-  const items = allItems.filter((item) => hasModule(item.module));
+  // Settings always visible so every team member can manage their own profile.
+  const items = allItems.filter((item) => item.url === '/settings' || hasModule(item.module));
+  // Non-admin team members only get the Profile sub-section.
+  const visibleSettingsSubItems = isStaffMember && !isAdmin
+    ? settingsSubItems.filter((s) => s.section === 'profile')
+    : settingsSubItems;
 
   const tenantName = business?.name || 'KudiTrack';
 
@@ -101,7 +106,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                       {!collapsed && settingsOpen && (
                         <div className="mt-1 ml-7 flex flex-col gap-0.5 border-l border-border/60 pl-2 animate-fade-in">
-                          {settingsSubItems.map((sub) => {
+                          {visibleSettingsSubItems.map((sub) => {
                             const isActive = onSettings && currentSection === sub.section;
                             return (
                               <button

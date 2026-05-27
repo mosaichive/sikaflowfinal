@@ -53,7 +53,7 @@ function generateSku(name: string) {
 }
 
 export default function ProductsPage() {
-  const { isAdmin, isManager, user, displayName } = useAuth();
+  const { isAdmin, isManager, user, displayName, effectiveBusinessOwnerId } = useAuth();
   const { businessId } = useBusiness();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -137,7 +137,7 @@ export default function ProductsPage() {
       const lowStockThreshold = Math.max(0, Number(form.low_stock_threshold || 0));
       const basePayload = {
         business_id: activeBusinessId,
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         name: form.name.trim(),
         category: form.category.trim(),
         cost_price: Number(form.cost_price || 0),

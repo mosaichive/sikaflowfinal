@@ -45,7 +45,7 @@ function matchesDateRange(dateValue: string, from: string, to: string) {
 }
 
 export default function ExpensesPage() {
-  const { user, displayName, isAdmin, isManager } = useAuth();
+  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
   const { businessId } = useBusiness();
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
@@ -147,7 +147,7 @@ export default function ExpensesPage() {
     try {
       const receipt = await uploadReceipt();
       await insertExpenseRecord({
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
         category: form.category,
         description: form.description.trim(),

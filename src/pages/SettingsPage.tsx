@@ -72,7 +72,7 @@ const roleBadgeVariant = (role: string) => {
 };
 
 export default function SettingsPage() {
-  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, refreshProfile } = useAuth();
+  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, isStaffMember, refreshProfile } = useAuth();
   const { business, businessId, refresh: refreshBusiness } = useBusiness();
   const { isDark, toggle } = useTheme();
   const { toast } = useToast();
@@ -83,9 +83,13 @@ export default function SettingsPage() {
   const businessName = business?.name || 'Your Business';
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
+  // Team members who aren't admins should land on Profile by default.
+  const staffOnlyProfile = isStaffMember && !isAdmin;
+
   // Profile state
   const location = useLocation();
-  const sectionParam = (new URLSearchParams(location.search).get('s') || 'none') as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const rawSection = (new URLSearchParams(location.search).get('s') || (staffOnlyProfile ? 'profile' : 'none')) as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const sectionParam = staffOnlyProfile ? 'profile' : rawSection;
   const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>(sectionParam);
   useEffect(() => { setActiveSection(sectionParam); }, [sectionParam]);
   const [profileForm, setProfileForm] = useState({
@@ -223,8 +227,11 @@ export default function SettingsPage() {
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-      business_name: profileForm.business_name || profileForm.display_name,
     };
+    // Only the workspace owner edits the business name from their own profile.
+    if (!staffOnlyProfile) {
+      payload.business_name = profileForm.business_name || profileForm.display_name;
+    }
     const { error } = await supabase.from('profiles').update(payload as any).eq('id', user.id);
     if (error) {
       toast({ title: 'Could not save profile', description: error.message || 'Please try again.', variant: 'destructive' });
@@ -619,15 +626,17 @@ export default function SettingsPage() {
                 <Input value={profileForm.title} onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Store Owner, Manager" />
               </div>
             </div>
-            <div>
-              <Label>Business Name</Label>
-              <Input
-                value={profileForm.business_name}
-                onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))}
-                placeholder="Your business name"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">Shows in sidebar, top bar, dashboard greeting and receipts.</p>
-            </div>
+            {!staffOnlyProfile && (
+              <div>
+                <Label>Business Name</Label>
+                <Input
+                  value={profileForm.business_name}
+                  onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))}
+                  placeholder="Your business name"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Shows in sidebar, top bar, dashboard greeting and receipts.</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Email</Label>

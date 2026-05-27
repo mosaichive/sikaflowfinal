@@ -105,7 +105,7 @@ function extractRestockExpenseId(description: string | null | undefined) {
 }
 
 export default function InventoryPage() {
-  const { user, displayName, isAdmin, isManager } = useAuth();
+  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
   const { businessId } = useBusiness();
   const { financials, loading: financialsLoading } = useBusinessFinancials();
   const { toast } = useToast();
@@ -481,7 +481,7 @@ export default function InventoryPage() {
       const movementDate = new Date(`${form.movement_date}T00:00:00`).toISOString();
 
       const restockPayload = {
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
         product_id: selectedProduct.id,
         product_name: selectedProduct.name,
