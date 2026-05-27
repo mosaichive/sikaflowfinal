@@ -552,7 +552,8 @@ export default function InventoryPage() {
     if (!confirmed) return;
     setDeletingRestockId(restock.id);
     try {
-      await cleanupLegacyRestockExpense(restock.id);
+      // DB trigger removes the linked expense automatically when the restock is deleted.
+
 
       const { error: restockError } = await supabase.from('restocks').delete().eq('id', restock.id);
       if (restockError) throw restockError;
