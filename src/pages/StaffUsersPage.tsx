@@ -48,8 +48,8 @@ export default function StaffUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const defaultRole = 'salesperson';
-  const [form, setForm] = useState<{ email: string; full_name: string; role: string; modules: ModuleKey[] }>(
-    { email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole) },
+  const [form, setForm] = useState<{ email: string; full_name: string; role: string; modules: ModuleKey[]; mode: 'link' | 'password'; password: string }>(
+    { email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' },
   );
 
   const load = useCallback(async () => {
