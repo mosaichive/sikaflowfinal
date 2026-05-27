@@ -1034,9 +1034,12 @@ export default function SettingsPage() {
         )}
 
         </section>
+        )}
 
         {/* ===== D. Audit Log (audit + system control) ===== */}
-        <section id="settings-audit" className="space-y-6 scroll-mt-24">
+        {activeSection === 'audit' && (
+        <section id="settings-audit" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         {/* Audit Log */}
         {isAdmin && (
