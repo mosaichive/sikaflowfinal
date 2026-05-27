@@ -83,7 +83,10 @@ export default function SettingsPage() {
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
   // Profile state
-  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>('none');
+  const location = useLocation();
+  const sectionParam = (new URLSearchParams(location.search).get('s') || 'none') as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>(sectionParam);
+  useEffect(() => { setActiveSection(sectionParam); }, [sectionParam]);
   const [profileForm, setProfileForm] = useState({
     display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
