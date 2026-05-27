@@ -721,9 +721,12 @@ export default function SettingsPage() {
         </Card>
 
         </section>
+        )}
 
         {/* ===== B. Sales Settings ===== */}
-        <section id="settings-sales" className="space-y-6 scroll-mt-24">
+        {activeSection === 'sales' && (
+        <section id="settings-sales" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         <Card>
           <CardHeader><CardTitle className="text-base">Store</CardTitle></CardHeader>
