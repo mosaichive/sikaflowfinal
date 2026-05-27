@@ -83,6 +83,7 @@ export default function SettingsPage() {
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
   // Profile state
+  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>('none');
   const [profileForm, setProfileForm] = useState({
     display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
@@ -557,26 +558,30 @@ export default function SettingsPage() {
   return (
     <AppLayout title="Settings">
       <div className="space-y-6 animate-fade-in max-w-3xl">
-        {/* Settings group navigator — scrolls to anchored sections. */}
-        <nav className="sticky top-2 z-20 -mx-1 flex gap-2 overflow-x-auto rounded-2xl border border-border/70 bg-background/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          {[
-            { href: '#settings-profile', label: 'Profile' },
-            { href: '#settings-sales', label: 'Sales Settings' },
-            { href: '#settings-bank', label: 'Bank' },
-            { href: '#settings-audit', label: 'Audit Log' },
-          ].map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="shrink-0 rounded-full border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
+        {/* Settings dropdown selector — only the chosen section is rendered. */}
+        <div className="rounded-2xl border border-border/70 bg-card/60 p-4 backdrop-blur">
+          <Label className="mb-2 block text-xs font-medium text-muted-foreground">Choose a settings section</Label>
+          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as typeof activeSection)}>
+            <SelectTrigger className="w-full sm:w-80">
+              <SelectValue placeholder="Select a settings category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— Select a section —</SelectItem>
+              <SelectItem value="profile">Profile (Settings, Verification, Password)</SelectItem>
+              <SelectItem value="sales">Sales Settings (Opening Cash, Stock Rules)</SelectItem>
+              <SelectItem value="bank">Bank (Savings Destinations)</SelectItem>
+              <SelectItem value="audit">Audit Log</SelectItem>
+            </SelectContent>
+          </Select>
+          {activeSection === 'none' && (
+            <p className="mt-3 text-sm text-muted-foreground">Pick a category above to open its settings.</p>
+          )}
+        </div>
 
         {/* ===== A. Profile ===== */}
-        <section id="settings-profile" className="space-y-6 scroll-mt-24">
+        {activeSection === 'profile' && (
+        <section id="settings-profile" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         {/* Profile Settings */}
         <Card>
@@ -716,9 +721,12 @@ export default function SettingsPage() {
         </Card>
 
         </section>
+        )}
 
         {/* ===== B. Sales Settings ===== */}
-        <section id="settings-sales" className="space-y-6 scroll-mt-24">
+        {activeSection === 'sales' && (
+        <section id="settings-sales" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         <Card>
           <CardHeader><CardTitle className="text-base">Store</CardTitle></CardHeader>
@@ -836,9 +844,12 @@ export default function SettingsPage() {
         </Card>
 
         </section>
+        )}
 
         {/* ===== C. Bank (admin tools + savings destinations) ===== */}
-        <section id="settings-bank" className="space-y-6 scroll-mt-24">
+        {activeSection === 'bank' && (
+        <section id="settings-bank" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         {/* User Management */}
         {isAdmin && (
@@ -1023,9 +1034,12 @@ export default function SettingsPage() {
         )}
 
         </section>
+        )}
 
         {/* ===== D. Audit Log (audit + system control) ===== */}
-        <section id="settings-audit" className="space-y-6 scroll-mt-24">
+        {activeSection === 'audit' && (
+        <section id="settings-audit" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         {/* Audit Log */}
         {isAdmin && (
@@ -1080,6 +1094,8 @@ export default function SettingsPage() {
         )}
 
         </section>
+        )}
+
 
         {/* Reset Dialogs */}
         <AlertDialog open={resetOpen} onOpenChange={(o) => { setResetOpen(o); if (!o) setResetInput(''); }}>
