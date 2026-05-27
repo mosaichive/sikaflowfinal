@@ -284,21 +284,25 @@ export default function InventoryPage() {
         };
       });
 
-    const restockRows = restocks.map((restock) => ({
-      id: restock.id,
-      entryType: 'restock' as const,
-      date: restock.restock_date,
-      productName: restock.product_name,
-      category: restock.category || '—',
-      quantityAdded: toNumber(restock.quantity_added),
-      costPerUnit: toNumber(restock.cost_price_per_unit),
-      totalCost: toNumber(restock.total_cost),
-      paymentMethod: restock.payment_method || null,
-      deductionStatus: 'Deducted from Available Money',
-      noteReference: restock.note || restock.reference || null,
-      createdByName: restock.recorded_by_name || null,
-      editableRestock: restock,
-    }));
+    const restockRows = restocks.map((restock) => {
+      const isOpening = Boolean((restock as any).is_opening_stock);
+      return {
+        id: restock.id,
+        entryType: (isOpening ? 'opening_stock' : 'restock') as 'opening_stock' | 'restock',
+        date: restock.restock_date,
+        productName: restock.product_name,
+        category: restock.category || '—',
+        quantityAdded: toNumber(restock.quantity_added),
+        costPerUnit: toNumber(restock.cost_price_per_unit),
+        totalCost: toNumber(restock.total_cost),
+        paymentMethod: restock.payment_method || null,
+        deductionStatus: isOpening ? 'Not deducted' : 'Deducted from Available Money',
+        noteReference: restock.note || restock.reference || null,
+        createdByName: restock.recorded_by_name || null,
+        editableRestock: restock,
+      };
+    });
+
 
     return [...restockRows, ...openingStockRows].sort(
       (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
