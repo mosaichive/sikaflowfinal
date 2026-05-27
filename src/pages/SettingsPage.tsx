@@ -1022,6 +1022,11 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        </section>
+
+        {/* ===== D. Audit Log (audit + system control) ===== */}
+        <section id="settings-audit" className="space-y-6 scroll-mt-24">
+
         {/* Audit Log */}
         {isAdmin && (
           <Card>
