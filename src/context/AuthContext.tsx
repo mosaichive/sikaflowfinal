@@ -21,6 +21,9 @@ interface ProfileData {
   phone: string;
   bio: string;
   onboarding_completed: boolean;
+  phone_verified: boolean;
+  phone_verified_at: string | null;
+  last_verified_phone: string | null;
 }
 
 function isMissingProfileColumnError(error: unknown, column: string) {
