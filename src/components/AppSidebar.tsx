@@ -47,6 +47,12 @@ export function AppSidebar() {
   const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
   const { business } = useBusiness();
   const { isDark, toggle } = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onSettings = location.pathname.startsWith('/settings');
+  const currentSection = new URLSearchParams(location.search).get('s') || '';
+  const [settingsOpen, setSettingsOpen] = useState(onSettings);
+
 
   const items = allItems.filter((item) => hasModule(item.module));
 
