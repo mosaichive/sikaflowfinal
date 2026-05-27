@@ -70,7 +70,15 @@ Deno.serve(async (req) => {
     }
 
     await admin.from('signup_otps').update({ consumed: true }).eq('id', rec.id);
-    await admin.from('profiles').update({ phone_verified: true, phone }).eq('id', user.id);
+    await admin
+      .from('profiles')
+      .update({
+        phone_verified: true,
+        phone,
+        phone_verified_at: new Date().toISOString(),
+        last_verified_phone: phone,
+      })
+      .eq('id', user.id);
 
     return json({ success: true });
   } catch (err) {

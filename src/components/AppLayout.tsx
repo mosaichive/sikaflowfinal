@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Logo } from '@/components/Logo';
 import { HeaderAdsTicker } from '@/components/HeaderAdsTicker';
+import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { ReferralNotifications } from '@/components/referrals/ReferralNotifications';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
@@ -102,6 +103,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
               </div>
             </div>
           </header>
+          <EmailVerifyBanner />
           <main className="flex-1 p-4 md:p-6 overflow-auto pb-24 md:pb-6">
             <PageTransition>
               {children}
