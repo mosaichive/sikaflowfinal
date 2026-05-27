@@ -557,6 +557,26 @@ export default function SettingsPage() {
   return (
     <AppLayout title="Settings">
       <div className="space-y-6 animate-fade-in max-w-3xl">
+        {/* Settings group navigator — scrolls to anchored sections. */}
+        <nav className="sticky top-2 z-20 -mx-1 flex gap-2 overflow-x-auto rounded-2xl border border-border/70 bg-background/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          {[
+            { href: '#settings-profile', label: 'Profile' },
+            { href: '#settings-sales', label: 'Sales Settings' },
+            { href: '#settings-bank', label: 'Bank' },
+            { href: '#settings-audit', label: 'Audit Log' },
+          ].map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="shrink-0 rounded-full border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+
+        {/* ===== A. Profile ===== */}
+        <section id="settings-profile" className="space-y-6 scroll-mt-24">
 
         {/* Profile Settings */}
         <Card>
