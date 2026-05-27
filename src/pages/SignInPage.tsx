@@ -102,6 +102,10 @@ function AuthShell({ children }: { children: ReactNode }) {
 
 function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [signupChannel, setSignupChannel] = useState<SignupChannel>('email');
+  const [phoneStage, setPhoneStage] = useState<PhoneStage>('collect');
+  const [phone, setPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
