@@ -654,6 +654,8 @@ export type Database = {
           onboarding_completed: boolean
           opening_cash_balance: number
           phone: string | null
+          phone_verified: boolean
+          referred_by_user_id: string | null
           role: string | null
           subscription_end_date: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
@@ -681,6 +683,8 @@ export type Database = {
           onboarding_completed?: boolean
           opening_cash_balance?: number
           phone?: string | null
+          phone_verified?: boolean
+          referred_by_user_id?: string | null
           role?: string | null
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
@@ -708,6 +712,8 @@ export type Database = {
           onboarding_completed?: boolean
           opening_cash_balance?: number
           phone?: string | null
+          phone_verified?: boolean
+          referred_by_user_id?: string | null
           role?: string | null
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
@@ -717,6 +723,60 @@ export type Database = {
           title?: string | null
           trial_end_date?: string
           trial_start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          referred_user_id: string
+          referrer_user_id: string
+          reward_payment_id: string | null
+          rewarded_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          referred_user_id: string
+          referrer_user_id: string
+          reward_payment_id?: string | null
+          rewarded_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          referred_user_id?: string
+          referrer_user_id?: string
+          reward_payment_id?: string | null
+          rewarded_at?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1048,6 +1108,42 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed: boolean
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          purpose: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone: string
+          purpose?: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          purpose?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       staff_invites: {
         Row: {
           accepted_at: string | null
@@ -1294,6 +1390,7 @@ export type Database = {
             Returns: Json
           }
       admin_platform_stats: { Args: never; Returns: Json }
+      ensure_referral_code: { Args: { _user_id: string }; Returns: string }
       get_table_columns: {
         Args: { _table_name: string }
         Returns: {
