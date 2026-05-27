@@ -32,6 +32,13 @@ const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] =
   { title: 'Support', url: '/support', icon: LifeBuoy, module: 'dashboard' },
   { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
+const settingsSubItems: { title: string; section: string; icon: any }[] = [
+  { title: 'Profile', section: 'profile', icon: User },
+  { title: 'Sales Settings', section: 'sales', icon: DollarSign },
+  { title: 'Bank', section: 'bank', icon: Landmark },
+  { title: 'Audit Log', section: 'audit', icon: FileClock },
+];
+
 
 
 export function AppSidebar() {
