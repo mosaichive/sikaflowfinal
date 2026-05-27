@@ -106,7 +106,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                       {!collapsed && settingsOpen && (
                         <div className="mt-1 ml-7 flex flex-col gap-0.5 border-l border-border/60 pl-2 animate-fade-in">
-                          {settingsSubItems.map((sub) => {
+                          {visibleSettingsSubItems.map((sub) => {
                             const isActive = onSettings && currentSection === sub.section;
                             return (
                               <button
