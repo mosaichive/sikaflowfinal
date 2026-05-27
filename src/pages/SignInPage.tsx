@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info, MessageSquareText } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
+import { AboutModal } from '@/components/auth/AboutModal';
+import { ContactModal } from '@/components/auth/ContactModal';
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
