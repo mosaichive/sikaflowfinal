@@ -227,8 +227,11 @@ export default function SettingsPage() {
       title: profileForm.title,
       phone: profileForm.phone,
       bio: profileForm.bio,
-      business_name: profileForm.business_name || profileForm.display_name,
     };
+    // Only the workspace owner edits the business name from their own profile.
+    if (!staffOnlyProfile) {
+      payload.business_name = profileForm.business_name || profileForm.display_name;
+    }
     const { error } = await supabase.from('profiles').update(payload as any).eq('id', user.id);
     if (error) {
       toast({ title: 'Could not save profile', description: error.message || 'Please try again.', variant: 'destructive' });
