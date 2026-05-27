@@ -72,6 +72,10 @@ interface AuthContextType {
   isStaffMember: boolean;
   effectiveBusinessOwnerId: string | null;
   hasModule: (m: ModuleKey) => boolean;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  phoneVerifiedAt: string | null;
+  lastVerifiedPhone: string | null;
 }
 
 const emptyProfile: ProfileData = {
@@ -81,6 +85,9 @@ const emptyProfile: ProfileData = {
   phone: '',
   bio: '',
   onboarding_completed: false,
+  phone_verified: false,
+  phone_verified_at: null,
+  last_verified_phone: null,
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -183,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const db = supabase as any;
     let { data, error } = await db
       .from('profiles')
-      .select('display_name, avatar_url, title, phone, bio, onboarding_completed')
+      .select('display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone')
       .eq('id', uid)
       .maybeSingle();
 
@@ -211,6 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: row.phone || '',
       bio: row.bio || '',
       onboarding_completed: Boolean(row.onboarding_completed),
+      phone_verified: Boolean(row.phone_verified),
+      phone_verified_at: row.phone_verified_at || null,
+      last_verified_phone: row.last_verified_phone || null,
     } : emptyProfile);
     return { found: !!data, error: false };
   }, [user?.id]);
@@ -367,6 +377,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isStaffMember,
       effectiveBusinessOwnerId,
       hasModule,
+      emailVerified: Boolean((session?.user as any)?.email_confirmed_at) || Boolean((session?.user as any)?.confirmed_at),
+      phoneVerified: profile.phone_verified,
+      phoneVerifiedAt: profile.phone_verified_at,
+      lastVerifiedPhone: profile.last_verified_phone,
     }}>
       {children}
     </AuthContext.Provider>
