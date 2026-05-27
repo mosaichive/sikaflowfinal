@@ -743,13 +743,8 @@ export default function Dashboard() {
             icon={WalletCards}
             helper={`Savings transfers in ${dateRange.label}`}
           />
-          <MetricCard
-            title="Investments"
-            value={formatCurrency(filteredFinancials.investments)}
-            icon={TrendingUp}
-            helper={`Investments made in ${dateRange.label}`}
-          />
         </div>
+
 
 
         {setupRequired ? (
