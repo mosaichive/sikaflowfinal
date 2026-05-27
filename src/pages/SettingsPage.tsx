@@ -835,6 +835,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        </section>
+
+        {/* ===== C. Bank (admin tools + savings destinations) ===== */}
+        <section id="settings-bank" className="space-y-6 scroll-mt-24">
+
         {/* User Management */}
         {isAdmin && (
           <Card>
