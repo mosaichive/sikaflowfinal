@@ -72,7 +72,7 @@ const roleBadgeVariant = (role: string) => {
 };
 
 export default function SettingsPage() {
-  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, refreshProfile } = useAuth();
+  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, isStaffMember, refreshProfile } = useAuth();
   const { business, businessId, refresh: refreshBusiness } = useBusiness();
   const { isDark, toggle } = useTheme();
   const { toast } = useToast();
@@ -83,9 +83,13 @@ export default function SettingsPage() {
   const businessName = business?.name || 'Your Business';
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
+  // Team members who aren't admins should land on Profile by default.
+  const staffOnlyProfile = isStaffMember && !isAdmin;
+
   // Profile state
   const location = useLocation();
-  const sectionParam = (new URLSearchParams(location.search).get('s') || 'none') as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const rawSection = (new URLSearchParams(location.search).get('s') || (staffOnlyProfile ? 'profile' : 'none')) as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const sectionParam = staffOnlyProfile ? 'profile' : rawSection;
   const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>(sectionParam);
   useEffect(() => { setActiveSection(sectionParam); }, [sectionParam]);
   const [profileForm, setProfileForm] = useState({
