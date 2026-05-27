@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
@@ -83,7 +83,10 @@ export default function SettingsPage() {
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
   // Profile state
-  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>('none');
+  const location = useLocation();
+  const sectionParam = (new URLSearchParams(location.search).get('s') || 'none') as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>(sectionParam);
+  useEffect(() => { setActiveSection(sectionParam); }, [sectionParam]);
   const [profileForm, setProfileForm] = useState({
     display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
@@ -558,25 +561,11 @@ export default function SettingsPage() {
   return (
     <AppLayout title="Settings">
       <div className="space-y-6 animate-fade-in max-w-3xl">
-        {/* Settings dropdown selector — only the chosen section is rendered. */}
-        <div className="rounded-2xl border border-border/70 bg-card/60 p-4 backdrop-blur">
-          <Label className="mb-2 block text-xs font-medium text-muted-foreground">Choose a settings section</Label>
-          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as typeof activeSection)}>
-            <SelectTrigger className="w-full sm:w-80">
-              <SelectValue placeholder="Select a settings category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">— Select a section —</SelectItem>
-              <SelectItem value="profile">Profile (Settings, Verification, Password)</SelectItem>
-              <SelectItem value="sales">Sales Settings (Opening Cash, Stock Rules)</SelectItem>
-              <SelectItem value="bank">Bank (Savings Destinations)</SelectItem>
-              <SelectItem value="audit">Audit Log</SelectItem>
-            </SelectContent>
-          </Select>
-          {activeSection === 'none' && (
-            <p className="mt-3 text-sm text-muted-foreground">Pick a category above to open its settings.</p>
-          )}
-        </div>
+        {activeSection === 'none' && (
+          <div className="rounded-2xl border border-border/70 bg-card/60 p-8 text-center text-sm text-muted-foreground backdrop-blur">
+            Choose a settings category from the sidebar to get started.
+          </div>
+        )}
 
         {/* ===== A. Profile ===== */}
         {activeSection === 'profile' && (

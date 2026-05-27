@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import {
-  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, Megaphone, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy
+  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, Megaphone, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, FileClock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { useTheme } from '@/hooks/useTheme';
@@ -29,6 +32,13 @@ const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] =
   { title: 'Support', url: '/support', icon: LifeBuoy, module: 'dashboard' },
   { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
+const settingsSubItems: { title: string; section: string; icon: any }[] = [
+  { title: 'Profile', section: 'profile', icon: User },
+  { title: 'Sales Settings', section: 'sales', icon: DollarSign },
+  { title: 'Bank', section: 'bank', icon: Landmark },
+  { title: 'Audit Log', section: 'audit', icon: FileClock },
+];
+
 
 
 export function AppSidebar() {
@@ -37,6 +47,12 @@ export function AppSidebar() {
   const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
   const { business } = useBusiness();
   const { isDark, toggle } = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onSettings = location.pathname.startsWith('/settings');
+  const currentSection = new URLSearchParams(location.search).get('s') || '';
+  const [settingsOpen, setSettingsOpen] = useState(onSettings);
+
 
   const items = allItems.filter((item) => hasModule(item.module));
 
@@ -61,25 +77,69 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/dashboard'}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200"
-                      activeClassName="bg-primary/10 text-primary font-semibold"
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map((item) => {
+                if (item.url === '/settings') {
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        onClick={() => {
+                          if (collapsed) {
+                            navigate('/settings');
+                          } else {
+                            setSettingsOpen((o) => !o);
+                          }
+                        }}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:text-foreground hover:bg-secondary transition-all duration-200 ${onSettings ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground'}`}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {!collapsed && (
+                          <>
+                            <span className="flex-1 text-left">{item.title}</span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+                          </>
+                        )}
+                      </SidebarMenuButton>
+                      {!collapsed && settingsOpen && (
+                        <div className="mt-1 ml-7 flex flex-col gap-0.5 border-l border-border/60 pl-2 animate-fade-in">
+                          {settingsSubItems.map((sub) => {
+                            const isActive = onSettings && currentSection === sub.section;
+                            return (
+                              <button
+                                key={sub.section}
+                                onClick={() => navigate(`/settings?s=${sub.section}`)}
+                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
+                              >
+                                <sub.icon className="h-3.5 w-3.5 shrink-0" />
+                                <span>{sub.title}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                }
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end={item.url === '/dashboard'}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200"
+                        activeClassName="bg-primary/10 text-primary font-semibold"
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
 
       <SidebarFooter className="p-3 space-y-2">
         {!collapsed && (
