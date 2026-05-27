@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import {
-  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, Megaphone, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy
+  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, Megaphone, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, FileClock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { useTheme } from '@/hooks/useTheme';
