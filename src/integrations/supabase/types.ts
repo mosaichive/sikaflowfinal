@@ -648,6 +648,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          last_verified_phone: string | null
           location: string | null
           logo_url: string | null
           num_employees: string | null
@@ -655,6 +656,7 @@ export type Database = {
           opening_cash_balance: number
           phone: string | null
           phone_verified: boolean
+          phone_verified_at: string | null
           referred_by_user_id: string | null
           role: string | null
           subscription_end_date: string | null
@@ -677,6 +679,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id: string
+          last_verified_phone?: string | null
           location?: string | null
           logo_url?: string | null
           num_employees?: string | null
@@ -684,6 +687,7 @@ export type Database = {
           opening_cash_balance?: number
           phone?: string | null
           phone_verified?: boolean
+          phone_verified_at?: string | null
           referred_by_user_id?: string | null
           role?: string | null
           subscription_end_date?: string | null
@@ -706,6 +710,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          last_verified_phone?: string | null
           location?: string | null
           logo_url?: string | null
           num_employees?: string | null
@@ -713,6 +718,7 @@ export type Database = {
           opening_cash_balance?: number
           phone?: string | null
           phone_verified?: boolean
+          phone_verified_at?: string | null
           referred_by_user_id?: string | null
           role?: string | null
           subscription_end_date?: string | null
