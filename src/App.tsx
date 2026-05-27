@@ -151,19 +151,19 @@ const App = () => (
                 {/* Tenant app */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="dashboard"><Dashboard /></RequireModule></ProtectedRoute>} />
-                <Route path="/sales" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/products" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'distributor']}><RequireModule module="inventory"><InventoryPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/customers" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson']}><RequireModule module="customers"><CustomersPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/orders" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'salesperson', 'distributor']}><RequireModule module="orders"><OrdersPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/other-income" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="other_income"><OtherIncomePage /></RequireModule></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="expenses"><ExpensesPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="reports"><ReportsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/sales" element={<ProtectedRoute><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/inventory" element={<ProtectedRoute><RequireModule module="inventory"><InventoryPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/customers" element={<ProtectedRoute><RequireModule module="customers"><CustomersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/orders" element={<ProtectedRoute><RequireModule module="orders"><OrdersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/other-income" element={<ProtectedRoute><RequireModule module="other_income"><OtherIncomePage /></RequireModule></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute><RequireModule module="expenses"><ExpensesPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute><RequireModule module="reports"><ReportsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/staff" element={<ProtectedRoute adminOnly><RequireModule module="staff"><StaffUsersPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/announcements" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="announcements"><TenantAnnouncementsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/support" element={<ProtectedRoute allowReadOnly allowOnboarding><SupportPage /></ProtectedRoute>} />
-                <Route path="/savings" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RequireModule module="savings"><SavingsPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute adminOnly allowReadOnly><RequireModule module="settings"><SettingsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/savings" element={<ProtectedRoute><RequireModule module="savings"><SavingsPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute allowReadOnly allowOnboarding><SettingsPage /></ProtectedRoute>} />
                 <Route path="/billing" element={<ProtectedRoute adminOnly allowReadOnly><BillingPage /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
                 </Routes>
