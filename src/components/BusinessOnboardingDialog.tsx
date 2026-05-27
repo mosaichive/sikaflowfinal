@@ -118,6 +118,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     business: ['companyName', 'location', 'employees'],
     owner: ['ownerName', 'phone', 'role', 'email'],
     review: ['companyName', 'location', 'employees', 'ownerName', 'phone', 'email'],
+    verify: [],
   };
 
   const validateStep = (key = currentStep.key) => {
