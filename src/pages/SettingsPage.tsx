@@ -844,9 +844,12 @@ export default function SettingsPage() {
         </Card>
 
         </section>
+        )}
 
         {/* ===== C. Bank (admin tools + savings destinations) ===== */}
-        <section id="settings-bank" className="space-y-6 scroll-mt-24">
+        {activeSection === 'bank' && (
+        <section id="settings-bank" className="space-y-6 scroll-mt-24 animate-fade-in">
+
 
         {/* User Management */}
         {isAdmin && (
