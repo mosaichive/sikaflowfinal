@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 
 type RoleKey = 'owner' | 'manager' | 'admin';
-type StepKey = 'business' | 'owner' | 'review';
+type StepKey = 'business' | 'owner' | 'review' | 'verify';
 
 const STEPS: { key: StepKey; label: string; title: string; subtitle: string }[] = [
   {
@@ -34,6 +34,12 @@ const STEPS: { key: StepKey; label: string; title: string; subtitle: string }[] 
     label: 'Review',
     title: 'Your 30-day trial is ready',
     subtitle: 'No billing step here. The app will remind you when it is time to upgrade.',
+  },
+  {
+    key: 'verify',
+    label: 'Verify',
+    title: 'Verify your phone number',
+    subtitle: 'Enter the 6-digit code we just sent by SMS to confirm your number.',
   },
 ];
 
