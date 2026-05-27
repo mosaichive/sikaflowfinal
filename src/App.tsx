@@ -62,7 +62,7 @@ function ProtectedRoute({
   allowReadOnly?: boolean;
   allowOnboarding?: boolean;
 }) {
-  const { user, loading, isAdmin, role } = useAuth();
+  const { user, loading, isAdmin, role, staffMembership } = useAuth();
   const { business, loading: bizLoading } = useBusiness();
   const { hasAccess, subscription, loading: subLoading, isSuperAdmin } = useSubscription();
   const location = useLocation();
@@ -73,24 +73,27 @@ function ProtectedRoute({
   if (!user) return <Navigate to="/sign-in" replace state={{ from: location.pathname + location.search }} />;
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />;
   // Only force users without a business back to /dashboard if they're not already there.
-  // /dashboard hosts the first-time setup dialog. Avoid bouncing on every nav while
-  // business data is still resolving by checking the current path.
   if (!business && !allowOnboarding && location.pathname !== '/dashboard') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Subscription gating: only force billing if a subscription row exists AND access is truly denied.
-  // This prevents a transient redirect to /billing while data is still resolving or for brand-new accounts.
   if (subscription && !hasAccess && !allowReadOnly) {
     return <Navigate to="/billing" replace />;
   }
 
   if (adminOnly && !isAdmin) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
-  // business_owner has full admin-equivalent access to all tenant pages.
-  const effectiveRole: AppRole | null = role === 'business_owner' ? 'admin' : role;
+  // For staff members the user_roles.role is always 'staff'; their real
+  // working role comes from staff_members.permissions.role. Map that into
+  // the effective role used for allowedRoles checks. business_owner is
+  // treated as admin for tenant pages.
+  let effectiveRole: AppRole | null = role === 'business_owner' ? 'admin' : role;
+  if (staffMembership) {
+    effectiveRole = (staffMembership.role as AppRole) || effectiveRole;
+  }
   if (allowedRoles && (!effectiveRole || !allowedRoles.includes(effectiveRole))) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
   return <>{children}</>;
 }
+
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
