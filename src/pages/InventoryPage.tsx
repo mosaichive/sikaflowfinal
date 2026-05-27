@@ -509,7 +509,8 @@ export default function InventoryPage() {
           } as RestockRow)
         : ((await insertRestockRecord(restockPayload)) as unknown as RestockRow);
 
-      await cleanupLegacyRestockExpense(savedRestock.id);
+      // DB trigger `trg_sync_restock_to_expense` keeps the linked expense row in sync.
+
 
       const { error: productError } = await supabase
         .from('products')
