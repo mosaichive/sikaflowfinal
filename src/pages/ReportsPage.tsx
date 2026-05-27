@@ -565,6 +565,17 @@ export default function ReportsPage() {
           <ReportMetric label="This Year Sales" value={formatCurrency(periodSales.year)} />
         </div>
 
+        <DynamicLineChart
+          from={from}
+          to={to}
+          sales={filtered.sales}
+          saleItems={filtered.saleItems}
+          otherIncome={filtered.otherIncome}
+          expenses={filtered.expenses}
+          restocks={filtered.restocks}
+          products={raw.products}
+        />
+
         <Card className="overflow-hidden border-primary/25">
           <CardHeader className="flex flex-col gap-4 border-b border-border/60 bg-muted/20 sm:flex-row sm:items-start sm:justify-between">
             <div>
