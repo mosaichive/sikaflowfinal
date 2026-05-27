@@ -24,6 +24,7 @@ import { EmailVerificationCard } from '@/components/settings/EmailVerificationCa
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { useToast } from '@/hooks/use-toast';
+import { getFunctionErrorMessage } from '@/lib/function-errors';
 
 interface BankAccount {
   id: string; bank_name: string; account_name: string; account_number: string;
@@ -429,7 +430,7 @@ export default function SettingsPage() {
     });
 
     if (error || (data && (data as any).error)) {
-      const msg = (data as any)?.error || error?.message || 'Failed to invite user';
+      const msg = (data as any)?.error || (error ? await getFunctionErrorMessage(error, 'Failed to invite user') : 'Failed to invite user');
       toast({ title: 'Could not invite user', description: msg, variant: 'destructive' });
       setUserSaving(false);
       return;
