@@ -25,6 +25,7 @@ import { BarChart3, CalendarRange, Download, FileText, FilterX, PackageSearch, R
 import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
 import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { DynamicLineChart } from '@/components/reports/DynamicLineChart';
 
 type RawReportData = {
   sales: any[];
