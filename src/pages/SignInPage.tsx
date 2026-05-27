@@ -159,11 +159,74 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     }
   };
 
+  const sendPhoneOtp = async () => {
+    setError('');
+    if (!fullName.trim()) { setError('Enter your full name.'); return; }
+    if (!phone.trim()) { setError('Enter your phone number.'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setSubmitting(true);
+    try {
+      const { error: fnErr } = await supabase.functions.invoke('phone-signup-send-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (fnErr) throw fnErr;
+      toast({ title: 'Code sent', description: 'Enter the 6-digit code we just texted you.' });
+      setPhoneStage('verify');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to send code.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('phone-signup-verify-otp', {
+        body: {
+          phone: phone.trim(),
+          otp: otpCode,
+          password,
+          full_name: fullName.trim(),
+          email: email.trim() || undefined,
+          referral_token: referralToken || undefined,
+          signup_device_id: getOrCreateReferralDeviceId(),
+          redirect_to: `${window.location.origin}/auth/callback?next=/dashboard`,
+        },
+      });
+      if (fnErr) throw fnErr;
+      const link = (data as { action_link?: string } | null)?.action_link;
+      if (link) {
+        window.location.href = link;
+        return;
+      }
+      toast({ title: 'Account created', description: 'Sign in with your email and password to continue.' });
+      setMode('sign-in');
+      setSignupChannel('email');
+      setPhoneStage('collect');
+      setOtpCode('');
+    } catch (err) {
+      setError((err as Error).message || 'Invalid or expired code.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    setSubmitting(true);
 
+    if (mode === 'sign-up' && signupChannel === 'phone') {
+      if (phoneStage === 'collect') {
+        await sendPhoneOtp();
+      } else {
+        await verifyPhoneOtp();
+      }
+      return;
+    }
+
+    setSubmitting(true);
     try {
       if (mode === 'sign-in') {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -212,6 +275,9 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setSubmitting(false);
     }
   };
+
+  const usePhone = mode === 'sign-up' && signupChannel === 'phone';
+  const onVerifyStage = usePhone && phoneStage === 'verify';
 
   return (
     <>
