@@ -416,7 +416,8 @@ export default function Dashboard() {
     setLocalOnboardingCompleted(true);
   }, [onboardingCompleted, user?.id]);
 
-  const setupRequired = !business || (!onboardingCompleted && !localOnboardingCompleted);
+  // Team members inherit the owner's workspace and never see fresh-setup onboarding.
+  const setupRequired = !isStaffMember && (!business || (!onboardingCompleted && !localOnboardingCompleted));
 
   useEffect(() => {
     if (!setupRequired) {
