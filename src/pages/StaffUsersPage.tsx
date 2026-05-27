@@ -48,8 +48,8 @@ export default function StaffUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const defaultRole = 'salesperson';
-  const [form, setForm] = useState<{ email: string; full_name: string; role: string; modules: ModuleKey[] }>(
-    { email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole) },
+  const [form, setForm] = useState<{ email: string; full_name: string; role: string; modules: ModuleKey[]; mode: 'link' | 'password'; password: string }>(
+    { email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' },
   );
 
   const load = useCallback(async () => {
@@ -98,20 +98,45 @@ export default function StaffUsersPage() {
     try {
       const email = form.email.trim().toLowerCase();
       if (!email) throw new Error('Email is required');
-      const { data, error } = await (supabase as any)
-        .from('staff_invites')
-        .insert({
-          business_owner_id: user.id,
-          email,
-          display_name: form.full_name.trim() || null,
-          permissions: { role: form.role, modules: form.modules },
-        })
-        .select('token')
-        .single();
-      if (error) throw error;
-      await copyLink(data.token);
-      toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
-      setForm({ email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole) });
+
+      if (form.mode === 'password') {
+        const fullName = form.full_name.trim();
+        if (!fullName) throw new Error('Full name is required for password invite');
+        if (!form.password || form.password.length < 8) throw new Error('Temporary password must be at least 8 characters');
+
+        const { data, error } = await supabase.functions.invoke('manage-business-user', {
+          body: {
+            action: 'invite',
+            mode: 'password',
+            email,
+            full_name: fullName,
+            role: form.role,
+            password: form.password,
+          },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        toast({
+          title: 'Team member created',
+          description: `${fullName} can now log in with the temporary password you set.`,
+        });
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('staff_invites')
+          .insert({
+            business_owner_id: user.id,
+            email,
+            display_name: form.full_name.trim() || null,
+            permissions: { role: form.role, modules: form.modules },
+          })
+          .select('token')
+          .single();
+        if (error) throw error;
+        await copyLink(data.token);
+        toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
+      }
+
+      setForm({ email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
       setInviteOpen(false);
       void load();
     } catch (err) {
@@ -211,11 +236,41 @@ export default function StaffUsersPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Invite method</Label>
+                    <Select value={form.mode} onValueChange={(v: 'link' | 'password') => setForm((f) => ({ ...f, mode: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="link">Send invite link (they set their own password)</SelectItem>
+                        <SelectItem value="password">Create account with a temporary password</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {form.mode === 'password'
+                        ? 'They can log in immediately with this password and should change it on first sign-in.'
+                        : 'Share the generated link. They will accept the invite and create their own password.'}
+                    </p>
+                  </div>
+                  {form.mode === 'password' ? (
+                    <div className="space-y-2">
+                      <Label>Temporary password</Label>
+                      <Input
+                        type="text"
+                        minLength={8}
+                        required
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="At least 8 characters"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
                     <Label>Module access</Label>
                     <PermissionsEditor value={form.modules} onChange={(modules) => setForm((f) => ({ ...f, modules }))} />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create invite link'}</Button>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? 'Creating...' : form.mode === 'password' ? 'Create team member' : 'Create invite link'}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
