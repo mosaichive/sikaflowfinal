@@ -380,6 +380,42 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
                     </div>
                   </div>
                 )}
+
+                {currentStep.key === 'verify' && (
+                  <div className="space-y-5">
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Phone className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="font-semibold">We sent a code to {phone}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Enter the 6-digit code below to verify your phone and finish setup.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Field label="6-digit code" icon={BadgeCheck} error={otpError}>
+                      <Input
+                        inputMode="numeric"
+                        pattern="\d{6}"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(event) => { setOtpCode(event.target.value.replace(/\D/g, '')); setOtpError(''); }}
+                        placeholder="123456"
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={resendOtp}
+                      disabled={resending || submitting}
+                      className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                    >
+                      {resending ? 'Resending…' : "Didn't get the code? Resend"}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -389,16 +425,18 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
               <Rocket className="h-3.5 w-3.5" /> Finish setup to open your workspace.
             </div>
             <div className="flex gap-2">
-              {stepIndex > 0 && (
+              {stepIndex > 0 && currentStep.key !== 'verify' && (
                 <Button type="button" variant="outline" onClick={goBack} disabled={submitting}>
                   Back
                 </Button>
               )}
               <Button type="submit" disabled={submitting} className="min-w-36">
                 {submitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
-                ) : isLastStep ? (
-                  'Open dashboard'
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working...</>
+                ) : currentStep.key === 'review' ? (
+                  'Send verification code'
+                ) : currentStep.key === 'verify' ? (
+                  'Verify & open dashboard'
                 ) : (
                   <>Next <ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
