@@ -1094,6 +1094,8 @@ export default function SettingsPage() {
         )}
 
         </section>
+        )}
+
 
         {/* Reset Dialogs */}
         <AlertDialog open={resetOpen} onOpenChange={(o) => { setResetOpen(o); if (!o) setResetInput(''); }}>
