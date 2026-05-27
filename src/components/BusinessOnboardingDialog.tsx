@@ -145,37 +145,76 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     setStepIndex((value) => Math.max(value - 1, 0));
   };
 
-  const submitBusinessSetup = async () => {
+  const saveProfileAndSendOtp = async () => {
     if (!user || !validateStep('review')) return;
     setSubmitting(true);
     try {
-      const db = supabase as any;
-      const { data: businessId, error: businessError } = await db.rpc('create_business_for_owner', {
-        _name: companyName.trim(),
-        _email: email,
-        _phone: phone.trim(),
-        _location: location.trim(),
-        _employees: employees,
-        _logo_light_url: '',
-        _logo_dark_url: '',
-      });
-      if (businessError) throw businessError;
-      if (!businessId) throw new Error('Business setup did not return an id');
-
-      await Promise.all([
-        db.from('businesses').update({
-          email_verified: true,
-          phone_verified: true,
-          status: 'active',
-        }).eq('id', businessId),
-        db.from('profiles').update({
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          business_name: companyName.trim(),
           display_name: ownerName.trim(),
           phone: phone.trim(),
           title: role,
-          email_verified: true,
-          phone_verified: true,
-        }).eq('user_id', user.id),
-      ]);
+          location: location.trim(),
+          num_employees: String(employees),
+        })
+        .eq('id', user.id);
+      if (profileError) throw profileError;
+
+      const { error: otpError } = await supabase.functions.invoke('send-signup-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (otpError) throw otpError;
+
+      toast({ title: 'Code sent', description: 'Check your phone for the 6-digit code.' });
+      setOtpCode('');
+      setOtpError('');
+      setDirection(1);
+      setStepIndex(STEPS.findIndex((s) => s.key === 'verify'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      toast({ title: 'Could not send code', description: message, variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    setResending(true);
+    setOtpError('');
+    try {
+      const { error } = await supabase.functions.invoke('send-signup-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (error) throw error;
+      toast({ title: 'New code sent' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not resend code.';
+      toast({ title: 'Resend failed', description: message, variant: 'destructive' });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const submitVerify = async () => {
+    if (!user) return;
+    if (otpCode.length !== 6) {
+      setOtpError('Enter the 6-digit code from your SMS.');
+      return;
+    }
+    setSubmitting(true);
+    setOtpError('');
+    try {
+      const { error: verifyError } = await supabase.functions.invoke('verify-signup-otp', {
+        body: { phone: phone.trim(), otp: otpCode },
+      });
+      if (verifyError) throw verifyError;
+
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('id', user.id);
 
       await supabase.functions.invoke('claim-referral', {
         body: {
@@ -185,11 +224,11 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
       });
 
       await Promise.all([refreshProfile(), refreshBusiness(), refreshSubscription()]);
-      toast({ title: 'Workspace created', description: 'Your dashboard is ready and your 30-day trial has started.' });
+      toast({ title: 'Workspace ready', description: 'Phone verified. Welcome to KudiTrack.' });
       onCompleted?.();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast({ title: 'Business setup failed', description: message, variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Invalid or expired code.';
+      setOtpError(message);
     } finally {
       setSubmitting(false);
     }
@@ -197,8 +236,12 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (isLastStep) {
-      void submitBusinessSetup();
+    if (currentStep.key === 'review') {
+      void saveProfileAndSendOtp();
+      return;
+    }
+    if (currentStep.key === 'verify') {
+      void submitVerify();
       return;
     }
     goNext();
