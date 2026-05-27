@@ -250,6 +250,7 @@ export function buildReportStatement({
   from,
   to,
   availableBusinessMoneyOverride,
+  openingCashBalance = 0,
 }: ReportSourceArgs) {
   const ordered = orderedTransactions({ sales, expenses, otherIncome, savings, investments, fundings, restocks, openingStockMovements });
   const fromMs = startOfDayMs(from);
@@ -259,7 +260,12 @@ export function buildReportStatement({
     return timestamp >= fromMs && timestamp <= toMs;
   };
 
-  const openingBalance = ordered
+  // Period opening balance = starting cash held by the business + every
+  // money-in / money-out event BEFORE the selected period. This keeps the
+  // running ledger aligned with the Available Business Money formula
+  // (opening cash + paid sales + other income + investor funds - expenses
+  // - restocks - savings - investments).
+  const openingBalance = Number(openingCashBalance || 0) + ordered
     .filter((row) => row.timestamp < fromMs)
     .reduce((sum, row) => sum + row.moneyIn - row.moneyOut, 0);
 
