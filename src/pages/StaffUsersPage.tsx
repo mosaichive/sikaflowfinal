@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Shield, Trash2, UserPlus, Users, Copy, Power, Settings2, Mail, RefreshCw } from 'lucide-react';
 import { PermissionsEditor } from '@/components/PermissionsEditor';
+import { getFunctionErrorMessage } from '@/lib/function-errors';
 import { TEAM_ROLES, modulesForRole, type ModuleKey } from '@/lib/permissions';
 
 type MemberRow = {
@@ -114,7 +115,7 @@ export default function StaffUsersPage() {
             password: form.password,
           },
         });
-        if (error) throw error;
+        if (error) throw new Error(await getFunctionErrorMessage(error, 'Failed to create team member'));
         if ((data as any)?.error) throw new Error((data as any).error);
         toast({
           title: 'Team member created',
