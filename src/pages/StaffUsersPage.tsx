@@ -236,11 +236,41 @@ export default function StaffUsersPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Invite method</Label>
+                    <Select value={form.mode} onValueChange={(v: 'link' | 'password') => setForm((f) => ({ ...f, mode: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="link">Send invite link (they set their own password)</SelectItem>
+                        <SelectItem value="password">Create account with a temporary password</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {form.mode === 'password'
+                        ? 'They can log in immediately with this password and should change it on first sign-in.'
+                        : 'Share the generated link. They will accept the invite and create their own password.'}
+                    </p>
+                  </div>
+                  {form.mode === 'password' ? (
+                    <div className="space-y-2">
+                      <Label>Temporary password</Label>
+                      <Input
+                        type="text"
+                        minLength={8}
+                        required
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="At least 8 characters"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
                     <Label>Module access</Label>
                     <PermissionsEditor value={form.modules} onChange={(modules) => setForm((f) => ({ ...f, modules }))} />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create invite link'}</Button>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? 'Creating...' : form.mode === 'password' ? 'Create team member' : 'Create invite link'}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
