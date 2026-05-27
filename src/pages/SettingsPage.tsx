@@ -83,6 +83,7 @@ export default function SettingsPage() {
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
   // Profile state
+  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>('none');
   const [profileForm, setProfileForm] = useState({
     display_name: '', title: '', phone: '', bio: '', business_name: '',
   });
