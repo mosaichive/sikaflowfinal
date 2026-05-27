@@ -34,7 +34,7 @@ import {
 } from '@/lib/workspace';
 
 export default function SalesPage() {
-  const { user, displayName, isAdmin, isManager } = useAuth();
+  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
   const { businessId, business } = useBusiness();
   const { toast } = useToast();
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -315,7 +315,7 @@ export default function SalesPage() {
     setLoading(true);
     try {
       const sale = await insertSaleRecord({
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
         sale_date: new Date(saleDate).toISOString(),
         customer_name: customerName || 'Walk-in',
@@ -337,7 +337,7 @@ export default function SalesPage() {
 
       for (const row of validLines) {
         const payload = {
-          user_id: user.id,
+          user_id: effectiveBusinessOwnerId ?? user.id,
           business_id: businessId,
           sale_id: sale.id,
           product_id: row.product!.id,
@@ -435,7 +435,7 @@ export default function SalesPage() {
 
       for (const row of validLines) {
         const payload = {
-          user_id: user.id,
+          user_id: effectiveBusinessOwnerId ?? user.id,
           business_id: businessId!,
           sale_id: editSaleId,
           product_id: row.product!.id,
@@ -569,7 +569,7 @@ export default function SalesPage() {
       const { data, error } = await supabase
         .from('sale_documents' as any)
         .upsert({
-          user_id: user.id,
+          user_id: effectiveBusinessOwnerId ?? user.id,
           sale_id: sale.id,
           kind,
           sale_date: sale.sale_date,

@@ -128,7 +128,7 @@ function getDestinationTypeIcon(type: string | null | undefined) {
 }
 
 export default function SavingsPage() {
-  const { user, isAdmin, isManager, displayName } = useAuth();
+  const { user, isAdmin, isManager, displayName, effectiveBusinessOwnerId } = useAuth();
   const { businessId } = useBusiness();
   const { financials, loading: financialsLoading } = useBusinessFinancials();
   const { toast } = useToast();
@@ -297,7 +297,7 @@ export default function SavingsPage() {
     const destination = destinations.find((d) => d.id === savingForm.bank_account_id);
 
     const payload: any = {
-      user_id: user.id,
+      user_id: effectiveBusinessOwnerId ?? user.id,
       amount: savingForm.amount,
       savings_date: new Date(savingForm.savings_date).toISOString(),
       source: savingForm.savings_type,
@@ -323,7 +323,7 @@ export default function SavingsPage() {
         ? `${destination.bank_name || destination.mobile_money_name || destination.account_type} • ${destination.account_name}`
         : 'Unknown destination';
       await supabase.from('audit_log').insert({
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         action: editSavingId ? 'savings_updated' : 'savings_recorded',
         details: `Amount ${savingForm.amount}; previous balance ${previousBalance.toFixed(2)}; new balance ${newBalance.toFixed(2)}; destination: ${destLabel}`,
         performed_by: user.id,
@@ -379,7 +379,7 @@ export default function SavingsPage() {
     }
 
     const payload = {
-      user_id: user.id,
+      user_id: effectiveBusinessOwnerId ?? user.id,
       account_type: type,
       bank_name: destinationForm.bank_name.trim(),
       account_name: accountName,

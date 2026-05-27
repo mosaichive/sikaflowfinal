@@ -32,7 +32,7 @@ function autoSku(name: string) {
 
 export function AddProductDialog({ open, onOpenChange, onCreated, offerRestockNext, onRestockNow }: AddProductDialogProps) {
   const { businessId } = useBusiness();
-  const { user, displayName } = useAuth();
+  const { user, displayName, effectiveBusinessOwnerId } = useAuth();
   const { toast } = useToast();
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
@@ -69,7 +69,7 @@ export function AddProductDialog({ open, onOpenChange, onCreated, offerRestockNe
     }
     const payload = {
       business_id: activeBusinessId,
-      user_id: user.id,
+      user_id: effectiveBusinessOwnerId ?? user.id,
       name: form.name.trim(),
       sku: autoSku(form.name),
       category: form.category.trim(),

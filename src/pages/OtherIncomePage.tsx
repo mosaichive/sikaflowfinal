@@ -30,7 +30,7 @@ type OtherIncomeRow = {
 };
 
 export default function OtherIncomePage() {
-  const { user, displayName, isAdmin, isManager } = useAuth();
+  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
   const { businessId } = useBusiness();
   const { toast } = useToast();
   const [rows, setRows] = useState<OtherIncomeRow[]>([]);
@@ -109,7 +109,7 @@ export default function OtherIncomePage() {
       }
 
       const payload: Record<string, unknown> = {
-        user_id: user.id,
+        user_id: effectiveBusinessOwnerId ?? user.id,
         source: form.category, // legacy NOT-NULL-friendly column; trigger also syncs this
         category: form.category,
         amount: amountValue,
