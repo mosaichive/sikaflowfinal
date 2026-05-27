@@ -626,15 +626,17 @@ export default function SettingsPage() {
                 <Input value={profileForm.title} onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Store Owner, Manager" />
               </div>
             </div>
-            <div>
-              <Label>Business Name</Label>
-              <Input
-                value={profileForm.business_name}
-                onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))}
-                placeholder="Your business name"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">Shows in sidebar, top bar, dashboard greeting and receipts.</p>
-            </div>
+            {!staffOnlyProfile && (
+              <div>
+                <Label>Business Name</Label>
+                <Input
+                  value={profileForm.business_name}
+                  onChange={e => setProfileForm(p => ({ ...p, business_name: e.target.value }))}
+                  placeholder="Your business name"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Shows in sidebar, top bar, dashboard greeting and receipts.</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Email</Label>
