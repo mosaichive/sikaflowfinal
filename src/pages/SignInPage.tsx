@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken, setPendingReferralToken } from '@/lib/referrals';
 
 type AuthMode = 'sign-in' | 'sign-up';
+type SignupChannel = 'email' | 'phone';
+type PhoneStage = 'collect' | 'verify';
 
 function AuthShell({ children }: { children: ReactNode }) {
   const [aboutOpen, setAboutOpen] = useState(false);
