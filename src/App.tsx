@@ -36,6 +36,8 @@ import ReferralsPage from "./pages/platform/ReferralsPage";
 import PlatformSupportPage from "./pages/platform/PlatformSupportPage";
 import NotFound from "./pages/NotFound";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
 
@@ -125,7 +127,8 @@ const App = () => (
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
                 <Route path="/auth/*" element={<Navigate to="/sign-in" replace />} />
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
-                <Route path="/reset-password" element={<Navigate to="/sign-in" replace />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/change-password" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/verify" element={<Navigate to="/dashboard" replace />} />
 
