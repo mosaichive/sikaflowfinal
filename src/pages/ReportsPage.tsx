@@ -417,9 +417,10 @@ export default function ReportsPage() {
         openingStockMovements,
         from,
         to,
+        openingCashBalance: financials.openingCash,
         availableBusinessMoneyOverride: financials.availableBusinessMoney,
       }),
-    [financials.availableBusinessMoney, from, openingStockMovements, raw, to],
+    [financials.availableBusinessMoney, financials.openingCash, from, openingStockMovements, raw, to],
   );
 
   const yearOptions = useMemo(() => {
@@ -729,43 +730,8 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <WalletCards className="h-4 w-4 text-primary" />
-                Payment Method Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {paymentBreakdown.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Money In</TableHead>
-                      <TableHead className="text-right">Money Out</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentBreakdown.map((row) => (
-                      <TableRow key={row.method}>
-                        <TableCell>{getPaymentMethodLabel(row.method)}</TableCell>
-                        <TableCell className="text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(row.moneyIn)}</TableCell>
-                        <TableCell className="text-right text-destructive">{formatCurrency(row.moneyOut)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <EmptyState
-                  icon={<WalletCards className="h-7 w-7 text-muted-foreground" />}
-                  title="No payment activity yet"
-                  description="Payment methods will appear once transactions are recorded."
-                />
-              )}
-            </CardContent>
-          </Card>
         </div>
+
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <Card>
@@ -822,45 +788,8 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Receipt className="h-4 w-4 text-primary" />
-                Customer Credit Report
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {creditReport.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {creditReport.map((row) => (
-                      <TableRow key={row.customerName}>
-                        <TableCell className="font-medium">{row.customerName}</TableCell>
-                        <TableCell className="text-right text-destructive">{formatCurrency(row.balance)}</TableCell>
-                        <TableCell>
-                          <Badge variant={row.status === 'Paid' ? 'secondary' : 'destructive'}>{row.status}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <EmptyState
-                  icon={<Receipt className="h-7 w-7 text-muted-foreground" />}
-                  title="No credit balances"
-                  description="Customers with unpaid or partial balances will show here."
-                />
-              )}
-            </CardContent>
-          </Card>
         </div>
+
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card>

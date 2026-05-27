@@ -1,45 +1,103 @@
-## KudiTrack — 12-Item Rollout Plan
+This is a large multi-area upgrade. Below is the plan grouped by area, ordered for safe execution. No destructive migrations; only additive schema/code changes. All existing data preserved.
 
-This request spans data model changes, auth flows, new subsystems (referrals, OTP), and UI fixes. Shipping all 12 in a single pass would be risky for your live data. I propose splitting into **4 phases**, each independently shippable and verifiable.
+## 1. Settings Page Restructure (UI-only)
 
-Please confirm the phasing (or tell me to reorder / drop items) before I start.
+Refactor `src/pages/SettingsPage.tsx` into a grouped layout with a left sidebar (desktop) / dropdown selector (mobile). All current cards/components stay — only regrouped:
+
+- **Profile**: ProfileSettings, EmailVerificationCard, PhoneVerificationCard, RecoveryOptionsCard (password reset)
+- **Sales Settings**:
+  - Opening Cash Balance (existing field on profile)
+  - Sales & Inventory: new toggle `allow_negative_stock` (profile field)
+- **Bank**: Savings Destinations, Bank Account Details
+- **Audit Log**: existing audit log view
+
+No data resets. Routes unchanged.
+
+## 2. Staff Invitation & Access Fix
+
+**DB (additive migration):**
+- Add `temp_password_hash` (optional) and `must_change_password` boolean to `staff_invites`
+- No changes to `staff_members` schema
+
+**Edge function `manage-business-user`:**
+- Accept optional `temp_password`; when present, create user with that password via `admin.auth.admin.createUser` (email_confirm=true) so they can log in immediately
+- Always create staff_invite row tied to `business_owner_id`
+- Send email with login link + temp password (when SMTP available, otherwise return link)
+
+**Frontend invite flow:**
+- `BusinessOnboardingDialog` / `FirstTimeSetupDialog`: detect if the user has a pending accepted staff_invite OR an existing `staff_members` row → skip business setup entirely
+- Already partially handled by `accept_staff_invite` RPC stamping `onboarding_completed = true`. Add guard in `BusinessContext` / `AppLayout` to never open the business setup dialog when user is a staff member
+- New "Complete your staff profile" minimal dialog: only **Full Name** + **Position**, then call `accept_staff_invite(token, full_name, position)`
+- `StaffUsersPage` add **Temporary Password** field in invite form
+
+**Permissions enforcement:** Already enforced via `RequireModule` + `AppSidebar` filter. Audit that Settings sub-sections (Bank, Audit, subscription) are owner-only via `hasModule('settings')` + extra owner check `isOwner`.
+
+## 3. Unified Financial Engine
+
+Create a single source of truth: `src/lib/financial-engine.ts` that all callers use.
+
+**Centralization:**
+- `calculateBusinessFinancials` already exists in `src/lib/business-money.ts` (delegates to `sales-inventory.ts`). Make this the *only* path for available money + closing balance.
+- Replace any duplicate "closing balance" math in Reports / PDFs / Financial Statement with calls to this engine.
+
+**Running balance rebuild:**
+- New `buildRunningLedger({ openingCash, events })` where events = chronologically sorted [paid sales, other income, investor funds, expenses, non-opening restocks, savings, investments]
+- Each row: `balance = previousBalance + delta`
+- Final row balance MUST equal `availableBusinessMoney` from snapshot — assert in dev with `warnIfFinancialInconsistency`
+
+**Rules enforced:**
+- Restocks deducted exactly once (skip `is_opening_stock=true`, skip `status='cancelled'`)
+- Opening stock never affects cash
+- Negative-day handling: when day cash goes negative, savings & expenses offset against same-day paid sales first (ordering logic in ledger builder)
+
+**Apply across:** Dashboard cards, Reports financial statement, Inventory finance summary, PDF export, CSV export.
+
+## 4. Dashboard Cleanup
+
+Remove the Investments metric card from `src/pages/Dashboard.tsx` only. Keep all investments data + Savings/Investments page.
+
+## 5. Reports Redesign
+
+Rebuild `src/pages/ReportsPage.tsx`:
+- Single reusable `<DynamicLineChart>` component (Recharts)
+- Dropdown selector for: Sales | Product Performance | Other Income | Expenses | Inventory
+- Date filter (day/month/year/custom) drives data
+- Remove **Customer Credit Report** + **Payment Method Breakdown** UI cards (keep backend untouched)
+- Smooth Framer-motion transitions on switch
+
+## 6. Date Filter Consistency
+
+- Single `DateRangeContext` (or hook) used by Dashboard cards
+- All metric cards (Available Money, Sales, Expenses, Profit, etc.) accept date range
+- Financial engine accepts `{ from, to }` and filters events by `sale_date`/`expense_date`/etc.
+- Available Business Money for a range = opening cash + sums in range
+
+## 7. Rebrand Sika Flow → KudiTrack
+
+Search & replace remaining mentions in:
+- UI strings (already mostly done)
+- `docs/`, `README.md`, `public/manifest.webmanifest`, `public/llms.txt`, `index.html` meta, `supabase/manual/reset_sikaflow_fresh.sql` (file name kept; only contents text)
+- Leave asset filenames (`sikaflow-logo.png`) and the special super-admin email `admin@sikaflow.com` untouched (that would break existing auth/data)
+
+## 8. Final QA
+
+- Verify build
+- Manual smoke: dashboard with date filter, staff invite + accept, reports switching, settings groups
+- Confirm closing balance == dashboard balance on multiple sample ranges
 
 ---
 
-### Phase 1 — Safe UI & form fixes (low risk, no schema change)
-Ship first, verify visually, then move on.
+### Technical notes
 
-1. **#3 Customers** — make Email + Note optional, add "(Optional)" labels.
-2. **#4 Products** — make Category optional; persist + display when set.
-3. **#5 Sales form** — multi-product rows (product / qty / discount / amount), empty defaults, dynamic per-row totals.
-4. **#9 Add Stock form** — responsive layout, no overflow on mobile.
-5. **#12 Calendar icon theming** — adapt to dark/light via `text-foreground` / semantic tokens.
+- Additive migration only: `profiles.allow_negative_stock boolean default false`; `staff_invites.temp_password_hash text`, `staff_invites.must_change_password boolean default true`
+- No removal of investments tables, customer credit data, or payment method tables
+- All edits respect existing RLS / GRANT patterns
+- Settings restructure stays within frontend only
 
-### Phase 2 — Inventory ↔ Expenses + Opening Stock edit (DB + logic)
-6. **#1 Restock → Expense** — DB trigger on `restocks` insert/update/delete that mirrors the cost into `expenses` with category `"Restock"`. Idempotent via `reference_id`. Flows automatically into Dashboard, Reports, cashflow (they already read `expenses`).
-7. **#2 Opening Stock edit** — edit dialog on opening-stock rows; existing `handle_restock_stock_ledger` already recomputes stock on UPDATE, so past sales are untouched.
+### Out of scope (will not touch)
 
-### Phase 3 — Team invite bug + permission gating (critical)
-8. **#10 Team invite blank dashboard** — invited users currently get bounced because `BusinessContext` looks for a business they don't own. Fix `BusinessContext` / `ProtectedRoute` to resolve the business via `staff_members.business_owner_id`, then gate sidebar + routes by `staff_members.permissions.modules`.
+- Renaming the `sikaflow-logo.png` asset or the seed super-admin email
+- Subscription/billing logic
+- Auth provider configuration
 
-### Phase 4 — Auth, phone verification, referrals (largest, needs decisions)
-9. **#6 Forgot password** — email reset via Supabase (works today, just needs UI). Phone reset requires an SMS provider.
-10. **#7 Phone verification in Settings** — needs SMS OTP provider.
-11. **#8 Phone login** — same dependency.
-12. **#11 Referral system** — new tables (`referrals`, `referral_rewards`), edge function to validate + extend `subscription_end_date` by 1 month per successful referral (cap 3), super-admin view on the existing `ReferralsPage`.
-
----
-
-### Decisions I need from you before Phase 4
-
-- **SMS provider for OTP** (#6 phone reset, #7 verify, #8 phone login): Twilio? Termii? Arkesel (popular in Ghana)? Or skip phone entirely and keep email-only?
-- **Referral attribution** (#11): track by `?ref=CODE` link + signup, or also require the referred user to complete a paid annual subscription before the reward triggers? (I'd recommend the latter — otherwise it's gameable.)
-- **Reward application** (#11): extend `subscription_end_date` immediately on qualifying event, or queue for super-admin approval?
-
----
-
-### Suggested next step
-
-Reply with: **"Start Phase 1"** (or pick a different starting set), and answer the Phase 4 questions whenever you're ready — I don't need them to start.
-
-If you'd rather I just blast through everything in one go knowing some items (phone OTP, referrals) will be partial without your answers, say **"do it all"** and I'll make reasonable defaults (Arkesel for SMS, reward on paid signup, auto-apply).
+Given the size, I'll execute in this order: rebrand quick passes → migration → financial engine → dashboard → reports → date filter → settings restructure → staff flow. I'll commit each area as I go.
