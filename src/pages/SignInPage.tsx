@@ -33,8 +33,31 @@ import { getOrCreateReferralDeviceId, getPendingReferralToken, setPendingReferra
 type AuthMode = 'sign-in' | 'sign-up';
 
 function AuthShell({ children }: { children: ReactNode }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="relative min-h-screen bg-background text-foreground">
+      {/* Top-right navigation */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-card hover:text-primary focus:outline-none focus:ring-2 focus:ring-ring sm:px-4 sm:py-2 sm:text-sm"
+        >
+          <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span>About</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setContactOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-card hover:text-primary focus:outline-none focus:ring-2 focus:ring-ring sm:px-4 sm:py-2 sm:text-sm"
+        >
+          <MessageSquareText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span>Contact Us</span>
+        </button>
+      </div>
+
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-10">
         <div className="grid w-full gap-8 lg:grid-cols-[0.9fr_1fr] lg:items-center">
           <section className="hidden space-y-6 lg:block">
@@ -68,6 +91,9 @@ function AuthShell({ children }: { children: ReactNode }) {
           </section>
         </div>
       </div>
+
+      <AboutModal open={aboutOpen} onOpenChange={setAboutOpen} />
+      <ContactModal open={contactOpen} onOpenChange={setContactOpen} />
     </main>
   );
 }
