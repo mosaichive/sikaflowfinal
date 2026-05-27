@@ -54,7 +54,8 @@ export function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(onSettings);
 
 
-  const items = allItems.filter((item) => hasModule(item.module));
+  // Settings always visible so every team member can manage their own profile.
+  const items = allItems.filter((item) => item.url === '/settings' || hasModule(item.module));
 
   const tenantName = business?.name || 'KudiTrack';
 
