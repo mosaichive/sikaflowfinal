@@ -20,6 +20,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2 } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
 import { ReferralProgramCard } from '@/components/settings/ReferralProgramCard';
+import { EmailVerificationCard } from '@/components/settings/EmailVerificationCard';
+import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
+import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { useToast } from '@/hooks/use-toast';
 
 interface BankAccount {
@@ -642,6 +645,10 @@ export default function SettingsPage() {
         </Card>
 
         <ReferralProgramCard />
+
+        <EmailVerificationCard />
+        <PhoneVerificationCard />
+        <RecoveryOptionsCard />
 
         {/* Account Settings */}
         <Card>
