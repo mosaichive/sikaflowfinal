@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken, setPendingReferralToken } from '@/lib/referrals';
 
 type AuthMode = 'sign-in' | 'sign-up';
+type SignupChannel = 'email' | 'phone';
+type PhoneStage = 'collect' | 'verify';
 
 function AuthShell({ children }: { children: ReactNode }) {
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -100,6 +102,10 @@ function AuthShell({ children }: { children: ReactNode }) {
 
 function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [signupChannel, setSignupChannel] = useState<SignupChannel>('email');
+  const [phoneStage, setPhoneStage] = useState<PhoneStage>('collect');
+  const [phone, setPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -153,11 +159,74 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     }
   };
 
+  const sendPhoneOtp = async () => {
+    setError('');
+    if (!fullName.trim()) { setError('Enter your full name.'); return; }
+    if (!phone.trim()) { setError('Enter your phone number.'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setSubmitting(true);
+    try {
+      const { error: fnErr } = await supabase.functions.invoke('phone-signup-send-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (fnErr) throw fnErr;
+      toast({ title: 'Code sent', description: 'Enter the 6-digit code we just texted you.' });
+      setPhoneStage('verify');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to send code.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('phone-signup-verify-otp', {
+        body: {
+          phone: phone.trim(),
+          otp: otpCode,
+          password,
+          full_name: fullName.trim(),
+          email: email.trim() || undefined,
+          referral_token: referralToken || undefined,
+          signup_device_id: getOrCreateReferralDeviceId(),
+          redirect_to: `${window.location.origin}/auth/callback?next=/dashboard`,
+        },
+      });
+      if (fnErr) throw fnErr;
+      const link = (data as { action_link?: string } | null)?.action_link;
+      if (link) {
+        window.location.href = link;
+        return;
+      }
+      toast({ title: 'Account created', description: 'Sign in with your email and password to continue.' });
+      setMode('sign-in');
+      setSignupChannel('email');
+      setPhoneStage('collect');
+      setOtpCode('');
+    } catch (err) {
+      setError((err as Error).message || 'Invalid or expired code.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    setSubmitting(true);
 
+    if (mode === 'sign-up' && signupChannel === 'phone') {
+      if (phoneStage === 'collect') {
+        await sendPhoneOtp();
+      } else {
+        await verifyPhoneOtp();
+      }
+      return;
+    }
+
+    setSubmitting(true);
     try {
       if (mode === 'sign-in') {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -206,6 +275,9 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setSubmitting(false);
     }
   };
+
+  const usePhone = mode === 'sign-up' && signupChannel === 'phone';
+  const onVerifyStage = usePhone && phoneStage === 'verify';
 
   return (
     <>
@@ -259,6 +331,31 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         </Alert>
       )}
 
+      {mode === 'sign-up' && (
+        <div className="mb-4 grid grid-cols-2 rounded-lg border border-border bg-muted p-1">
+          <button
+            type="button"
+            onClick={() => { setSignupChannel('email'); setError(''); setPhoneStage('collect'); setOtpCode(''); }}
+            className={cn(
+              'h-9 rounded-md text-sm font-medium transition-colors',
+              signupChannel === 'email' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSignupChannel('phone'); setError(''); }}
+            className={cn(
+              'h-9 rounded-md text-sm font-medium transition-colors',
+              signupChannel === 'phone' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Phone number
+          </button>
+        </div>
+      )}
+
       <form className="space-y-4" onSubmit={submit}>
         {mode === 'sign-up' && (
           <div className="space-y-2">
@@ -269,22 +366,56 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               placeholder="Ama Mensah"
+              disabled={onVerifyStage}
               required
             />
           </div>
         )}
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@business.com"
-            required
-          />
-        </div>
+
+        {usePhone ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+233 24 123 4567"
+                disabled={onVerifyStage}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-optional">Email (optional)</Label>
+              <Input
+                id="email-optional"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@business.com"
+                disabled={onVerifyStage}
+              />
+              <p className="text-xs text-muted-foreground">Used for password recovery. You can add this later.</p>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@business.com"
+              required
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
@@ -301,9 +432,33 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             minLength={6}
+            disabled={onVerifyStage}
             required
           />
         </div>
+
+        {onVerifyStage && (
+          <div className="space-y-2">
+            <Label htmlFor="otp">6-digit verification code</Label>
+            <Input
+              id="otp"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              value={otpCode}
+              onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              required
+            />
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => { setPhoneStage('collect'); setOtpCode(''); setError(''); }}
+            >
+              Use a different phone number
+            </button>
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -311,11 +466,20 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
           </Alert>
         )}
 
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={submitting || (onVerifyStage && otpCode.length !== 6)}
+        >
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'sign-in' ? 'Sign in' : 'Create account'}
+          {mode === 'sign-in'
+            ? 'Sign in'
+            : usePhone
+              ? (onVerifyStage ? 'Verify & create account' : 'Send verification code')
+              : 'Create account'}
         </Button>
       </form>
+
 
       <div className="my-4 flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
