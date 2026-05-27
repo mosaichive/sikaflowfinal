@@ -331,6 +331,31 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         </Alert>
       )}
 
+      {mode === 'sign-up' && (
+        <div className="mb-4 grid grid-cols-2 rounded-lg border border-border bg-muted p-1">
+          <button
+            type="button"
+            onClick={() => { setSignupChannel('email'); setError(''); setPhoneStage('collect'); setOtpCode(''); }}
+            className={cn(
+              'h-9 rounded-md text-sm font-medium transition-colors',
+              signupChannel === 'email' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSignupChannel('phone'); setError(''); }}
+            className={cn(
+              'h-9 rounded-md text-sm font-medium transition-colors',
+              signupChannel === 'phone' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Phone number
+          </button>
+        </div>
+      )}
+
       <form className="space-y-4" onSubmit={submit}>
         {mode === 'sign-up' && (
           <div className="space-y-2">
@@ -341,22 +366,56 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               placeholder="Ama Mensah"
+              disabled={onVerifyStage}
               required
             />
           </div>
         )}
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@business.com"
-            required
-          />
-        </div>
+
+        {usePhone ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+233 24 123 4567"
+                disabled={onVerifyStage}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-optional">Email (optional)</Label>
+              <Input
+                id="email-optional"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@business.com"
+                disabled={onVerifyStage}
+              />
+              <p className="text-xs text-muted-foreground">Used for password recovery. You can add this later.</p>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@business.com"
+              required
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
@@ -373,9 +432,33 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             minLength={6}
+            disabled={onVerifyStage}
             required
           />
         </div>
+
+        {onVerifyStage && (
+          <div className="space-y-2">
+            <Label htmlFor="otp">6-digit verification code</Label>
+            <Input
+              id="otp"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              value={otpCode}
+              onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              required
+            />
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => { setPhoneStage('collect'); setOtpCode(''); setError(''); }}
+            >
+              Use a different phone number
+            </button>
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -383,11 +466,20 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
           </Alert>
         )}
 
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={submitting || (onVerifyStage && otpCode.length !== 6)}
+        >
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'sign-in' ? 'Sign in' : 'Create account'}
+          {mode === 'sign-in'
+            ? 'Sign in'
+            : usePhone
+              ? (onVerifyStage ? 'Verify & create account' : 'Send verification code')
+              : 'Create account'}
         </Button>
       </form>
+
 
       <div className="my-4 flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
