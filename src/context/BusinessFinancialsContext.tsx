@@ -45,9 +45,13 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         return;
       }
 
-      // In this single-tenant schema each user owns their own data via
-      // user_id + RLS. There is no business_id column on sales/expenses/etc.
-      const userId = user.id;
+      // For owners businessId === user.id. For invited staff, businessId is
+      // the owning business's user_id (resolved via staff_members in
+      // BusinessContext). RLS team policies grant staff read access to the
+      // owner's rows, so scoping by businessId surfaces the business data
+      // instead of the staff member's empty own-account rows.
+      const userId = businessId ?? user.id;
+
 
       if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 

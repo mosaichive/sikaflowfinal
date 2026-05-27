@@ -29,10 +29,13 @@ interface SubContextType {
 const SubContext = createContext<SubContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, staffMembership } = useAuth();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Staff members inherit the business owner's subscription; owners use their own.
+  const subscriptionOwnerId = staffMembership?.business_owner_id ?? user?.id ?? null;
 
   const load = useCallback(async () => {
     if (authLoading) return;
@@ -52,10 +55,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     setIsSuperAdmin(!!superRow);
 
+    const targetId = subscriptionOwnerId ?? user.id;
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, subscription_plan, subscription_status, subscription_start_date, subscription_end_date, trial_start_date, trial_end_date')
-      .eq('id', user.id)
+      .eq('id', targetId)
       .maybeSingle();
 
     if (!profile) {
@@ -79,22 +83,23 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       current_period_end: profile.subscription_end_date,
     });
     setLoading(false);
-  }, [user, authLoading]);
+  }, [user, authLoading, subscriptionOwnerId]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!user) return;
-    const channel = supabase.channel(`subscription:${user.id}`)
+    if (!subscriptionOwnerId) return;
+    const channel = supabase.channel(`subscription:${subscriptionOwnerId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${subscriptionOwnerId}` },
         () => { void load(); },
       )
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
-  }, [user, load]);
+  }, [subscriptionOwnerId, load]);
+
 
   const computeAccess = (): { hasAccess: boolean; daysRemaining: number | null } => {
     if (!subscription) return { hasAccess: false, daysRemaining: null };
