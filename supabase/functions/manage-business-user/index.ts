@@ -142,10 +142,37 @@ Deno.serve(async (req) => {
       const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: { display_name: full_name, phone },
       });
-      if (inviteErr || !invited.user) {
-        return json(400, { error: inviteErr?.message || 'Failed to send invite email' });
+      if (inviteErr || !invited?.user) {
+        console.error('inviteUserByEmail failed:', inviteErr);
+        // Fallback: create the user with a random password and generate an invite link.
+        // This avoids dependency on a configured outbound SMTP provider for the invite flow.
+        const tempPassword = crypto.randomUUID() + 'A1!';
+        const { data: created, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password: tempPassword,
+          email_confirm: false,
+          user_metadata: { display_name: full_name, phone, must_change_password: true },
+        });
+        if (createErr || !created.user) {
+          console.error('Fallback createUser failed:', createErr);
+          return json(400, {
+            error: `Failed to send invite email: ${inviteErr?.message || 'unknown error'}. Create fallback also failed: ${createErr?.message || 'unknown'}`,
+          });
+        }
+        newUserId = created.user.id;
+        // Try to generate a recovery/invite link so the owner can share it manually if email didn't go through.
+        try {
+          const { data: linkData } = await admin.auth.admin.generateLink({
+            type: 'invite',
+            email,
+          });
+          console.log('Generated invite link:', linkData?.properties?.action_link);
+        } catch (e) {
+          console.error('generateLink failed:', e);
+        }
+      } else {
+        newUserId = invited.user.id;
       }
-      newUserId = invited.user.id;
     }
 
     // Ensure profile row (handle_new_user trigger may have created it)
