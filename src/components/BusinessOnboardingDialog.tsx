@@ -76,6 +76,9 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
   const [location, setLocation] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resending, setResending] = useState(false);
 
   const currentStep = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
