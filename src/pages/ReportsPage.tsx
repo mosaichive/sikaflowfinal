@@ -417,9 +417,10 @@ export default function ReportsPage() {
         openingStockMovements,
         from,
         to,
+        openingCashBalance: financials.openingCash,
         availableBusinessMoneyOverride: financials.availableBusinessMoney,
       }),
-    [financials.availableBusinessMoney, from, openingStockMovements, raw, to],
+    [financials.availableBusinessMoney, financials.openingCash, from, openingStockMovements, raw, to],
   );
 
   const yearOptions = useMemo(() => {
