@@ -81,7 +81,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
   const [resending, setResending] = useState(false);
 
   const currentStep = STEPS[stepIndex];
-  const isLastStep = stepIndex === STEPS.length - 1;
+  void STEPS;
   const email = user?.email ?? '';
   const metadataName = useMemo(
     () => user?.user_metadata?.display_name || user?.user_metadata?.full_name || '',
@@ -261,7 +261,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
               <BadgeCheck className="h-3.5 w-3.5" /> 30-day trial
             </span>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-4 gap-2">
             {STEPS.map((step, index) => (
               <button
                 key={step.key}
