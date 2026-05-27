@@ -38,6 +38,7 @@ import NotFound from "./pages/NotFound";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import PhoneLoginPage from "./pages/PhoneLoginPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
 
@@ -129,6 +130,7 @@ const App = () => (
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/phone-login" element={<PhoneLoginPage />} />
                 <Route path="/change-password" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/verify" element={<Navigate to="/dashboard" replace />} />
 

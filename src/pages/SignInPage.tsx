@@ -311,6 +311,12 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         Continue with Google
       </Button>
 
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        <Link to="/phone-login" className="font-medium text-primary hover:underline">
+          Sign in with phone number
+        </Link>
+      </p>
+
       {mode === 'sign-up' && (
         <p className="mt-4 text-center text-xs text-muted-foreground">
           New businesses start with a 30-day free trial. No card required.
