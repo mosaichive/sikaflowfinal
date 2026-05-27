@@ -98,20 +98,45 @@ export default function StaffUsersPage() {
     try {
       const email = form.email.trim().toLowerCase();
       if (!email) throw new Error('Email is required');
-      const { data, error } = await (supabase as any)
-        .from('staff_invites')
-        .insert({
-          business_owner_id: user.id,
-          email,
-          display_name: form.full_name.trim() || null,
-          permissions: { role: form.role, modules: form.modules },
-        })
-        .select('token')
-        .single();
-      if (error) throw error;
-      await copyLink(data.token);
-      toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
-      setForm({ email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole) });
+
+      if (form.mode === 'password') {
+        const fullName = form.full_name.trim();
+        if (!fullName) throw new Error('Full name is required for password invite');
+        if (!form.password || form.password.length < 8) throw new Error('Temporary password must be at least 8 characters');
+
+        const { data, error } = await supabase.functions.invoke('manage-business-user', {
+          body: {
+            action: 'invite',
+            mode: 'password',
+            email,
+            full_name: fullName,
+            role: form.role,
+            password: form.password,
+          },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        toast({
+          title: 'Team member created',
+          description: `${fullName} can now log in with the temporary password you set.`,
+        });
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('staff_invites')
+          .insert({
+            business_owner_id: user.id,
+            email,
+            display_name: form.full_name.trim() || null,
+            permissions: { role: form.role, modules: form.modules },
+          })
+          .select('token')
+          .single();
+        if (error) throw error;
+        await copyLink(data.token);
+        toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
+      }
+
+      setForm({ email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
       setInviteOpen(false);
       void load();
     } catch (err) {
