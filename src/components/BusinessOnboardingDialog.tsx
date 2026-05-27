@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 
 type RoleKey = 'owner' | 'manager' | 'admin';
-type StepKey = 'business' | 'owner' | 'review';
+type StepKey = 'business' | 'owner' | 'review' | 'verify';
 
 const STEPS: { key: StepKey; label: string; title: string; subtitle: string }[] = [
   {
@@ -34,6 +34,12 @@ const STEPS: { key: StepKey; label: string; title: string; subtitle: string }[] 
     label: 'Review',
     title: 'Your 30-day trial is ready',
     subtitle: 'No billing step here. The app will remind you when it is time to upgrade.',
+  },
+  {
+    key: 'verify',
+    label: 'Verify',
+    title: 'Verify your phone number',
+    subtitle: 'Enter the 6-digit code we just sent by SMS to confirm your number.',
   },
 ];
 
@@ -70,9 +76,12 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
   const [location, setLocation] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resending, setResending] = useState(false);
 
   const currentStep = STEPS[stepIndex];
-  const isLastStep = stepIndex === STEPS.length - 1;
+  void STEPS;
   const email = user?.email ?? '';
   const metadataName = useMemo(
     () => user?.user_metadata?.display_name || user?.user_metadata?.full_name || '',
@@ -112,6 +121,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     business: ['companyName', 'location', 'employees'],
     owner: ['ownerName', 'phone', 'role', 'email'],
     review: ['companyName', 'location', 'employees', 'ownerName', 'phone', 'email'],
+    verify: [],
   };
 
   const validateStep = (key = currentStep.key) => {
@@ -135,37 +145,76 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     setStepIndex((value) => Math.max(value - 1, 0));
   };
 
-  const submitBusinessSetup = async () => {
+  const saveProfileAndSendOtp = async () => {
     if (!user || !validateStep('review')) return;
     setSubmitting(true);
     try {
-      const db = supabase as any;
-      const { data: businessId, error: businessError } = await db.rpc('create_business_for_owner', {
-        _name: companyName.trim(),
-        _email: email,
-        _phone: phone.trim(),
-        _location: location.trim(),
-        _employees: employees,
-        _logo_light_url: '',
-        _logo_dark_url: '',
-      });
-      if (businessError) throw businessError;
-      if (!businessId) throw new Error('Business setup did not return an id');
-
-      await Promise.all([
-        db.from('businesses').update({
-          email_verified: true,
-          phone_verified: true,
-          status: 'active',
-        }).eq('id', businessId),
-        db.from('profiles').update({
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          business_name: companyName.trim(),
           display_name: ownerName.trim(),
           phone: phone.trim(),
           title: role,
-          email_verified: true,
-          phone_verified: true,
-        }).eq('user_id', user.id),
-      ]);
+          location: location.trim(),
+          num_employees: String(employees),
+        })
+        .eq('id', user.id);
+      if (profileError) throw profileError;
+
+      const { error: otpError } = await supabase.functions.invoke('send-signup-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (otpError) throw otpError;
+
+      toast({ title: 'Code sent', description: 'Check your phone for the 6-digit code.' });
+      setOtpCode('');
+      setOtpError('');
+      setDirection(1);
+      setStepIndex(STEPS.findIndex((s) => s.key === 'verify'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      toast({ title: 'Could not send code', description: message, variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    setResending(true);
+    setOtpError('');
+    try {
+      const { error } = await supabase.functions.invoke('send-signup-otp', {
+        body: { phone: phone.trim() },
+      });
+      if (error) throw error;
+      toast({ title: 'New code sent' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not resend code.';
+      toast({ title: 'Resend failed', description: message, variant: 'destructive' });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const submitVerify = async () => {
+    if (!user) return;
+    if (otpCode.length !== 6) {
+      setOtpError('Enter the 6-digit code from your SMS.');
+      return;
+    }
+    setSubmitting(true);
+    setOtpError('');
+    try {
+      const { error: verifyError } = await supabase.functions.invoke('verify-signup-otp', {
+        body: { phone: phone.trim(), otp: otpCode },
+      });
+      if (verifyError) throw verifyError;
+
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('id', user.id);
 
       await supabase.functions.invoke('claim-referral', {
         body: {
@@ -175,11 +224,11 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
       });
 
       await Promise.all([refreshProfile(), refreshBusiness(), refreshSubscription()]);
-      toast({ title: 'Workspace created', description: 'Your dashboard is ready and your 30-day trial has started.' });
+      toast({ title: 'Workspace ready', description: 'Phone verified. Welcome to KudiTrack.' });
       onCompleted?.();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast({ title: 'Business setup failed', description: message, variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Invalid or expired code.';
+      setOtpError(message);
     } finally {
       setSubmitting(false);
     }
@@ -187,8 +236,12 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (isLastStep) {
-      void submitBusinessSetup();
+    if (currentStep.key === 'review') {
+      void saveProfileAndSendOtp();
+      return;
+    }
+    if (currentStep.key === 'verify') {
+      void submitVerify();
       return;
     }
     goNext();
@@ -208,7 +261,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
               <BadgeCheck className="h-3.5 w-3.5" /> 30-day trial
             </span>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-4 gap-2">
             {STEPS.map((step, index) => (
               <button
                 key={step.key}
@@ -327,6 +380,42 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
                     </div>
                   </div>
                 )}
+
+                {currentStep.key === 'verify' && (
+                  <div className="space-y-5">
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Phone className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="font-semibold">We sent a code to {phone}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Enter the 6-digit code below to verify your phone and finish setup.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Field label="6-digit code" icon={BadgeCheck} error={otpError}>
+                      <Input
+                        inputMode="numeric"
+                        pattern="\d{6}"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(event) => { setOtpCode(event.target.value.replace(/\D/g, '')); setOtpError(''); }}
+                        placeholder="123456"
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={resendOtp}
+                      disabled={resending || submitting}
+                      className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                    >
+                      {resending ? 'Resending…' : "Didn't get the code? Resend"}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -336,16 +425,18 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
               <Rocket className="h-3.5 w-3.5" /> Finish setup to open your workspace.
             </div>
             <div className="flex gap-2">
-              {stepIndex > 0 && (
+              {stepIndex > 0 && currentStep.key !== 'verify' && (
                 <Button type="button" variant="outline" onClick={goBack} disabled={submitting}>
                   Back
                 </Button>
               )}
               <Button type="submit" disabled={submitting} className="min-w-36">
                 {submitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
-                ) : isLastStep ? (
-                  'Open dashboard'
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working...</>
+                ) : currentStep.key === 'review' ? (
+                  'Send verification code'
+                ) : currentStep.key === 'verify' ? (
+                  'Verify & open dashboard'
                 ) : (
                   <>Next <ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
