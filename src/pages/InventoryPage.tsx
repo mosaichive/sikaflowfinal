@@ -375,12 +375,11 @@ export default function InventoryPage() {
     setDialogOpen(true);
   };
 
-  const cleanupLegacyRestockExpense = async (restockId: string) => {
-    const existingExpenseId = restockExpenseByRestockId.get(restockId) || null;
-    if (!existingExpenseId) return;
-    const { error } = await supabase.from('expenses').delete().eq('id', existingExpenseId);
-    if (error) throw error;
-  };
+  // Restock ↔ Expense linkage is now maintained by the `trg_sync_restock_to_expense`
+  // database trigger. The client no longer needs to delete or recreate matching
+  // expense rows — inserting / updating / deleting a restock automatically keeps
+  // its "Restock" expense in sync.
+
 
   const upsertRestockMovement = async ({
     restockId,
