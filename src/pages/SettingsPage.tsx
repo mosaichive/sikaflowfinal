@@ -1079,6 +1079,8 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        </section>
+
         {/* Reset Dialogs */}
         <AlertDialog open={resetOpen} onOpenChange={(o) => { setResetOpen(o); if (!o) setResetInput(''); }}>
           <AlertDialogContent>
