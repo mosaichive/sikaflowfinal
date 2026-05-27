@@ -715,6 +715,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        </section>
+
+        {/* ===== B. Sales Settings ===== */}
+        <section id="settings-sales" className="space-y-6 scroll-mt-24">
+
         <Card>
           <CardHeader><CardTitle className="text-base">Store</CardTitle></CardHeader>
           <CardContent className="space-y-5 text-sm">
