@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async';
+
 import { HeroSection } from '@/components/marketing/sections/HeroSection';
 import { FeaturesSection } from '@/components/marketing/sections/FeaturesSection';
 import { ProblemSection } from '@/components/marketing/sections/ProblemSection';
