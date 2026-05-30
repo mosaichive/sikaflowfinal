@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_applications: {
+        Row: {
+          ad_goal: string | null
+          budget: string | null
+          business_name: string
+          business_type: string | null
+          contact_name: string
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          phone: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          ad_goal?: string | null
+          budget?: string | null
+          business_name: string
+          business_type?: string | null
+          contact_name: string
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          ad_goal?: string | null
+          budget?: string | null
+          business_name?: string
+          business_type?: string | null
+          contact_name?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       announcements: {
         Row: {
           audience: Database["public"]["Enums"]["announcement_audience"]
@@ -212,6 +260,42 @@ export type Database = {
           recorded_by_name?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      feedback_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject?: string
         }
         Relationships: []
       }
