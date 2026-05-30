@@ -157,10 +157,22 @@ const App = () => (
                   <Route path="ads" element={<AdsPage />} />
                   <Route path="support" element={<PlatformSupportPage />} />
                   <Route path="announcements" element={<PlatformAnnouncementsPage />} />
+                  <Route path="feedback" element={<PlatformFeedbackPage />} />
+                  <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
+                </Route>
+
+                {/* Public marketing site */}
+                <Route element={<MarketingLayout />}>
+                  <Route path="/" element={<MarketingOrDashboard />} />
+                  <Route path="/features" element={<MarketingHome />} />
+                  <Route path="/pricing" element={<MarketingHome />} />
+                  <Route path="/reviews" element={<MarketingHome />} />
+                  <Route path="/advertise" element={<MarketingHome />} />
+                  <Route path="/contact" element={<MarketingHome />} />
+                  <Route path="/feedback" element={<MarketingHome />} />
                 </Route>
 
                 {/* Tenant app */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="dashboard"><Dashboard /></RequireModule></ProtectedRoute>} />
                 <Route path="/sales" element={<ProtectedRoute><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />
