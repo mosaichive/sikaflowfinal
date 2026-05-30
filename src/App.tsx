@@ -41,6 +41,17 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PhoneLoginPage from "./pages/PhoneLoginPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
+import { MarketingLayout } from "./components/marketing/MarketingLayout";
+import MarketingHome from "./pages/marketing/HomePage";
+import PlatformFeedbackPage from "./pages/platform/FeedbackPage";
+import PlatformAdApplicationsPage from "./pages/platform/AdApplicationsPage";
+
+function MarketingOrDashboard() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Loading..." size="md" /></div>;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <MarketingHome />;
+}
 
 
 const queryClient = new QueryClient();
@@ -146,10 +157,22 @@ const App = () => (
                   <Route path="ads" element={<AdsPage />} />
                   <Route path="support" element={<PlatformSupportPage />} />
                   <Route path="announcements" element={<PlatformAnnouncementsPage />} />
+                  <Route path="feedback" element={<PlatformFeedbackPage />} />
+                  <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
+                </Route>
+
+                {/* Public marketing site */}
+                <Route element={<MarketingLayout />}>
+                  <Route path="/" element={<MarketingOrDashboard />} />
+                  <Route path="/features" element={<MarketingHome />} />
+                  <Route path="/pricing" element={<MarketingHome />} />
+                  <Route path="/reviews" element={<MarketingHome />} />
+                  <Route path="/advertise" element={<MarketingHome />} />
+                  <Route path="/contact" element={<MarketingHome />} />
+                  <Route path="/feedback" element={<MarketingHome />} />
                 </Route>
 
                 {/* Tenant app */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="dashboard"><Dashboard /></RequireModule></ProtectedRoute>} />
                 <Route path="/sales" element={<ProtectedRoute><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />

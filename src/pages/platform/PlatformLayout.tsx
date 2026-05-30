@@ -4,7 +4,7 @@ import { useSubscription } from '@/context/SubscriptionContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, LogOut, Wallet, ImagePlus, LifeBuoy, Gift } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
@@ -15,6 +15,8 @@ const NAV = [
   { to: '/super-admin/payment-methods', label: 'Payment Methods', icon: Wallet },
   { to: '/super-admin/referrals', label: 'Referrals', icon: Gift },
   { to: '/super-admin/ads', label: 'Ads', icon: ImagePlus },
+  { to: '/super-admin/ad-applications', label: 'Ad Applications', icon: Sparkles },
+  { to: '/super-admin/feedback', label: 'Feedback', icon: MessageSquare },
   { to: '/super-admin/support', label: 'Support', icon: LifeBuoy },
   { to: '/super-admin/announcements', label: 'Announcements', icon: Megaphone },
 ];
