@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
-  { label: 'Pricing', href: '/#pricing' },
   { label: 'Reviews', href: '/#reviews' },
   { label: 'Advertise', href: '/#advertise' },
   { label: 'Contact', href: '/#contact' },
@@ -202,7 +201,6 @@ function Footer() {
             title="Product"
             links={[
               { label: 'Features', href: '/#features' },
-              { label: 'Pricing', href: '/#pricing' },
               { label: 'Reviews', href: '/#reviews' },
               { label: 'FAQ', href: '/#faq' },
             ]}
