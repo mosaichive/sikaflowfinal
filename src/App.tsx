@@ -41,6 +41,17 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PhoneLoginPage from "./pages/PhoneLoginPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
+import { MarketingLayout } from "./components/marketing/MarketingLayout";
+import MarketingHome from "./pages/marketing/HomePage";
+import PlatformFeedbackPage from "./pages/platform/FeedbackPage";
+import PlatformAdApplicationsPage from "./pages/platform/AdApplicationsPage";
+
+function MarketingOrDashboard() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Loading..." size="md" /></div>;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <MarketingHome />;
+}
 
 
 const queryClient = new QueryClient();
