@@ -371,6 +371,73 @@ function getOnboardingCompletionKey(userId: string) {
   return `sikaflow_onboarding_complete_${userId}`;
 }
 
+// Tabbed analytics chart — area or bar with gradient fill + interactive tooltip.
+function AnalyticsChart({
+  data, dataKey, gradientId, stroke, stop1, stop2, emptyText, kind,
+}: {
+  data: { label: string; sales: number; profit: number; expenses: number }[];
+  dataKey: 'sales' | 'profit' | 'expenses';
+  gradientId: string;
+  stroke: string;
+  stop1: string;
+  stop2: string;
+  emptyText: string;
+  kind: 'area' | 'bar';
+}) {
+  const hasData = data.some((row) => (row[dataKey] as number) > 0);
+  if (!hasData) {
+    return (
+      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 text-sm text-muted-foreground">
+        {emptyText}
+      </div>
+    );
+  }
+  return (
+    <div className="h-[320px]">
+      <ResponsiveContainer width="100%" height="100%">
+        {kind === 'area' ? (
+          <AreaChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={stop1} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={stop2} stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={50} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <RechartsTooltip
+              cursor={{ stroke, strokeOpacity: 0.2 }}
+              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
+              formatter={(value: number) => formatCurrency(value)}
+            />
+            <Area type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2.5} fill={`url(#${gradientId})`} animationDuration={700} />
+          </AreaChart>
+        ) : (
+          <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={stop1} stopOpacity={0.95} />
+                <stop offset="100%" stopColor={stop2} stopOpacity={0.4} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={50} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <RechartsTooltip
+              cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
+              formatter={(value: number) => formatCurrency(value)}
+            />
+            <Bar dataKey={dataKey} fill={`url(#${gradientId})`} radius={[8, 8, 0, 0]} animationDuration={700} />
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+
 
 export default function Dashboard() {
   const now = new Date();
