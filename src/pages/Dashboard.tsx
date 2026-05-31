@@ -234,56 +234,143 @@ function buildSalesChart(sales: SaleRow[], year: number, month: number | null) {
   return Array.from(grouped.entries()).map(([label, value]) => ({ label, value }));
 }
 
-function MetricCard({
+// Premium gradient KPI card used in the top row of the dashboard.
+function KpiCard({
   title,
   value,
   icon: Icon,
   helper,
-  tooltip,
-  valueClassName,
+  gradient,
+  iconTint,
+  trend,
+  index = 0,
+  isCurrency = true,
 }: {
   title: string;
-  value: string;
+  value: number;
   icon: React.ComponentType<{ className?: string }>;
-  helper: string;
-  tooltip?: string;
-  valueClassName?: string;
+  helper?: string;
+  gradient: string; // tailwind gradient classes for the soft background
+  iconTint: string; // tailwind classes for the icon chip
+  trend?: { value: number; label: string; direction: 'up' | 'down' | 'flat' } | null;
+  index?: number;
+  isCurrency?: boolean;
 }) {
   return (
-    <Card className="border-border/70 bg-card/85">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
-              {tooltip ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="text-xs text-muted-foreground underline decoration-dotted underline-offset-4">
-                      Info
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-sm">
-                    {tooltip}
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
-            <p className={cn('text-3xl font-semibold tracking-tight text-foreground', valueClassName)}>{value}</p>
-            <p className="text-sm text-muted-foreground">{helper}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: index * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
+      whileHover={{ y: -3 }}
+      className="group relative"
+    >
+      {/* Glow */}
+      <div className={cn('pointer-events-none absolute -inset-px rounded-3xl opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-60', gradient)} />
+      <div className={cn(
+        'relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-5 backdrop-blur-xl shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:border-border',
+      )}>
+        {/* Soft gradient wash */}
+        <div className={cn('pointer-events-none absolute inset-0 opacity-70 bg-gradient-to-br', gradient)} />
+        {/* Decorative blob */}
+        <div className={cn('pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full blur-3xl opacity-30 bg-gradient-to-br', gradient)} />
+        <div className="relative flex items-start justify-between">
+          <div className="space-y-2 min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground tabular-nums">
+              {isCurrency
+                ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
+                : <AnimatedNumber value={value} />}
+            </p>
+            {trend ? (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className={cn(
+                  'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold',
+                  trend.direction === 'up' && 'bg-emerald-500/15 text-emerald-500',
+                  trend.direction === 'down' && 'bg-rose-500/15 text-rose-500',
+                  trend.direction === 'flat' && 'bg-muted text-muted-foreground',
+                )}>
+                  {trend.direction === 'up' ? <ArrowUpRight className="h-3 w-3" /> : trend.direction === 'down' ? <ArrowDownRight className="h-3 w-3" /> : null}
+                  {trend.direction === 'flat' ? '0%' : `${trend.direction === 'up' ? '+' : '-'}${Math.abs(trend.value).toFixed(1)}%`}
+                </span>
+                <span className="text-muted-foreground truncate">{trend.label}</span>
+              </div>
+            ) : helper ? (
+              <p className="text-xs text-muted-foreground line-clamp-1">{helper}</p>
+            ) : null}
           </div>
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-inner ring-1 ring-inset ring-white/10', iconTint)}>
             <Icon className="h-5 w-5" />
           </span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
+}
+
+// Compact secondary metric (Stock Left, Other Income, etc).
+function MiniMetric({
+  title,
+  value,
+  icon: Icon,
+  helper,
+  valueClassName,
+  index = 0,
+  isCurrency = false,
+}: {
+  title: string;
+  value: number | string;
+  icon: React.ComponentType<{ className?: string }>;
+  helper?: string;
+  valueClassName?: string;
+  index?: number;
+  isCurrency?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.25 + index * 0.05 }}
+      className="group rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-sm transition-all hover:border-border hover:bg-card hover:-translate-y-0.5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <p className={cn('text-xl font-bold tabular-nums text-foreground', valueClassName)}>
+            {typeof value === 'number'
+              ? (isCurrency
+                  ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
+                  : <AnimatedNumber value={value} />)
+              : value}
+          </p>
+          {helper ? <p className="text-[11px] text-muted-foreground line-clamp-1">{helper}</p> : null}
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good Morning';
+  if (h < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
+function computeTrend(current: number, previous: number): { value: number; label: string; direction: 'up' | 'down' | 'flat' } {
+  if (!previous && !current) return { value: 0, label: 'vs prior period', direction: 'flat' };
+  if (!previous) return { value: 100, label: 'vs prior period', direction: 'up' };
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  if (Math.abs(pct) < 0.05) return { value: 0, label: 'vs prior period', direction: 'flat' };
+  return { value: pct, label: 'vs prior period', direction: pct > 0 ? 'up' : 'down' };
 }
 
 function getOnboardingCompletionKey(userId: string) {
   return `sikaflow_onboarding_complete_${userId}`;
 }
+
 
 export default function Dashboard() {
   const now = new Date();
