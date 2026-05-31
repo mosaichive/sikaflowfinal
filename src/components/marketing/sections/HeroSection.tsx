@@ -111,7 +111,7 @@ export function HeroSection() {
               variant="outline"
               className="h-12 px-7 rounded-full bg-white/5 border-white/20 text-white hover:bg-white/10 hover:text-white backdrop-blur"
             >
-              <a href="#dashboard">
+              <a href="#watch-demo">
                 <Play className="mr-1.5 h-4 w-4" /> Watch Demo
               </a>
             </Button>
