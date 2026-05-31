@@ -6,6 +6,7 @@ type Ad = {
   id: string;
   title: string;
   description: string;
+  image_url: string;
   cta_text: string | null;
   cta_url: string | null;
   active: boolean;
@@ -23,7 +24,7 @@ export function HeaderAdsTicker() {
     const load = async () => {
       const { data } = await supabase
         .from('platform_ads' as any)
-        .select('id,title,description,cta_text,cta_url,active,sort_order')
+        .select('id,title,description,image_url,cta_text,cta_url,active,sort_order')
         .eq('active', true)
         .order('sort_order')
         .order('created_at');
@@ -64,12 +65,10 @@ export function HeaderAdsTicker() {
   const renderMobileAd = (ad: Ad, itemIndex: number) => {
     const href = ad.cta_url?.trim();
     const external = href ? /^https?:\/\//i.test(href) : false;
-    const itemLabel = ad.cta_text || ad.description;
     const item = (
-      <span className="inline-flex h-6 max-w-[180px] items-center gap-1 rounded-full bg-primary/10 px-2 text-[10px] font-semibold text-primary">
-        <span className="truncate">{ad.title}</span>
-        {itemLabel ? <span className="shrink-0 text-primary/70">- {itemLabel}</span> : null}
-        {external ? <ExternalLink className="h-2.5 w-2.5 shrink-0" /> : null}
+      <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-primary/10 px-2 text-[10px] font-semibold text-primary">
+        <img src={ad.image_url} alt="" loading="lazy" className="h-4 w-4 shrink-0 rounded-full object-cover" />
+        <span className="shrink-0">Learn more</span>
       </span>
     );
 
@@ -101,7 +100,7 @@ export function HeaderAdsTicker() {
         <div className="relative h-8 overflow-hidden rounded-full border border-border/70 bg-muted/30">
           <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-card to-transparent" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-card to-transparent" />
-          <div className="flex h-full w-max items-center gap-2 whitespace-nowrap px-2 will-change-transform [animation:header-ad-marquee-ltr_18s_linear_infinite]">
+          <div className="flex h-full w-max items-center gap-2 whitespace-nowrap px-2 will-change-transform [animation:header-ad-marquee-rtl_36s_linear_infinite]">
             {mobileAds.map(renderMobileAd)}
           </div>
         </div>
