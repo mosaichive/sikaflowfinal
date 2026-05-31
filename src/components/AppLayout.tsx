@@ -65,19 +65,19 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
       <div className="min-h-screen flex w-full bg-background">
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-            <div className="flex items-center gap-3">
+          <header className="h-14 flex items-center gap-2 border-b border-border px-4 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+            <div className="flex shrink-0 items-center gap-3">
               {!isMobile && <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors duration-200" />}
               <div className="flex items-center gap-2 md:hidden">
                 <Logo className="h-6 w-6 object-contain" />
-                <span className="text-sm font-semibold text-foreground truncate max-w-[140px]">
+                <span className="max-w-[112px] truncate text-sm font-semibold text-foreground min-[390px]:max-w-[140px]">
                   {business?.name || 'KudiTrack'}
                 </span>
               </div>
               {title && <h1 className="text-lg font-semibold text-foreground hidden md:block">{title}</h1>}
             </div>
             <HeaderAdsTicker />
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 md:gap-3">
               <button
                 onClick={() => navigate('/announcements')}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 active:scale-95 relative"

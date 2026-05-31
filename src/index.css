@@ -4,6 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes header-ad-marquee-ltr {
+  from {
+    transform: translateX(-50%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 98%;
