@@ -642,6 +642,66 @@ export default function Dashboard() {
     [data.products],
   );
 
+  // Previous period financials — for KPI trend % deltas.
+  const previousFinancials = useMemo(() => {
+    const fromMs = new Date(`${dateRange.from}T00:00:00`).getTime();
+    const toMs = new Date(`${dateRange.to}T23:59:59`).getTime();
+    const span = toMs - fromMs;
+    const prevToMs = fromMs - 1;
+    const prevFromMs = prevToMs - span;
+    const inPrev = (value: string | null | undefined) => {
+      if (!value) return false;
+      const t = new Date(value).getTime();
+      return !Number.isNaN(t) && t >= prevFromMs && t <= prevToMs;
+    };
+    const sales = data.sales.filter((row) => inPrev(row.sale_date));
+    const saleIds = new Set(sales.map((row) => row.id));
+    return calculateBusinessFinancials({
+      sales: sales as any,
+      saleItems: data.saleItems.filter((item) => saleIds.has(item.sale_id)) as any,
+      products: data.products as any,
+      otherIncome: data.otherIncome.filter((row) => inPrev(row.income_date)) as any,
+      expenses: data.expenses.filter((row) => inPrev(row.expense_date)) as any,
+      savings: data.savings.filter((row) => inPrev(row.savings_date)) as any,
+      investments: data.investments.filter((row) => inPrev(row.investment_date)) as any,
+      investorFunds: data.investorFunds.filter((row) => inPrev(row.date_received)) as any,
+      restocks: data.restocks as any,
+      openingCashBalance: financials.openingCash,
+    });
+  }, [data, dateRange.from, dateRange.to, financials.openingCash]);
+
+  // Combined series for the analytics chart tabs.
+  const analyticsChartData = useMemo(() => {
+    const buckets = new Map<string, { label: string; sales: number; expenses: number }>();
+    salesChartData.forEach((row) => {
+      buckets.set(row.label, { label: row.label, sales: row.value, expenses: 0 });
+    });
+    if (month === null) {
+      data.expenses.forEach((row) => {
+        const date = new Date(row.expense_date);
+        if (date.getFullYear() !== year) return;
+        const key = new Date(Date.UTC(year, date.getMonth(), 1)).toLocaleDateString('en-GH', { month: 'short' });
+        const existing = buckets.get(key) || { label: key, sales: 0, expenses: 0 };
+        existing.expenses += toNumber(row.amount);
+        buckets.set(key, existing);
+      });
+    } else {
+      data.expenses.forEach((row) => {
+        const date = new Date(row.expense_date);
+        if (date.getFullYear() !== year || date.getMonth() !== month) return;
+        const key = String(date.getDate()).padStart(2, '0');
+        const existing = buckets.get(key) || { label: key, sales: 0, expenses: 0 };
+        existing.expenses += toNumber(row.amount);
+        buckets.set(key, existing);
+      });
+    }
+    return Array.from(buckets.values()).map((row) => ({
+      ...row,
+      profit: Math.max(0, row.sales - row.expenses),
+    }));
+  }, [salesChartData, data.expenses, year, month]);
+
+
   if (loading || financialsLoading) {
     return (
       <AppLayout title="Dashboard">
