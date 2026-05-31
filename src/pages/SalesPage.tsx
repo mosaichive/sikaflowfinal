@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -33,10 +34,27 @@ import {
   updateSaleRecord,
 } from '@/lib/workspace';
 
+type SaleLine = {
+  key: string;
+  product_id: string;
+  quantity: string;
+  discount: string;
+  amount: string;
+};
+
+const newLine = (): SaleLine => ({
+  key: Math.random().toString(36).slice(2),
+  product_id: '',
+  quantity: '',
+  discount: '',
+  amount: '',
+});
+
 export default function SalesPage() {
   const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
   const { businessId, business } = useBusiness();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [sales, setSales] = useState<any[]>([]);
@@ -60,24 +78,6 @@ export default function SalesPage() {
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [pendingStockOverrideAction, setPendingStockOverrideAction] = useState<'new' | 'edit' | null>(null);
-
-  // Multi-product line items. Each row stores strings so qty/discount/amount
-  // can stay empty by default (per spec). `amount` is the line total in GH₵;
-  // if blank, it auto-derives from qty × product price − discount.
-  type SaleLine = {
-    key: string;
-    product_id: string;
-    quantity: string;
-    discount: string;
-    amount: string;
-  };
-  const newLine = (): SaleLine => ({
-    key: Math.random().toString(36).slice(2),
-    product_id: '',
-    quantity: '',
-    discount: '',
-    amount: '',
-  });
 
   const [lines, setLines] = useState<SaleLine[]>([newLine()]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -201,7 +201,7 @@ export default function SalesPage() {
     // adjust_stock_on_sale_item trigger, which handles all stock deltas.
   };
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setLines([newLine()]);
     setPaymentMethod('cash');
     setAmountPaid(0);
@@ -212,7 +212,19 @@ export default function SalesPage() {
     setSaleNotes('');
     setEditSaleId(null);
     setEditOriginalLines([]);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get('newSale') !== '1') return;
+
+    resetForm();
+    setOpen(true);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('newSale');
+      return next;
+    }, { replace: true });
+  }, [resetForm, searchParams, setSearchParams]);
 
   const createSaleMovement = async (_args: {
     saleItemId: string;

@@ -889,7 +889,7 @@ export default function Dashboard() {
               </Tooltip>
 
               <Button asChild size="sm" className="rounded-full gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 hover:opacity-95 shadow-md shadow-primary/30">
-                <Link to="/sales"><Plus className="h-4 w-4" />New Sale</Link>
+                <Link to="/sales?newSale=1"><Plus className="h-4 w-4" />New Sale</Link>
               </Button>
             </div>
           </div>

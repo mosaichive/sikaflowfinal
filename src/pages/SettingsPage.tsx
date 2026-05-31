@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2, User, DollarSign, FileClock } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
 import { ReferralProgramCard } from '@/components/settings/ReferralProgramCard';
 import { EmailVerificationCard } from '@/components/settings/EmailVerificationCard';
@@ -85,6 +85,14 @@ export default function SettingsPage() {
 
   // Team members who aren't admins should land on Profile by default.
   const staffOnlyProfile = isStaffMember && !isAdmin;
+  const settingsCategoryItems = staffOnlyProfile
+    ? [{ title: 'Profile', section: 'profile' as const, icon: User, description: 'Manage your photo, name, phone and account details.' }]
+    : [
+        { title: 'Profile', section: 'profile' as const, icon: User, description: 'Manage your photo, name, business display and account details.' },
+        { title: 'Sales Settings', section: 'sales' as const, icon: DollarSign, description: 'Control inventory rules, opening cash and sales preferences.' },
+        { title: 'Bank', section: 'bank' as const, icon: Landmark, description: 'Add and manage bank or mobile money accounts.' },
+        { title: 'Audit Log', section: 'audit' as const, icon: FileClock, description: 'Review recent system and team activity.' },
+      ];
 
   // Profile state
   const location = useLocation();
@@ -570,9 +578,39 @@ export default function SettingsPage() {
     <AppLayout title="Settings">
       <div className="space-y-6 animate-fade-in max-w-3xl">
         {activeSection === 'none' && (
-          <div className="rounded-2xl border border-border/70 bg-card/60 p-8 text-center text-sm text-muted-foreground backdrop-blur">
-            Choose a settings category from the sidebar to get started.
-          </div>
+          <>
+            <div className="hidden rounded-2xl border border-border/70 bg-card/60 p-8 text-center text-sm text-muted-foreground backdrop-blur md:block">
+              Choose a settings category from the sidebar to get started.
+            </div>
+            <div className="space-y-3 md:hidden">
+              <div className="px-1">
+                <p className="text-xs uppercase tracking-[0.22em] text-primary">Settings</p>
+                <h2 className="mt-1 text-xl font-semibold text-foreground">Choose a category</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Tap a category to manage that part of your account.</p>
+              </div>
+              <div className="grid gap-3">
+                {settingsCategoryItems.map((category) => {
+                  const Icon = category.icon;
+                  return (
+                    <button
+                      key={category.section}
+                      type="button"
+                      onClick={() => navigate(`/settings?s=${category.section}`)}
+                      className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/70 p-4 text-left shadow-sm backdrop-blur transition-colors hover:border-primary/40 hover:bg-secondary/70"
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-foreground">{category.title}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{category.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {/* ===== A. Profile ===== */}

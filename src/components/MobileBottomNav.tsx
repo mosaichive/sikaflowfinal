@@ -22,7 +22,7 @@ const MORE_ITEMS = [
   { to: '/reports', label: 'Reports', icon: BarChart3, minRole: 'manager' as const },
   { to: '/staff', label: 'Staff / Users', icon: Shield, adminOnly: true },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
-  { to: '/settings', label: 'Settings', icon: Settings, adminOnly: true },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function MobileBottomNav() {
