@@ -5,7 +5,7 @@ import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingRefer
 import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
 import { ALL_MODULES, modulesForRole, type ModuleKey } from '@/lib/permissions';
 
-export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'distributor' | 'business_owner';
+export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'cashier' | 'distributor' | 'business_owner';
 
 export interface StaffMembership {
   business_owner_id: string;
@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const roles = ((data || []) as Array<{ role: AppRole }>).map((row) => row.role);
-    const priority: AppRole[] = ['super_admin', 'admin', 'business_owner', 'manager', 'salesperson', 'distributor', 'staff'];
+    const priority: AppRole[] = ['super_admin', 'admin', 'business_owner', 'manager', 'salesperson', 'cashier', 'distributor', 'staff'];
     const nextRole = priority.find((candidate) => roles.includes(candidate)) || null;
     setRole(nextRole);
     return nextRole;
@@ -364,12 +364,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileBio: profile.bio,
       signOut,
       refreshProfile: async () => {
-        if (!user?.id) return;
-        await Promise.all([fetchProfile(user.id), fetchRole(user.id), fetchStaffMembership(user.id)]);
+        const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) return;
+        await Promise.all([fetchProfile(userId), fetchRole(userId), fetchStaffMembership(userId)]);
       },
       isAdmin,
       isManager: role === 'manager' || staffMembership?.role === 'manager',
-      isSalesperson: role === 'salesperson' || staffMembership?.role === 'salesperson',
+      isSalesperson: role === 'salesperson' || role === 'cashier' || staffMembership?.role === 'salesperson' || staffMembership?.role === 'cashier',
       isDistributor: role === 'distributor' || staffMembership?.role === 'distributor',
       isSuperAdmin,
       onboardingCompleted: profile.onboarding_completed || isStaffMember,

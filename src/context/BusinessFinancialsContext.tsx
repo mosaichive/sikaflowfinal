@@ -32,117 +32,111 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
   const [financials, setFinancials] = useState<BusinessFinancials>(EMPTY_FINANCIALS);
   const [loading, setLoading] = useState(true);
   const hasLoadedOnceRef = useRef(false);
-  const inFlightRef = useRef<Promise<void> | null>(null);
+  const loadSeqRef = useRef(0);
 
   const load = useCallback(async (showLoading = false) => {
-    if (inFlightRef.current) return inFlightRef.current;
+    const loadSeq = ++loadSeqRef.current;
+    if (!user || businessLoading) {
+      setFinancials(EMPTY_FINANCIALS);
+      setLoading(true);
+      hasLoadedOnceRef.current = false;
+      return;
+    }
 
-    const run = (async () => {
-      if (!user || businessLoading) {
-        setFinancials(EMPTY_FINANCIALS);
-        setLoading(true);
-        hasLoadedOnceRef.current = false;
-        return;
-      }
+    // For owners businessId === user.id. For invited staff, businessId is
+    // the owning business's user_id (resolved via staff_members in
+    // BusinessContext). RLS team policies grant staff read access to the
+    // owner's rows, so scoping by businessId surfaces the business data
+    // instead of the staff member's empty own-account rows.
+    const userId = businessId ?? user.id;
 
-      // For owners businessId === user.id. For invited staff, businessId is
-      // the owning business's user_id (resolved via staff_members in
-      // BusinessContext). RLS team policies grant staff read access to the
-      // owner's rows, so scoping by businessId surfaces the business data
-      // instead of the staff member's empty own-account rows.
-      const userId = businessId ?? user.id;
+    if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
+    try {
+      const db = supabase as any;
+      // Tables that exist for this user. `restocks`, `investments`, and
+      // `investor_funding` do not exist in the live schema and have been
+      // removed to avoid silent query failures that zero out financials.
+      const [
+        salesRes,
+        productsRes,
+        expensesRes,
+        otherIncomeRes,
+        savingsRes,
+        restocksRes,
+        investmentsRes,
+        investorFundsRes,
+        profileRes,
+      ] = await Promise.allSettled([
+        db
+          .from('sales')
+          .select('id,total,amount_paid,sale_date')
+          .eq('user_id', userId)
+          .order('sale_date', { ascending: false }),
+        loadProductsCompat(false, businessId ?? userId),
+        db.from('expenses').select('amount,category,note,description').eq('user_id', userId),
+        db.from('other_income').select('amount').eq('user_id', userId),
+        db.from('savings').select('amount').eq('user_id', userId),
+        db.from('restocks').select('total_cost,status,is_opening_stock').eq('user_id', userId),
+        db.from('investments').select('amount,status').eq('user_id', userId),
+        db.from('investor_funding').select('amount').eq('user_id', userId),
+        db.from('profiles').select('opening_cash_balance').eq('id', userId).maybeSingle(),
+      ]);
 
-      if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
+      if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { userId });
+      if (productsRes.status === 'rejected') logSupabaseError('financials.load.products', productsRes.reason, { userId });
+      if (expensesRes.status === 'rejected') logSupabaseError('financials.load.expenses', expensesRes.reason, { userId });
+      if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { userId });
+      if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { userId });
+      if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { userId });
 
-      try {
-        const db = supabase as any;
-        // Tables that exist for this user. `restocks`, `investments`, and
-        // `investor_funding` do not exist in the live schema and have been
-        // removed to avoid silent query failures that zero out financials.
-        const [
-          salesRes,
-          productsRes,
-          expensesRes,
-          otherIncomeRes,
-          savingsRes,
-          restocksRes,
-          investmentsRes,
-          investorFundsRes,
-          profileRes,
-        ] = await Promise.allSettled([
-            db
-              .from('sales')
-              .select('id,total,amount_paid,sale_date')
-              .eq('user_id', userId)
-              .order('sale_date', { ascending: false }),
-            loadProductsCompat(false, businessId ?? userId),
-            db.from('expenses').select('amount,category,note,description').eq('user_id', userId),
-            db.from('other_income').select('amount').eq('user_id', userId),
-            db.from('savings').select('amount').eq('user_id', userId),
-            db.from('restocks').select('total_cost,status,is_opening_stock').eq('user_id', userId),
-            db.from('investments').select('amount,status').eq('user_id', userId),
-            db.from('investor_funding').select('amount').eq('user_id', userId),
-            db.from('profiles').select('opening_cash_balance').eq('id', userId).maybeSingle(),
-          ]);
+      const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
+      let saleItems: any[] = [];
 
-        if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { userId });
-        if (productsRes.status === 'rejected') logSupabaseError('financials.load.products', productsRes.reason, { userId });
-        if (expensesRes.status === 'rejected') logSupabaseError('financials.load.expenses', expensesRes.reason, { userId });
-        if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { userId });
-        if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { userId });
-        if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { userId });
+      if (salesRes.status === 'fulfilled' && !(salesRes.value as any).error) {
+        const saleIds = sales.map((sale: any) => sale.id).filter(Boolean);
+        if (saleIds.length > 0) {
+          const { data, error } = await db
+            .from('sale_items')
+            .select('sale_id,quantity,unit_cost,unit_price')
+            .in('sale_id', saleIds);
 
-        const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
-        let saleItems: any[] = [];
-
-        if (salesRes.status === 'fulfilled' && !(salesRes.value as any).error) {
-          const saleIds = sales.map((sale: any) => sale.id).filter(Boolean);
-          if (saleIds.length > 0) {
-            const { data, error } = await db
-              .from('sale_items')
-              .select('sale_id,quantity,unit_cost,unit_price')
-              .in('sale_id', saleIds);
-
-            if (error) {
-              logSupabaseError('financials.load.saleItems', error, { userId, saleCount: saleIds.length });
-            } else {
-              saleItems = (data as any[]) ?? [];
-            }
+          if (error) {
+            logSupabaseError('financials.load.saleItems', error, { userId, saleCount: saleIds.length });
+          } else {
+            saleItems = (data as any[]) ?? [];
           }
         }
+      }
 
-        const openingCashBalance =
-          profileRes.status === 'fulfilled'
-            ? Number((profileRes.value as any)?.data?.opening_cash_balance ?? 0)
-            : 0;
+      const openingCashBalance =
+        profileRes.status === 'fulfilled'
+          ? Number((profileRes.value as any)?.data?.opening_cash_balance ?? 0)
+          : 0;
 
-        const next = calculateBusinessFinancials({
-          sales: sales as any,
-          saleItems,
-          products: (productsRes.status === 'fulfilled' ? ((productsRes.value as any) ?? []) : []) as any,
-          otherIncome: (otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value as any).data ?? []) : []) as any,
-          expenses: (expensesRes.status === 'fulfilled' ? ((expensesRes.value as any).data ?? []) : []) as any,
-          savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any).data ?? []) : []) as any,
-          investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any).data ?? []) : []) as any,
-          investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any).data ?? []) : []) as any,
-          restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
-          openingCashBalance,
-        });
+      const next = calculateBusinessFinancials({
+        sales: sales as any,
+        saleItems,
+        products: (productsRes.status === 'fulfilled' ? ((productsRes.value as any) ?? []) : []) as any,
+        otherIncome: (otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value as any).data ?? []) : []) as any,
+        expenses: (expensesRes.status === 'fulfilled' ? ((expensesRes.value as any).data ?? []) : []) as any,
+        savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any).data ?? []) : []) as any,
+        investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any).data ?? []) : []) as any,
+        investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any).data ?? []) : []) as any,
+        restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
+        openingCashBalance,
+      });
 
-        console.info('Financial Breakdown:', next);
-        setFinancials(next);
-      } finally {
+      if (loadSeq !== loadSeqRef.current) return;
+
+      console.info('Financial Breakdown:', next);
+      setFinancials(next);
+    } finally {
+      if (loadSeq === loadSeqRef.current) {
         setLoading(false);
         hasLoadedOnceRef.current = true;
       }
-    })();
-
-    inFlightRef.current = run.finally(() => {
-      inFlightRef.current = null;
-    });
-
-    return inFlightRef.current;
+    }
   }, [businessId, businessLoading, user]);
 
   useEffect(() => {
@@ -152,16 +146,15 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (!user) return;
-    const userId = user.id;
+    const userId = businessId ?? user.id;
 
     const refresh = () => {
       void load(false);
     };
 
-    // RLS scopes by user_id, so a postgres_changes subscription with the
-    // user_id filter receives only this user's row events. The previous
-    // `business_id=eq.<id>` filter never matched any rows because the
-    // tables don't have a business_id column, so realtime never fired.
+    // Tenant rows are scoped by the owner's user_id. Staff members therefore
+    // subscribe to the owner id so owner/staff dashboard figures refresh from
+    // the same workspace changes.
     const channel = supabase
       .channel(`business-financials:${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `user_id=eq.${userId}` }, refresh)
@@ -180,7 +173,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load, user]);
+  }, [businessId, load, user]);
 
   const refresh = useCallback(() => load(false), [load]);
 

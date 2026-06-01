@@ -58,7 +58,7 @@ const queryClient = new QueryClient();
 
 function getRoleHomePath(role: AppRole | null, isSuperAdmin: boolean) {
   if (isSuperAdmin || role === 'super_admin') return '/super-admin';
-  if (role === 'salesperson') return '/sales';
+  if (role === 'salesperson' || role === 'cashier') return '/sales';
   if (role === 'distributor') return '/inventory';
   return '/dashboard';
 }

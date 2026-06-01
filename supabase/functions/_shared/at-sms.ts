@@ -35,7 +35,7 @@ export async function sendAtSms(to: string, message: string) {
 }
 
 export function normalizePhone(raw: string): string {
-  let p = String(raw || '').trim().replace(/\s+/g, '');
+  const p = String(raw || '').trim().replace(/\s+/g, '');
   if (!p) return '';
   if (p.startsWith('+')) return p;
   // Ghana default if 10 digits starting with 0

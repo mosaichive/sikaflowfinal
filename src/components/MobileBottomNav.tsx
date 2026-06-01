@@ -5,42 +5,36 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import type { ModuleKey } from '@/lib/permissions';
+import { getVisibleMobileNavItems } from '@/lib/mobile-nav';
 
 const PRIMARY = [
-  { to: '/dashboard', label: 'Home', icon: Home, end: true },
-  { to: '/sales', label: 'POS', icon: ShoppingCart },
-  { to: '/orders', label: 'Orders', icon: ClipboardList, minRole: 'sales' as const },
-  { to: '/inventory', label: 'Inventory', icon: Boxes, minRole: 'distributor' as const },
+  { to: '/dashboard', label: 'Home', icon: Home, module: 'dashboard' as ModuleKey, end: true },
+  { to: '/sales', label: 'POS', icon: ShoppingCart, module: 'sales' as ModuleKey },
+  { to: '/orders', label: 'Orders', icon: ClipboardList, module: 'orders' as ModuleKey },
+  { to: '/inventory', label: 'Inventory', icon: Boxes, module: 'inventory' as ModuleKey },
 ];
 
 const MORE_ITEMS = [
-  { to: '/customers', label: 'Customers', icon: Users },
-  { to: '/products', label: 'Products', icon: Boxes, minRole: 'manager' as const },
-  { to: '/other-income', label: 'Other Income', icon: Banknote, minRole: 'manager' as const },
-  { to: '/expenses', label: 'Expenses', icon: CreditCard, minRole: 'manager' as const },
-  { to: '/savings', label: 'Savings', icon: PiggyBank, minRole: 'manager' as const },
-  { to: '/reports', label: 'Reports', icon: BarChart3, minRole: 'manager' as const },
-  { to: '/staff', label: 'Staff / Users', icon: Shield, adminOnly: true },
-  { to: '/announcements', label: 'Announcements', icon: Megaphone },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/customers', label: 'Customers', icon: Users, module: 'customers' as ModuleKey },
+  { to: '/products', label: 'Products', icon: Boxes, module: 'products' as ModuleKey },
+  { to: '/other-income', label: 'Other Income', icon: Banknote, module: 'other_income' as ModuleKey },
+  { to: '/expenses', label: 'Expenses', icon: CreditCard, module: 'expenses' as ModuleKey },
+  { to: '/savings', label: 'Savings', icon: PiggyBank, module: 'savings' as ModuleKey },
+  { to: '/reports', label: 'Reports', icon: BarChart3, module: 'reports' as ModuleKey },
+  { to: '/staff', label: 'Staff / Users', icon: Shield, module: 'staff' as ModuleKey },
+  { to: '/announcements', label: 'Announcements', icon: Megaphone, module: 'announcements' as ModuleKey },
+  { to: '/settings', label: 'Settings', icon: Settings, alwaysVisible: true },
 ];
 
 export function MobileBottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
-  const { isAdmin, isManager, isSalesperson, isDistributor, displayName, avatarUrl, profileTitle, signOut } = useAuth();
+  const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
   const { isDark, toggle } = useTheme();
 
-  const canSee = (item: { minRole?: 'manager' | 'sales' | 'distributor'; adminOnly?: boolean }) => {
-    if (item.adminOnly) return isAdmin;
-    if (item.minRole === 'sales') return isAdmin || isManager || isSalesperson;
-    if (item.minRole === 'distributor') return isAdmin || isManager || isDistributor;
-    if (item.minRole === 'manager') return isAdmin || isManager;
-    return true;
-  };
-
-  const visiblePrimary = PRIMARY.filter(canSee);
-  const visibleMore = MORE_ITEMS.filter(canSee);
+  const visiblePrimary = getVisibleMobileNavItems(PRIMARY, hasModule);
+  const visibleMore = getVisibleMobileNavItems(MORE_ITEMS, hasModule);
 
   const go = (to: string) => {
     setMoreOpen(false);

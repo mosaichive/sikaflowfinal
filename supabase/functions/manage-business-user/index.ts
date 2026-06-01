@@ -19,7 +19,7 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-type TeamRole = 'admin' | 'manager' | 'staff' | 'salesperson' | 'distributor';
+type TeamRole = 'admin' | 'manager' | 'staff' | 'salesperson' | 'cashier' | 'distributor';
 
 type Action =
   | {
@@ -29,11 +29,12 @@ type Action =
       full_name: string;
       phone?: string;
       role: TeamRole;
+      modules?: string[];
       password?: string;
     }
   | { action: 'remove'; user_id: string };
 
-const VALID_ROLES: TeamRole[] = ['admin', 'manager', 'staff', 'salesperson', 'distributor'];
+const VALID_ROLES: TeamRole[] = ['admin', 'manager', 'staff', 'salesperson', 'cashier', 'distributor'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -90,6 +91,9 @@ Deno.serve(async (req) => {
     const full_name = (body.full_name || '').trim();
     const phone = body.phone?.trim() || null;
     const role = body.role;
+    const modules = Array.isArray(body.modules)
+      ? body.modules.filter((module) => typeof module === 'string')
+      : [];
 
     if (!email) return json(400, { error: 'Email is required' });
     if (!full_name) return json(400, { error: 'Full name is required' });
@@ -215,7 +219,7 @@ Deno.serve(async (req) => {
           staff_user_id: newUserId,
           display_name: full_name,
           email,
-          permissions: { role },
+          permissions: modules.length > 0 ? { role, modules } : { role },
           active: true,
         },
         { onConflict: 'business_owner_id,staff_user_id' },

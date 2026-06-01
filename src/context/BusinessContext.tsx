@@ -35,66 +35,64 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const hasLoadedOnceRef = useRef(false);
-  const inFlightRef = useRef<Promise<void> | null>(null);
+  const loadSeqRef = useRef(0);
 
   const ownerUserId = staffMembership?.business_owner_id ?? user?.id ?? null;
 
   const load = useCallback(async (showLoading = false) => {
-    if (inFlightRef.current) return inFlightRef.current;
+    const loadSeq = ++loadSeqRef.current;
+    if (!user || !ownerUserId) {
+      setBusiness(null);
+      setLoading(false);
+      hasLoadedOnceRef.current = true;
+      return;
+    }
+    if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
-    const run = (async () => {
-      if (!user || !ownerUserId) {
+    try {
+      const db = supabase as any;
+      // For team members, ownerUserId points at the inviting business owner.
+      // For owners themselves, it points at their own user id.
+      const { data: profile } = await db
+        .from('profiles')
+        .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email')
+        .eq('id', ownerUserId)
+        .maybeSingle();
+
+      if (loadSeq !== loadSeqRef.current) return;
+
+      if (!profile) {
         setBusiness(null);
-        setLoading(false);
-        hasLoadedOnceRef.current = true;
         return;
       }
-      if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
-      try {
-        const db = supabase as any;
-        // For team members, ownerUserId points at the inviting business owner.
-        // For owners themselves, it points at their own user id.
-        const { data: profile } = await db
-          .from('profiles')
-          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email')
-          .eq('id', ownerUserId)
-          .maybeSingle();
+      const p = profile as any;
+      if (!p.business_name) {
+        setBusiness(null);
+        return;
+      }
 
-        if (!profile) {
-          setBusiness(null);
-          return;
-        }
-
-        const p = profile as any;
-        if (!p.business_name) {
-          setBusiness(null);
-          return;
-        }
-
-        setBusiness({
-          id: ownerUserId,
-          name: p.business_name,
-          slug: null,
-          logo_light_url: p.logo_url ?? null,
-          logo_dark_url: p.logo_url ?? null,
-          email: p.email ?? user.email ?? null,
-          phone: p.phone ?? null,
-          location: p.location ?? null,
-          number_of_employees: null,
-          owner_user_id: ownerUserId,
-          status: 'active',
-          email_verified: true,
-          phone_verified: false,
-        });
-      } finally {
+      setBusiness({
+        id: ownerUserId,
+        name: p.business_name,
+        slug: null,
+        logo_light_url: p.logo_url ?? null,
+        logo_dark_url: p.logo_url ?? null,
+        email: p.email ?? user.email ?? null,
+        phone: p.phone ?? null,
+        location: p.location ?? null,
+        number_of_employees: null,
+        owner_user_id: ownerUserId,
+        status: 'active',
+        email_verified: true,
+        phone_verified: false,
+      });
+    } finally {
+      if (loadSeq === loadSeqRef.current) {
         setLoading(false);
         hasLoadedOnceRef.current = true;
       }
-    })();
-
-    inFlightRef.current = run.finally(() => { inFlightRef.current = null; });
-    return inFlightRef.current;
+    }
   }, [user, ownerUserId]);
 
   useEffect(() => {

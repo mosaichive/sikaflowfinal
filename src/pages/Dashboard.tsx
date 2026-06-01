@@ -445,7 +445,7 @@ export default function Dashboard() {
   const currentMonth = now.getMonth();
   const { business } = useBusiness();
   const businessId = business?.id ?? null;
-  const { isAdmin, isManager, displayName, onboardingCompleted, user, isStaffMember } = useAuth();
+  const { isAdmin, isManager, displayName, onboardingCompleted, user, isStaffMember, hasModule } = useAuth();
   const { financials, loading: financialsLoading } = useBusinessFinancials();
   const [data, setData] = useState<DashboardData>({
     sales: [],
@@ -888,9 +888,11 @@ export default function Dashboard() {
                 <TooltipContent>Announcements</TooltipContent>
               </Tooltip>
 
-              <Button asChild size="sm" className="rounded-full gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 hover:opacity-95 shadow-md shadow-primary/30">
-                <Link to="/sales?newSale=1"><Plus className="h-4 w-4" />New Sale</Link>
-              </Button>
+              {hasModule('sales') ? (
+                <Button asChild size="sm" className="rounded-full gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 hover:opacity-95 shadow-md shadow-primary/30">
+                  <Link to="/sales?newSale=1"><Plus className="h-4 w-4" />New Sale</Link>
+                </Button>
+              ) : null}
             </div>
           </div>
         </motion.section>
@@ -1073,9 +1075,11 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <Button asChild variant="outline" size="sm" className="w-full rounded-xl border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50">
-                  <Link to="/inventory">View Inventory</Link>
-                </Button>
+                {hasModule('inventory') ? (
+                  <Button asChild variant="outline" size="sm" className="w-full rounded-xl border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50">
+                    <Link to="/inventory">View Inventory</Link>
+                  </Button>
+                ) : null}
               </div>
             </motion.div>
           </div>

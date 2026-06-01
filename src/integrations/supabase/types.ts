@@ -1519,6 +1519,7 @@ export type Database = {
         | "admin"
         | "manager"
         | "salesperson"
+        | "cashier"
         | "distributor"
       savings_type: "bank" | "mobile_money" | "susu"
       subscription_plan: "trial" | "monthly" | "annual"
@@ -1659,6 +1660,7 @@ export const Constants = {
         "admin",
         "manager",
         "salesperson",
+        "cashier",
         "distributor",
       ],
       savings_type: ["bank", "mobile_money", "susu"],

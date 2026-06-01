@@ -112,6 +112,7 @@ export default function StaffUsersPage() {
             email,
             full_name: fullName,
             role: form.role,
+            modules: form.modules,
             password: form.password,
           },
         });
