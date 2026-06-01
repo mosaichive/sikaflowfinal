@@ -1,11 +1,25 @@
 export const SITE_URL = 'https://kuditrack.online';
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/kuditrack-demo-poster.png`;
+export const DEFAULT_KEYWORDS = [
+  'kudi track',
+  'kuditrack',
+  'sales tracker',
+  'inventory tracker',
+  'expense tracker',
+  'stock management',
+  'profit tracker',
+  'cash flow tracker',
+  'business money tracker',
+  'small business app Ghana',
+  'African business app',
+].join(', ');
 
 export type PageSeo = {
   title: string;
   description: string;
   path: string;
   image?: string;
+  keywords?: string;
   noindex?: boolean;
 };
 
@@ -15,6 +29,7 @@ export const DEFAULT_SEO: PageSeo = {
     'KudiTrack helps African small businesses track daily sales, stock, expenses, profit, savings and cash flow from one mobile-first dashboard.',
   path: '/',
   image: DEFAULT_OG_IMAGE,
+  keywords: DEFAULT_KEYWORDS,
 };
 
 export const MARKETING_SEO: Record<string, PageSeo> = {

@@ -10,6 +10,7 @@ export function SEO({
   description = DEFAULT_SEO.description,
   path = DEFAULT_SEO.path,
   image = DEFAULT_OG_IMAGE,
+  keywords = DEFAULT_SEO.keywords,
   canonical,
   noindex = false,
 }: SEOProps) {
@@ -22,6 +23,7 @@ export function SEO({
   useEffect(() => {
     document.title = title;
     upsertMeta('name', 'description', description);
+    if (keywords) upsertMeta('name', 'keywords', keywords);
     upsertMeta('name', 'robots', robots);
     upsertCanonical(url);
 
@@ -41,7 +43,7 @@ export function SEO({
     upsertMeta('name', 'twitter:description', description);
     upsertMeta('name', 'twitter:image', imageUrl);
     upsertMeta('name', 'twitter:image:alt', 'KudiTrack business dashboard preview');
-  }, [description, imageUrl, robots, title, url]);
+  }, [description, imageUrl, keywords, robots, title, url]);
 
   return null;
 }
