@@ -45,11 +45,12 @@ import { MarketingLayout } from "./components/marketing/MarketingLayout";
 import MarketingHome from "./pages/marketing/HomePage";
 import PlatformFeedbackPage from "./pages/platform/FeedbackPage";
 import PlatformAdApplicationsPage from "./pages/platform/AdApplicationsPage";
+import { getFirstAssignedModulePath } from "@/lib/module-navigation";
 
 function MarketingOrDashboard() {
-  const { user, loading } = useAuth();
+  const { user, loading, staffMembership } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Loading..." size="md" /></div>;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={getStaffHomePath(staffMembership)} replace />;
   return <MarketingHome />;
 }
 
@@ -61,6 +62,11 @@ function getRoleHomePath(role: AppRole | null, isSuperAdmin: boolean) {
   if (role === 'salesperson' || role === 'cashier') return '/sales';
   if (role === 'distributor') return '/inventory';
   return '/dashboard';
+}
+
+function getStaffHomePath(staffMembership: ReturnType<typeof useAuth>['staffMembership']) {
+  if (!staffMembership) return '/dashboard';
+  return getFirstAssignedModulePath(staffMembership.modules) ?? '/dashboard';
 }
 
 function ProtectedRoute({
@@ -95,7 +101,9 @@ function ProtectedRoute({
     return <Navigate to="/billing" replace />;
   }
 
-  if (adminOnly && !isAdmin) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
+  if (adminOnly && !isAdmin) {
+    return <Navigate to={staffMembership ? getStaffHomePath(staffMembership) : getRoleHomePath(role, isSuperAdmin)} replace />;
+  }
   // For staff members the user_roles.role is always 'staff'; their real
   // working role comes from staff_members.permissions.role. Map that into
   // the effective role used for allowedRoles checks. business_owner is
@@ -104,13 +112,15 @@ function ProtectedRoute({
   if (staffMembership) {
     effectiveRole = (staffMembership.role as AppRole) || effectiveRole;
   }
-  if (allowedRoles && (!effectiveRole || !allowedRoles.includes(effectiveRole))) return <Navigate to={getRoleHomePath(role, isSuperAdmin)} replace />;
+  if (allowedRoles && (!effectiveRole || !allowedRoles.includes(effectiveRole))) {
+    return <Navigate to={staffMembership ? getStaffHomePath(staffMembership) : getRoleHomePath(role, isSuperAdmin)} replace />;
+  }
   return <>{children}</>;
 }
 
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, staffMembership } = useAuth();
   const { isSuperAdmin, loading: subLoading } = useSubscription();
   const location = useLocation();
   if (loading || subLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Loading..." size="md" /></div>;
@@ -118,7 +128,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   if (user) {
     // If they were redirected here from a protected route, return to that page.
     const from = (location.state as { from?: string } | null)?.from;
-    return <Navigate to={from && !from.startsWith('/sign-') && from !== '/auth' ? from : '/dashboard'} replace />;
+    return <Navigate to={from && !from.startsWith('/sign-') && from !== '/auth' ? from : getStaffHomePath(staffMembership)} replace />;
   }
   return <>{children}</>;
 }

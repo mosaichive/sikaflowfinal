@@ -3,7 +3,8 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
 import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
-import { ALL_MODULES, modulesForRole, type ModuleKey } from '@/lib/permissions';
+import { ALL_MODULES, type ModuleKey } from '@/lib/permissions';
+import { resolveStaffModules } from '@/lib/staff-permissions';
 
 export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'cashier' | 'distributor' | 'business_owner';
 
@@ -129,11 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStaffMembership((current) => (current === null ? current : null));
       return null;
     }
-    const perms = (data.permissions || {}) as { role?: string; modules?: ModuleKey[] };
+    const perms = (data.permissions || {}) as { role?: string; modules?: unknown };
+    const staffRole = perms.role || 'staff';
     const membership: StaffMembership = {
       business_owner_id: data.business_owner_id,
-      role: perms.role || 'staff',
-      modules: Array.isArray(perms.modules) && perms.modules.length > 0 ? perms.modules : modulesForRole(perms.role || 'staff'),
+      role: staffRole,
+      modules: resolveStaffModules(staffRole, perms.modules),
       active: data.active,
     };
     setStaffMembership((current) => (areStaffMembershipsEqual(current, membership) ? current : membership));

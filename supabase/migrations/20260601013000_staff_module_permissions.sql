@@ -17,11 +17,10 @@ AS $$
         sm.permissions ->> 'role' = 'admin'
         OR (
           jsonb_typeof(sm.permissions -> 'modules') = 'array'
-          AND jsonb_array_length(sm.permissions -> 'modules') > 0
           AND (sm.permissions -> 'modules') ? _module
         )
         OR (
-          COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(sm.permissions -> 'modules') = 'array' THEN sm.permissions -> 'modules' ELSE '[]'::jsonb END), 0) = 0
+          jsonb_typeof(sm.permissions -> 'modules') IS DISTINCT FROM 'array'
           AND (
             (_module = 'dashboard')
             OR (sm.permissions ->> 'role' = 'manager' AND _module = ANY (ARRAY['sales','products','inventory','customers','orders','other_income','expenses','savings','reports','announcements']))

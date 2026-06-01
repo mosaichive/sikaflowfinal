@@ -42,6 +42,20 @@ describe('getVisibleMobileNavItems', () => {
     expect(layout.overflowItems).toEqual([]);
   });
 
+  it('omits Home and lands without More when Dashboard/Home is not assigned', () => {
+    const items = [
+      { to: '/dashboard', label: 'Home', icon: Icon, module: 'dashboard' as ModuleKey },
+      { to: '/sales', label: 'POS', icon: Icon, module: 'sales' as ModuleKey },
+      { to: '/inventory', label: 'Inventory', icon: Icon, module: 'inventory' as ModuleKey },
+      { to: '/settings', label: 'Settings', icon: Icon, alwaysVisible: true },
+    ];
+
+    const layout = getMobileNavLayout(items, (module) => module === 'sales', 5);
+
+    expect(layout.showMore).toBe(false);
+    expect(layout.primaryItems.map((item) => item.label)).toEqual(['POS', 'Settings']);
+  });
+
   it('uses More only for links that exceed the mobile nav capacity', () => {
     const items = [
       { to: '/dashboard', label: 'Home', icon: Icon, module: 'dashboard' as ModuleKey },
