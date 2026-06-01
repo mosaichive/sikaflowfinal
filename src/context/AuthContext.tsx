@@ -90,7 +90,24 @@ const emptyProfile: ProfileData = {
   last_verified_phone: null,
 };
 
+const STAFF_MEMBERSHIP_POLL_MS = 3000;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function areModuleListsEqual(left: ModuleKey[], right: ModuleKey[]) {
+  if (left.length !== right.length) return false;
+  return left.every((module, index) => module === right[index]);
+}
+
+function areStaffMembershipsEqual(left: StaffMembership | null, right: StaffMembership | null) {
+  if (!left || !right) return left === right;
+  return (
+    left.business_owner_id === right.business_owner_id
+    && left.role === right.role
+    && left.active === right.active
+    && areModuleListsEqual(left.modules, right.modules)
+  );
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -109,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (!data) {
-      setStaffMembership(null);
+      setStaffMembership((current) => (current === null ? current : null));
       return null;
     }
     const perms = (data.permissions || {}) as { role?: string; modules?: ModuleKey[] };
@@ -119,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       modules: Array.isArray(perms.modules) && perms.modules.length > 0 ? perms.modules : modulesForRole(perms.role || 'staff'),
       active: data.active,
     };
-    setStaffMembership(membership);
+    setStaffMembership((current) => (areStaffMembershipsEqual(current, membership) ? current : membership));
     return membership;
   }, []);
 
@@ -287,6 +304,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${userId}` }, () => {
         void fetchRole(userId);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members', filter: `staff_user_id=eq.${userId}` }, () => {
+        void fetchStaffMembership(userId);
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscription_payments', filter: `user_id=eq.${userId}` }, () => {
         // Trigger downstream refresh by re-reading the profile (subscription fields live there).
         void fetchProfile(userId);
@@ -296,7 +316,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, fetchProfile, fetchRole]);
+  }, [userId, fetchProfile, fetchRole, fetchStaffMembership]);
+
+  useEffect(() => {
+    if (!userId || !staffMembership) return;
+
+    const intervalId = window.setInterval(() => {
+      void fetchStaffMembership(userId);
+    }, STAFF_MEMBERSHIP_POLL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [userId, staffMembership, fetchStaffMembership]);
 
 
   useEffect(() => {

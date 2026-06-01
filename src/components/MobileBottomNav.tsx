@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { ModuleKey } from '@/lib/permissions';
-import { getVisibleMobileNavItems } from '@/lib/mobile-nav';
+import { getMobileNavLayout } from '@/lib/mobile-nav';
 
 const PRIMARY = [
   { to: '/dashboard', label: 'Home', icon: Home, module: 'dashboard' as ModuleKey, end: true },
@@ -27,14 +27,17 @@ const MORE_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings, alwaysVisible: true },
 ];
 
+const NAV_ITEMS = [...PRIMARY, ...MORE_ITEMS];
+const MAX_DIRECT_NAV_ITEMS = 5;
+
 export function MobileBottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
   const { displayName, avatarUrl, profileTitle, signOut, hasModule } = useAuth();
   const { isDark, toggle } = useTheme();
 
-  const visiblePrimary = getVisibleMobileNavItems(PRIMARY, hasModule);
-  const visibleMore = getVisibleMobileNavItems(MORE_ITEMS, hasModule);
+  const { primaryItems, overflowItems, showMore } = getMobileNavLayout(NAV_ITEMS, hasModule, MAX_DIRECT_NAV_ITEMS);
+  const navColumnCount = primaryItems.length + (showMore ? 1 : 0);
 
   const go = (to: string) => {
     setMoreOpen(false);
@@ -48,12 +51,15 @@ export function MobileBottomNav() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Primary"
       >
-        <ul className="grid grid-cols-5 h-16">
-          {visiblePrimary.map((item) => (
+        <ul
+          className="grid h-16"
+          style={{ gridTemplateColumns: `repeat(${Math.max(navColumnCount, 1)}, minmax(0, 1fr))` }}
+        >
+          {primaryItems.map((item) => (
             <li key={item.to}>
               <NavLink
                 to={item.to}
-                end={item.end}
+                end={'end' in item ? item.end : undefined}
                 className={({ isActive }) =>
                   `flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
                     isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
@@ -71,17 +77,19 @@ export function MobileBottomNav() {
               </NavLink>
             </li>
           ))}
-          <li>
-            <button
-              onClick={() => setMoreOpen(true)}
-              className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <span className="flex items-center justify-center h-8 w-12 rounded-xl">
-                <MoreHorizontal className="h-5 w-5" />
-              </span>
-              <span>More</span>
-            </button>
-          </li>
+          {showMore ? (
+            <li>
+              <button
+                onClick={() => setMoreOpen(true)}
+                className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="flex items-center justify-center h-8 w-12 rounded-xl">
+                  <MoreHorizontal className="h-5 w-5" />
+                </span>
+                <span>More</span>
+              </button>
+            </li>
+          ) : null}
         </ul>
       </nav>
 
@@ -106,7 +114,7 @@ export function MobileBottomNav() {
           </SheetHeader>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
-            {visibleMore.map((item) => (
+            {overflowItems.map((item) => (
               <button
                 key={item.to}
                 onClick={() => go(item.to)}
