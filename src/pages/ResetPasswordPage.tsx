@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { SEO } from '@/components/SEO';
 
 export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
@@ -65,11 +65,12 @@ export default function ResetPasswordPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Reset password | KudiTrack</title>
-        <meta name="description" content="Set a new password for your KudiTrack account." />
-        <link rel="canonical" href="https://kuditrack.online/reset-password" />
-      </Helmet>
+      <SEO
+        title="Reset password | KudiTrack"
+        description="Set a new password for your KudiTrack account."
+        path="/reset-password"
+        noindex
+      />
       <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center px-4 py-10">
           <section className="w-full rounded-lg border border-border bg-card/70 p-6 shadow-sm">

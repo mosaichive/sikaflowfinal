@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Loader2, Info, MessageSquareText } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
 import { AboutModal } from '@/components/auth/AboutModal';
 import { ContactModal } from '@/components/auth/ContactModal';
+import { SEO } from '@/components/SEO';
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
@@ -521,14 +521,12 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
 export function SignInPage() {
   return (
     <>
-      <Helmet>
-        <title>Sign in | KudiTrack</title>
-        <meta name="description" content="Sign in to your KudiTrack business workspace to manage sales, stock, expenses and profit." />
-        <link rel="canonical" href="https://kuditrack.online/sign-in" />
-        <meta property="og:title" content="Sign in | KudiTrack" />
-        <meta property="og:description" content="Sign in to your KudiTrack business workspace to manage sales, stock, expenses and profit." />
-        <meta property="og:url" content="https://kuditrack.online/sign-in" />
-      </Helmet>
+      <SEO
+        title="Sign in | KudiTrack"
+        description="Sign in to your KudiTrack business workspace to manage sales, stock, expenses and profit."
+        path="/sign-in"
+        noindex
+      />
       <AuthShell>
         <AuthPanel initialMode="sign-in" />
       </AuthShell>
@@ -539,14 +537,11 @@ export function SignInPage() {
 export function SignUpPage() {
   return (
     <>
-      <Helmet>
-        <title>Sign up | KudiTrack — Start your 30-day free trial</title>
-        <meta name="description" content="Create a free KudiTrack account and start a 30-day trial to track daily sales, stock, expenses and profit in one dashboard." />
-        <link rel="canonical" href="https://kuditrack.online/sign-up" />
-        <meta property="og:title" content="Sign up | KudiTrack" />
-        <meta property="og:description" content="Create a free KudiTrack account and start a 30-day trial to track daily sales, stock, expenses and profit in one dashboard." />
-        <meta property="og:url" content="https://kuditrack.online/sign-up" />
-      </Helmet>
+      <SEO
+        title="Sign up | KudiTrack - Start your 30-day free trial"
+        description="Create a free KudiTrack account and start a 30-day trial to track daily sales, stock, expenses and profit in one dashboard."
+        path="/sign-up"
+      />
       <AuthShell>
         <AuthPanel initialMode="sign-up" />
       </AuthShell>

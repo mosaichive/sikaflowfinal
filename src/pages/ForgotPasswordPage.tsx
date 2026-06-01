@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { SEO } from '@/components/SEO';
 
 type Step = 'enter' | 'verify';
 
@@ -229,11 +229,12 @@ export default function ForgotPasswordPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Forgot password | KudiTrack</title>
-        <meta name="description" content="Reset your KudiTrack account password by email or verified phone number." />
-        <link rel="canonical" href="https://kuditrack.online/forgot-password" />
-      </Helmet>
+      <SEO
+        title="Forgot password | KudiTrack"
+        description="Reset your KudiTrack account password by email or verified phone number."
+        path="/forgot-password"
+        noindex
+      />
       <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center px-4 py-10">
           <section className="w-full rounded-lg border border-border bg-card/70 p-6 shadow-sm">

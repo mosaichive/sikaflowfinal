@@ -1,11 +1,14 @@
 # KudiTrack
 
-> KudiTrack helps small businesses track sales, stock, expenses, savings, investments and profit from one simple dashboard.
+> KudiTrack helps African small businesses track sales, inventory, expenses, savings, profit and cash flow from one mobile-first dashboard.
 
-KudiTrack is a web app for daily business operations in Ghana and across Africa. Owners and staff record sales, manage inventory, log expenses and savings, and view live profit and cash-flow reports. New businesses start with a 30-day free trial.
+KudiTrack is a web app for daily business operations in Ghana and across Africa. Owners and staff record sales, manage inventory, log expenses and savings, and view live profit and cash-flow reports. Teams can invite staff with section-based permissions so each person only sees the work they are assigned.
 
 ## Pages
 
 - [Home](/): Product overview and entry point for KudiTrack.
-- [Sign in](/sign-in): Sign in to an existing business workspace.
+- [Features](/features): Sales, stock, expenses, reports, staff permissions and dashboard tools.
+- [Reviews](/reviews): Customer-style examples and trust signals for business owners.
+- [Advertise](/advertise): Apply to advertise to KudiTrack business owners.
+- [Contact](/contact): Contact the KudiTrack team or book a product demo.
 - [Sign up](/sign-up): Create a new business account and start a 30-day free trial.

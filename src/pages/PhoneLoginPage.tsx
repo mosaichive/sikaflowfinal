@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { SEO } from '@/components/SEO';
 
 export function PhoneLoginPage() {
   const [phone, setPhone] = useState('');
@@ -57,10 +57,12 @@ export function PhoneLoginPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Phone login | KudiTrack</title>
-        <meta name="description" content="Sign in to KudiTrack with your verified phone number." />
-      </Helmet>
+      <SEO
+        title="Phone login | KudiTrack"
+        description="Sign in to KudiTrack with your verified phone number."
+        path="/phone-login"
+        noindex
+      />
       <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
           <div className="mb-6 flex items-center gap-3">
