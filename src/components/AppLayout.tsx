@@ -25,7 +25,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
   const [announcementBadge, setAnnouncementBadge] = useState(0);
 
   useEffect(() => {
-    if (!user || !businessId) {
+    if (!user) {
       setAnnouncementBadge(0);
       return;
     }
@@ -33,31 +33,38 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
     let cancelled = false;
 
     const loadAnnouncementBadge = async () => {
-      const [{ data: announcements }, { data: reads }] = await Promise.all([
-        supabase.from('platform_announcements' as any).select('id').eq('active', true),
-        supabase.from('platform_announcement_reads' as any).select('announcement_id').eq('user_id', user.id).eq('business_id', businessId),
-      ]);
+      const { data: announcements } = await supabase
+        .from('announcements')
+        .select('id')
+        .lte('publish_at', new Date().toISOString());
 
       if (cancelled) return;
 
-      const readIds = new Set(((reads || []) as any[]).map((row) => row.announcement_id));
-      const unread = ((announcements || []) as any[]).filter((row) => !readIds.has(row.id)).length;
+      const unread = ((announcements || []) as { id: string }[]).filter(
+        (row) => !localStorage.getItem(`ann_read_${user.id}_${row.id}`),
+      ).length;
       setAnnouncementBadge(unread);
     };
 
     void loadAnnouncementBadge();
 
     const channel = supabase
-      .channel(`app-layout-announcements-${businessId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcements' }, () => { void loadAnnouncementBadge(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcement_reads' }, () => { void loadAnnouncementBadge(); })
+      .channel(`app-layout-announcements-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => { void loadAnnouncementBadge(); })
       .subscribe();
+
+    const onStorage = () => { void loadAnnouncementBadge(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('announcements:read', onStorage);
 
     return () => {
       cancelled = true;
       void supabase.removeChannel(channel);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('announcements:read', onStorage);
     };
   }, [businessId, user]);
+
 
   return (
     <SidebarProvider>
