@@ -4,7 +4,6 @@ import { EmptyState } from '@/components/EmptyState';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
-import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, Bell, Info, Megaphone } from 'lucide-react';
 import { logSupabaseError } from '@/lib/workspace';
@@ -12,137 +11,81 @@ import { logSupabaseError } from '@/lib/workspace';
 type AnnouncementRow = {
   id: string;
   title: string;
-  body: string;
-  level: 'info' | 'warning' | 'critical';
+  message: string;
+  priority: 'normal' | 'high' | 'critical';
   audience: string;
+  publish_at: string;
   created_at: string;
-  starts_at: string;
-  target_business_id?: string | null;
 };
 
-type ReadRow = {
-  announcement_id: string;
-  user_id: string;
-};
-
-function getLevelIcon(level: AnnouncementRow['level']) {
-  if (level === 'critical') return AlertTriangle;
-  if (level === 'warning') return Megaphone;
+function getLevelIcon(p: AnnouncementRow['priority']) {
+  if (p === 'critical') return AlertTriangle;
+  if (p === 'high') return Megaphone;
   return Info;
 }
 
-function getLevelTone(level: AnnouncementRow['level']) {
-  if (level === 'critical') {
-    return {
-      border: 'border-destructive/30',
-      badge: 'destructive' as const,
-      icon: 'text-destructive',
-    };
-  }
-  if (level === 'warning') {
-    return {
-      border: 'border-amber-500/30',
-      badge: 'secondary' as const,
-      icon: 'text-amber-500',
-    };
-  }
-  return {
-    border: 'border-primary/20',
-    badge: 'outline' as const,
-    icon: 'text-primary',
-  };
+function getLevelTone(p: AnnouncementRow['priority']) {
+  if (p === 'critical') return { border: 'border-destructive/30', badge: 'destructive' as const, icon: 'text-destructive' };
+  if (p === 'high') return { border: 'border-amber-500/30', badge: 'secondary' as const, icon: 'text-amber-500' };
+  return { border: 'border-primary/20', badge: 'outline' as const, icon: 'text-primary' };
 }
+
+const readKey = (userId: string, id: string) => `ann_read_${userId}_${id}`;
 
 export default function AnnouncementsPage() {
   const { user, role } = useAuth();
-  const { businessId } = useBusiness();
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
-  const [reads, setReads] = useState<ReadRow[]>([]);
+  const [readVersion, setReadVersion] = useState(0);
 
   const load = useCallback(async () => {
-    if (!user || !businessId) {
+    if (!user) {
       setRows([]);
-      setReads([]);
       return;
     }
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id,title,message,priority,audience,publish_at,created_at')
+      .lte('publish_at', new Date().toISOString())
+      .order('publish_at', { ascending: false });
 
-    const [announcementsRes, readsRes] = await Promise.all([
-      supabase
-        .from('platform_announcements' as any)
-        .select('id,title,body,level,audience,created_at,starts_at,target_business_id')
-        .eq('active', true)
-        .order('starts_at', { ascending: false }),
-      supabase
-        .from('platform_announcement_reads' as any)
-        .select('announcement_id,user_id')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId),
-    ]);
-
-    if (announcementsRes.error) {
-      logSupabaseError('tenantAnnouncements.loadAnnouncements', announcementsRes.error, {
-        userId: user.id,
-        businessId,
-      });
+    if (error) {
+      logSupabaseError('tenantAnnouncements.load', error, { userId: user.id });
     }
-
-    if (readsRes.error) {
-      logSupabaseError('tenantAnnouncements.loadReads', readsRes.error, {
-        userId: user.id,
-        businessId,
-      });
-    }
-
-    setRows(((announcementsRes.data || []) as AnnouncementRow[]) ?? []);
-    setReads(((readsRes.data || []) as ReadRow[]) ?? []);
-  }, [businessId, user]);
+    setRows(((data || []) as unknown) as AnnouncementRow[]);
+  }, [user]);
 
   useEffect(() => {
     void load();
-
     const channel = supabase
-      .channel(`tenant-platform-announcements-${user?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcements' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcement_reads' }, () => { void load(); })
+      .channel(`tenant-announcements-${user?.id || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => { void load(); })
       .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    return () => { void supabase.removeChannel(channel); };
   }, [load, user?.id]);
 
+  // Mark all visible announcements as read for this user
   useEffect(() => {
-    if (!user || !businessId || rows.length === 0) return;
+    if (!user || rows.length === 0) return;
+    let changed = false;
+    rows.forEach((row) => {
+      const key = readKey(user.id, row.id);
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, new Date().toISOString());
+        changed = true;
+      }
+    });
+    if (changed) {
+      window.dispatchEvent(new Event('announcements:read'));
+      setReadVersion((v) => v + 1);
+    }
+  }, [rows, user]);
 
-    const unreadRows = rows.filter((row) => !reads.some((read) => read.announcement_id === row.id && read.user_id === user.id));
-    if (unreadRows.length === 0) return;
-
-    void supabase
-      .from('platform_announcement_reads' as any)
-      .upsert(
-        unreadRows.map((row) => ({
-          announcement_id: row.id,
-          user_id: user.id,
-          business_id: businessId,
-          read_at: new Date().toISOString(),
-        })),
-        { onConflict: 'announcement_id,user_id' },
-      )
-      .then(({ error }) => {
-        if (error) {
-          logSupabaseError('tenantAnnouncements.markRead', error, {
-            userId: user.id,
-            businessId,
-            announcementIds: unreadRows.map((row) => row.id),
-          });
-        }
-      });
-  }, [businessId, reads, rows, user]);
-
-  const unreadIds = useMemo(
-    () => new Set(reads.filter((read) => read.user_id === user?.id).map((read) => read.announcement_id)),
-    [reads, user?.id],
-  );
+  const readIds = useMemo(() => {
+    if (!user) return new Set<string>();
+    return new Set(rows.filter((r) => localStorage.getItem(readKey(user.id, r.id))).map((r) => r.id));
+    // readVersion is intentionally part of deps to refresh after marking
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, user, readVersion]);
 
   return (
     <AppLayout title="Announcements">
@@ -160,14 +103,11 @@ export default function AnnouncementsPage() {
           <CardContent className="space-y-4 p-4">
             {rows.length > 0 ? (
               rows.map((row) => {
-                const Icon = getLevelIcon(row.level);
-                const tone = getLevelTone(row.level);
-                const isRead = unreadIds.has(row.id);
+                const Icon = getLevelIcon(row.priority);
+                const tone = getLevelTone(row.priority);
+                const isRead = readIds.has(row.id);
                 return (
-                  <article
-                    key={row.id}
-                    className={`rounded-2xl border bg-card/50 p-4 transition-colors ${tone.border}`}
-                  >
+                  <article key={row.id} className={`rounded-2xl border bg-card/50 p-4 transition-colors ${tone.border}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <span className="mt-0.5 rounded-2xl bg-primary/10 p-2">
@@ -176,18 +116,15 @@ export default function AnnouncementsPage() {
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-semibold text-foreground">{row.title}</p>
-                            <Badge variant={tone.badge}>{row.level}</Badge>
-                            <Badge variant={isRead ? 'secondary' : 'default'}>
-                              {isRead ? 'Read' : 'Unread'}
-                            </Badge>
+                            <Badge variant={tone.badge}>{row.priority}</Badge>
+                            <Badge variant={isRead ? 'secondary' : 'default'}>{isRead ? 'Read' : 'New'}</Badge>
                           </div>
-                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{row.body}</p>
+                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{row.message}</p>
                         </div>
                       </div>
-
                       <div className="text-right text-xs text-muted-foreground">
-                        <p>{new Date(row.starts_at || row.created_at).toLocaleDateString('en-GH')}</p>
-                        <p className="mt-1 uppercase tracking-[0.14em]">{row.audience.replace(/_/g, ' ')}</p>
+                        <p>{new Date(row.publish_at || row.created_at).toLocaleDateString('en-GH')}</p>
+                        <p className="mt-1 uppercase tracking-[0.14em]">{(row.audience || 'all').replace(/_/g, ' ')}</p>
                       </div>
                     </div>
                   </article>
