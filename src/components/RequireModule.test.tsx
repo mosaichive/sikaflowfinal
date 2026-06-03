@@ -12,7 +12,7 @@ const authState = {
   staffMembership: {
     modules: ['dashboard'],
   },
-  hasModule: (module: string) => module === 'dashboard',
+  hasModule: ((module: string) => module === 'dashboard') as (module: string) => boolean,
 };
 
 vi.mock('@/context/AuthContext', () => ({
