@@ -1511,7 +1511,7 @@ export type Database = {
     }
     Enums: {
       announcement_audience: "all" | "trial" | "active" | "expired"
-      announcement_priority: "low" | "normal" | "high"
+      announcement_priority: "low" | "normal" | "high" | "critical"
       app_role:
         | "super_admin"
         | "business_owner"
@@ -1519,11 +1519,15 @@ export type Database = {
         | "admin"
         | "manager"
         | "salesperson"
-        | "cashier"
         | "distributor"
       savings_type: "bank" | "mobile_money" | "susu"
-      subscription_plan: "trial" | "monthly" | "annual"
-      subscription_status: "trial" | "active" | "expired" | "suspended"
+      subscription_plan: "trial" | "monthly" | "annual" | "lifetime"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "expired"
+        | "suspended"
+        | "lifetime"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1652,7 +1656,7 @@ export const Constants = {
   public: {
     Enums: {
       announcement_audience: ["all", "trial", "active", "expired"],
-      announcement_priority: ["low", "normal", "high"],
+      announcement_priority: ["low", "normal", "high", "critical"],
       app_role: [
         "super_admin",
         "business_owner",
@@ -1660,12 +1664,17 @@ export const Constants = {
         "admin",
         "manager",
         "salesperson",
-        "cashier",
         "distributor",
       ],
       savings_type: ["bank", "mobile_money", "susu"],
-      subscription_plan: ["trial", "monthly", "annual"],
-      subscription_status: ["trial", "active", "expired", "suspended"],
+      subscription_plan: ["trial", "monthly", "annual", "lifetime"],
+      subscription_status: [
+        "trial",
+        "active",
+        "expired",
+        "suspended",
+        "lifetime",
+      ],
     },
   },
 } as const
