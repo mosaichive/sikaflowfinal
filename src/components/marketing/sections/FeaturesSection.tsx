@@ -1,54 +1,250 @@
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
-  TrendingUp, Package, Receipt, BarChart3, Users, Bell, FileText, LayoutDashboard, Cloud,
-  type LucideIcon,
+  TrendingUp, Package, Receipt, BarChart3, Users, Bell, FileText, Activity, Cloud,
+  ArrowRight, CheckCircle2, type LucideIcon,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import salesImage from '@/assets/feature-sales.jpg';
+import inventoryImage from '@/assets/feature-inventory.jpg';
+import growImage from '@/assets/feature-grow.jpg';
 
-const FEATURES: { icon: LucideIcon; title: string; desc: string; accent: string }[] = [
-  { icon: TrendingUp, title: 'Sales Tracking', desc: 'Record every sale on web or mobile. See daily, weekly, and monthly totals instantly.', accent: 'from-violet-500/30 to-fuchsia-500/10' },
-  { icon: Package, title: 'Inventory Management', desc: 'Track stock levels, restocks, and movements per product across multiple shops.', accent: 'from-cyan-500/30 to-blue-500/10' },
-  { icon: Receipt, title: 'Expense Tracking', desc: 'Log expenses by category and attach receipts. Know where your money goes.', accent: 'from-rose-500/30 to-pink-500/10' },
-  { icon: BarChart3, title: 'Profit Analytics', desc: 'Automatic profit calculation per sale, per product, per period. No spreadsheets.', accent: 'from-emerald-500/30 to-teal-500/10' },
-  { icon: Users, title: 'Team Management', desc: 'Add staff with role-based permissions. Salespeople, managers, distributors.', accent: 'from-amber-500/30 to-orange-500/10' },
-  { icon: Bell, title: 'Low Stock Alerts', desc: 'Never run out of best-sellers. Smart alerts when stock dips below your threshold.', accent: 'from-yellow-500/30 to-amber-500/10' },
-  { icon: FileText, title: 'Business Reports', desc: 'Generate sales, profit, and inventory reports. Export to PDF or share via WhatsApp.', accent: 'from-fuchsia-500/30 to-violet-500/10' },
-  { icon: LayoutDashboard, title: 'Real-time Dashboard', desc: 'A single screen showing sales, profit, expenses, and cash on hand. Live.', accent: 'from-sky-500/30 to-cyan-500/10' },
-  { icon: Cloud, title: 'Cloud Sync', desc: 'Your data is safe in the cloud. Sign in from any device, anywhere, anytime.', accent: 'from-indigo-500/30 to-violet-500/10' },
+type SubFeature = { icon: LucideIcon; label: string };
+
+type Category = {
+  eyebrow: string;
+  title: string;
+  highlight: string;
+  subtitle: string;
+  image: string;
+  gradient: string;
+  glow: string;
+  accent: string;
+  mockup: 'sales' | 'inventory' | 'team';
+  features: SubFeature[];
+};
+
+const CATEGORIES: Category[] = [
+  {
+    eyebrow: 'track',
+    title: 'Track your',
+    highlight: 'sales',
+    subtitle: 'Sales, expenses & profit in one view',
+    image: salesImage,
+    gradient: 'from-violet-500/40 via-fuchsia-500/20 to-transparent',
+    glow: 'from-violet-500/60 to-fuchsia-500/30',
+    accent: 'bg-violet-500',
+    mockup: 'sales',
+    features: [
+      { icon: TrendingUp, label: 'Sales Tracking' },
+      { icon: Receipt, label: 'Expense Tracking' },
+      { icon: BarChart3, label: 'Profit Analytics' },
+    ],
+  },
+  {
+    eyebrow: 'manage',
+    title: 'Manage your',
+    highlight: 'inventory',
+    subtitle: 'Stock, alerts & real-time monitoring',
+    image: inventoryImage,
+    gradient: 'from-cyan-500/40 via-emerald-500/20 to-transparent',
+    glow: 'from-cyan-500/60 to-emerald-500/30',
+    accent: 'bg-cyan-500',
+    mockup: 'inventory',
+    features: [
+      { icon: Package, label: 'Inventory Management' },
+      { icon: Bell, label: 'Low Stock Alerts' },
+      { icon: Activity, label: 'Real-Time Stock Monitoring' },
+    ],
+  },
+  {
+    eyebrow: 'grow',
+    title: 'Grow your',
+    highlight: 'business',
+    subtitle: 'Team, reports & cloud anywhere',
+    image: growImage,
+    gradient: 'from-pink-500/40 via-rose-500/20 to-transparent',
+    glow: 'from-pink-500/60 to-rose-500/30',
+    accent: 'bg-pink-500',
+    mockup: 'team',
+    features: [
+      { icon: Users, label: 'Team Management' },
+      { icon: FileText, label: 'Business Reports' },
+      { icon: Cloud, label: 'Cloud Sync' },
+    ],
+  },
 ];
 
 export function FeaturesSection() {
+  const navigate = useNavigate();
+
   return (
     <section id="features" className="relative py-24 sm:py-32">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-950/10 to-transparent pointer-events-none" />
+      <div className="relative max-w-7xl mx-auto px-5 sm:px-8">
         <SectionHeader
           eyebrow="Features"
           title="Everything you need to run a smarter business"
-          sub="From the corner shop to a growing distributor, KudiTrack gives you the tools to track, decide, and grow — without spreadsheets."
+          sub="From the corner shop to a growing distributor — track, decide, and grow without spreadsheets."
         />
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-14">
-          {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 24 }}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-16">
+          {CATEGORIES.map((cat, i) => (
+            <motion.article
+              key={cat.title}
+              initial={{ opacity: 0, y: 32 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.5, delay: (i % 3) * 0.08 }}
-              className="group relative rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-xl p-6 transition-all hover:-translate-y-1 hover:shadow-[0_20px_60px_-15px_rgba(139,92,246,0.35)] overflow-hidden"
+              viewport={{ once: true, margin: '-80px' }}
+              transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              className={`group relative rounded-[28px] border border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:border-white/20 hover:shadow-[0_30px_80px_-20px_rgba(139,92,246,0.5)] ${i === 1 ? 'md:col-span-2 lg:col-span-1' : ''}`}
             >
-              <div className={`absolute -top-16 -right-16 w-40 h-40 rounded-full bg-gradient-to-br ${f.accent} blur-3xl opacity-60 group-hover:opacity-100 transition-opacity`} />
-              <div className="relative">
-                <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${f.accent} border border-white/10 flex items-center justify-center mb-4`}>
-                  <f.icon className="h-5 w-5 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">{f.title}</h3>
-                <p className="mt-2 text-sm text-white/65 leading-relaxed">{f.desc}</p>
+              {/* Ambient gradient glow */}
+              <div className={`absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br ${cat.glow} blur-3xl opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
+
+              {/* Image block */}
+              <div className={`relative m-3 rounded-[20px] overflow-hidden aspect-[4/3] bg-gradient-to-br ${cat.gradient}`}>
+                <img
+                  src={cat.image}
+                  alt={`${cat.title} ${cat.highlight}`}
+                  loading="lazy"
+                  width={1024}
+                  height={768}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+                {/* Floating dashboard mockup */}
+                <FloatingMockup variant={cat.mockup} />
+
+                {/* Status pill */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.4 + i * 0.1 }}
+                  className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 backdrop-blur-sm text-[10px] font-semibold text-white shadow-lg"
+                >
+                  <CheckCircle2 className="h-3 w-3" /> Live
+                </motion.div>
               </div>
-            </motion.div>
+
+              {/* Content */}
+              <div className="relative p-6 pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40 mb-2">{cat.eyebrow}</p>
+                <h3 className="text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-white">
+                  {cat.title}{' '}
+                  <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent italic">
+                    {cat.highlight}
+                  </span>
+                </h3>
+                <p className="mt-2 text-sm text-white/60">{cat.subtitle}</p>
+
+                <ul className="mt-5 space-y-2.5">
+                  {cat.features.map((f) => (
+                    <li key={f.label} className="flex items-center gap-3 text-sm text-white/80">
+                      <span className={`flex items-center justify-center h-7 w-7 rounded-lg bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors`}>
+                        <f.icon className="h-3.5 w-3.5 text-white/80" />
+                      </span>
+                      {f.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.article>
           ))}
         </div>
+
+        {/* CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mt-14 flex flex-col items-center gap-3"
+        >
+          <Button
+            onClick={() => navigate('/sign-up')}
+            className="bg-gradient-to-r from-violet-500 to-cyan-400 text-black hover:opacity-90 rounded-full px-8 h-12 font-semibold text-base shadow-[0_0_40px_-5px_rgba(139,92,246,0.7)]"
+          >
+            Start Tracking Today <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Button>
+          <p className="text-xs text-white/40">Free to start • No credit card required</p>
+        </motion.div>
       </div>
     </section>
+  );
+}
+
+function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: 0.5, duration: 0.6 }}
+      animate={{ y: [0, -6, 0] }}
+      // @ts-expect-error framer typing
+      transition_={{ y: { repeat: Infinity, duration: 4, ease: 'easeInOut' } }}
+      className="absolute bottom-4 left-4 right-4 sm:right-auto sm:w-[58%] rounded-2xl bg-white/95 backdrop-blur-xl border border-white/40 shadow-2xl p-3 text-[10px] text-slate-800"
+    >
+      {variant === 'sales' && (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold text-slate-900">Today's Sales</span>
+            <span className="text-emerald-600 font-semibold">+24%</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900">₦248,500</div>
+          <div className="mt-2 flex items-end gap-1 h-8">
+            {[40, 65, 35, 80, 55, 90, 70].map((h, idx) => (
+              <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-violet-400 to-fuchsia-400" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+        </>
+      )}
+      {variant === 'inventory' && (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold text-slate-900">Stock Levels</span>
+            <span className="text-amber-600 font-semibold">3 low</span>
+          </div>
+          {[
+            { name: 'Rice 5kg', pct: 78, color: 'bg-emerald-500' },
+            { name: 'Cooking Oil', pct: 22, color: 'bg-amber-500' },
+            { name: 'Sugar 1kg', pct: 56, color: 'bg-cyan-500' },
+          ].map((p) => (
+            <div key={p.name} className="mb-1.5 last:mb-0">
+              <div className="flex justify-between mb-0.5"><span>{p.name}</span><span className="text-slate-500">{p.pct}%</span></div>
+              <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
+                <div className={`h-full ${p.color}`} style={{ width: `${p.pct}%` }} />
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      {variant === 'team' && (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold text-slate-900">Team Activity</span>
+            <span className="text-pink-600 font-semibold">5 active</span>
+          </div>
+          {[
+            { name: 'Ama K.', role: 'Manager', color: 'bg-violet-500' },
+            { name: 'Kwame O.', role: 'Sales', color: 'bg-cyan-500' },
+            { name: 'Zola M.', role: 'Sales', color: 'bg-pink-500' },
+          ].map((m) => (
+            <div key={m.name} className="flex items-center gap-2 mb-1 last:mb-0">
+              <div className={`h-5 w-5 rounded-full ${m.color} flex items-center justify-center text-white text-[8px] font-bold`}>
+                {m.name[0]}
+              </div>
+              <div className="flex-1 flex justify-between">
+                <span className="font-medium">{m.name}</span>
+                <span className="text-slate-500">{m.role}</span>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </motion.div>
   );
 }
 
