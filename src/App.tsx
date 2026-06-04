@@ -45,6 +45,7 @@ import { MarketingLayout } from "./components/marketing/MarketingLayout";
 import MarketingHome from "./pages/marketing/HomePage";
 import PlatformFeedbackPage from "./pages/platform/FeedbackPage";
 import PlatformAdApplicationsPage from "./pages/platform/AdApplicationsPage";
+import PlatformReviewsPage from "./pages/platform/ReviewsPage";
 import { getFirstAssignedModulePath } from "@/lib/module-navigation";
 
 function MarketingOrDashboard() {
@@ -169,6 +170,7 @@ const App = () => (
                   <Route path="announcements" element={<PlatformAnnouncementsPage />} />
                   <Route path="feedback" element={<PlatformFeedbackPage />} />
                   <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
+                  <Route path="reviews" element={<PlatformReviewsPage />} />
                 </Route>
 
                 {/* Public marketing site */}
