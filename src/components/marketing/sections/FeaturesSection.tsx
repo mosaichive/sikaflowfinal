@@ -193,7 +193,7 @@ function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }
             <span className="font-semibold text-slate-900">Today's Sales</span>
             <span className="text-emerald-600 font-semibold">+24%</span>
           </div>
-          <div className="text-lg font-bold text-slate-900">₦248,500</div>
+          <div className="text-lg font-bold text-slate-900">GH₵ 12,480</div>
           <div className="mt-2 flex items-end gap-1 h-8">
             {[40, 65, 35, 80, 55, 90, 70].map((h, idx) => (
               <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-violet-400 to-fuchsia-400" style={{ height: `${h}%` }} />
