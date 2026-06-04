@@ -371,6 +371,54 @@ export type Database = {
         }
         Relationships: []
       }
+      marketing_reviews: {
+        Row: {
+          avatar_url: string | null
+          business_name: string | null
+          created_at: string
+          created_by: string | null
+          customer_name: string
+          id: string
+          media_type: string | null
+          media_url: string | null
+          rating: number
+          sort_order: number
+          testimonial: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          avatar_url?: string | null
+          business_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          rating?: number
+          sort_order?: number
+          testimonial?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          avatar_url?: string | null
+          business_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          rating?: number
+          sort_order?: number
+          testimonial?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           business_id: string
