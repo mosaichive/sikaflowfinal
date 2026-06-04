@@ -1,72 +1,132 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { SectionHeader } from './FeaturesSection';
 
-const REVIEWS = [
-  { name: 'Akua Mensah', biz: 'Akua Provisions, Kumasi', initials: 'AM', stars: 5, text: 'KudiTrack helped me finally understand my actual business profit. I used to think I was making more than I really was.' },
-  { name: 'Kwame Boateng', biz: 'Boateng Electronics', initials: 'KB', stars: 5, text: "Stock alerts are a game changer. I never run out of best-sellers anymore — my customers always find what they need." },
-  { name: 'Esther Owusu', biz: 'Esi Beauty Lounge', initials: 'EO', stars: 5, text: "Setup took 10 minutes. My salesperson uses it on her phone every day. Reports are ready when I need them." },
-  { name: 'Yaw Asante', biz: 'Asante Distributors', initials: 'YA', stars: 5, text: 'Managing three shops from one dashboard saved me hours each week. The expense tracking is brilliant.' },
-  { name: 'Ama Sarpong', biz: 'Ama Foods', initials: 'AS', stars: 5, text: "The WhatsApp report sharing is genius. I just send daily summary to my accountant. Done." },
-  { name: 'Kojo Adjei', biz: 'Adjei Spare Parts', initials: 'KA', stars: 5, text: 'I trust the numbers now. No more arguing with myself about how much I made.' },
+type Review = {
+  id: string;
+  customer_name: string;
+  business_name: string | null;
+  testimonial: string;
+  rating: number;
+  media_url: string | null;
+  media_type: 'image' | 'video' | null;
+  avatar_url: string | null;
+};
+
+const FALLBACK: Review[] = [
+  { id: 'f1', customer_name: 'Akua Mensah', business_name: 'Akua Provisions, Kumasi', testimonial: 'KudiTrack helped me finally understand my actual business profit. I used to think I was making more than I really was.', rating: 5, media_url: null, media_type: null, avatar_url: null },
+  { id: 'f2', customer_name: 'Kwame Boateng', business_name: 'Boateng Electronics', testimonial: 'Stock alerts are a game changer. I never run out of best-sellers anymore — my customers always find what they need.', rating: 5, media_url: null, media_type: null, avatar_url: null },
+  { id: 'f3', customer_name: 'Esther Owusu', business_name: 'Esi Beauty Lounge', testimonial: 'Setup took 10 minutes. My salesperson uses it on her phone every day. Reports are ready when I need them.', rating: 5, media_url: null, media_type: null, avatar_url: null },
+  { id: 'f4', customer_name: 'Yaw Asante', business_name: 'Asante Distributors', testimonial: 'Managing three shops from one dashboard saved me hours each week. The expense tracking is brilliant.', rating: 5, media_url: null, media_type: null, avatar_url: null },
+  { id: 'f5', customer_name: 'Ama Sarpong', business_name: 'Ama Foods', testimonial: 'The WhatsApp report sharing is genius. I just send daily summary to my accountant. Done.', rating: 5, media_url: null, media_type: null, avatar_url: null },
+  { id: 'f6', customer_name: 'Kojo Adjei', business_name: 'Adjei Spare Parts', testimonial: 'I trust the numbers now. No more arguing with myself about how much I made.', rating: 5, media_url: null, media_type: null, avatar_url: null },
 ];
 
+const ACCENTS = ['from-emerald-400 to-emerald-600', 'from-blue-400 to-blue-600', 'from-amber-400 to-amber-500', 'from-emerald-500 to-blue-500'];
+
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || '•';
+}
+
 export function ReviewsSection() {
-  // Duplicate for seamless marquee
-  const row1 = REVIEWS;
-  const row2 = [...REVIEWS].reverse();
+  const [reviews, setReviews] = useState<Review[]>(FALLBACK);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('marketing_reviews')
+        .select('id, customer_name, business_name, testimonial, rating, media_url, media_type, avatar_url')
+        .eq('visible', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false });
+      if (data && data.length) setReviews(data as Review[]);
+    })();
+  }, []);
+
+  const doubled = [...reviews, ...reviews];
 
   return (
-    <section id="reviews" className="relative py-24 sm:py-32 overflow-hidden">
+    <section id="reviews" className="relative py-24 sm:py-32 bg-[#faf7f1] overflow-hidden">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
-        <SectionHeader
-          eyebrow="Loved by businesses"
-          title="Trusted by shop owners across Ghana"
-          sub="From neighborhood shops to growing distributors — see why owners choose KudiTrack."
-        />
+        <div className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Customer love</p>
+          <h2 className="mt-3 text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">
+            Trusted by Business Owners
+          </h2>
+          <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
+            See how KudiTrack helps businesses track sales, manage inventory, and know their money.
+          </p>
+        </div>
       </div>
 
-      <div className="mt-14 space-y-6">
-        <Marquee items={row1} duration={50} />
-        <Marquee items={row2} duration={60} reverse />
+      <div className="mt-16 relative">
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+
+        <motion.div
+          animate={{ x: ['0%', '-50%'] }}
+          transition={{ duration: Math.max(40, reviews.length * 8), repeat: Infinity, ease: 'linear' }}
+          className="flex gap-6 w-max px-5 sm:px-8"
+        >
+          {doubled.map((r, i) => {
+            const isMediaCard = !!r.media_url && i % 2 === 0;
+            return isMediaCard
+              ? <MediaCard key={`${r.id}-${i}`} review={r} />
+              : <TextCard key={`${r.id}-${i}`} review={r} accent={ACCENTS[i % ACCENTS.length]} />;
+          })}
+        </motion.div>
       </div>
     </section>
   );
 }
 
-function Marquee({ items, duration, reverse = false }: { items: typeof REVIEWS; duration: number; reverse?: boolean }) {
-  const doubled = [...items, ...items];
+function MediaCard({ review }: { review: Review }) {
   return (
-    <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-      <motion.div
-        animate={{ x: reverse ? ['-50%', '0%'] : ['0%', '-50%'] }}
-        transition={{ duration, repeat: Infinity, ease: 'linear' }}
-        className="flex gap-5 w-max"
-      >
-        {doubled.map((r, i) => (
-          <ReviewCard key={i} {...r} />
-        ))}
-      </motion.div>
+    <div className="w-[300px] sm:w-[360px] h-[440px] shrink-0 rounded-[32px] overflow-hidden relative shadow-[0_20px_60px_-20px_rgba(0,0,0,0.25)] bg-slate-100">
+      {review.media_type === 'video' && review.media_url ? (
+        <video
+          src={review.media_url}
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay muted loop playsInline
+        />
+      ) : (
+        <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full object-cover" />
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5">
+        <div className="flex items-center gap-2 mb-1">
+          {Array.from({ length: review.rating }).map((_, k) => (
+            <Star key={k} className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+          ))}
+        </div>
+        <p className="text-white font-semibold text-base">{review.customer_name}</p>
+        {review.business_name && <p className="text-white/80 text-xs">{review.business_name}</p>}
+      </div>
     </div>
   );
 }
 
-function ReviewCard({ name, biz, initials, stars, text }: typeof REVIEWS[number]) {
+function TextCard({ review, accent }: { review: Review; accent: string }) {
   return (
-    <div className="w-[340px] sm:w-[400px] shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)]">
-      <div className="flex gap-0.5 mb-3">
-        {Array.from({ length: stars }).map((_, i) => (
-          <Star key={i} className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+    <div className="w-[320px] sm:w-[380px] h-[440px] shrink-0 rounded-[32px] bg-white border border-slate-200/80 p-7 flex flex-col shadow-[0_20px_60px_-30px_rgba(0,0,0,0.18)]">
+      <div className="flex gap-1 mb-4">
+        {Array.from({ length: review.rating }).map((_, k) => (
+          <Star key={k} className="h-4 w-4 fill-amber-400 text-amber-400" />
         ))}
       </div>
-      <p className="text-sm text-white/85 leading-relaxed">"{text}"</p>
-      <div className="mt-5 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-black">
-          {initials}
-        </div>
+      <p className="text-slate-800 text-[17px] leading-relaxed flex-1">"{review.testimonial}"</p>
+      <div className="mt-6 flex items-center gap-3">
+        {review.avatar_url ? (
+          <img src={review.avatar_url} alt={review.customer_name} className="h-11 w-11 rounded-full object-cover" />
+        ) : (
+          <div className={`h-11 w-11 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-xs font-bold text-white`}>
+            {initials(review.customer_name)}
+          </div>
+        )}
         <div>
-          <p className="text-sm font-semibold">{name}</p>
-          <p className="text-xs text-white/55">{biz}</p>
+          <p className="text-sm font-semibold text-slate-900">{review.customer_name}</p>
+          {review.business_name && <p className="text-xs text-slate-500">{review.business_name}</p>}
         </div>
       </div>
     </div>
