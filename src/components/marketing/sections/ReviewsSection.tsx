@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { SectionHeader } from './FeaturesSection';
 
 type Review = {
   id: string;
@@ -15,15 +14,6 @@ type Review = {
   avatar_url: string | null;
 };
 
-const FALLBACK: Review[] = [
-  { id: 'f1', customer_name: 'Akua Mensah', business_name: 'Akua Provisions, Kumasi', testimonial: 'KudiTrack helped me finally understand my actual business profit. I used to think I was making more than I really was.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-  { id: 'f2', customer_name: 'Kwame Boateng', business_name: 'Boateng Electronics', testimonial: 'Stock alerts are a game changer. I never run out of best-sellers anymore — my customers always find what they need.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-  { id: 'f3', customer_name: 'Esther Owusu', business_name: 'Esi Beauty Lounge', testimonial: 'Setup took 10 minutes. My salesperson uses it on her phone every day. Reports are ready when I need them.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-  { id: 'f4', customer_name: 'Yaw Asante', business_name: 'Asante Distributors', testimonial: 'Managing three shops from one dashboard saved me hours each week. The expense tracking is brilliant.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-  { id: 'f5', customer_name: 'Ama Sarpong', business_name: 'Ama Foods', testimonial: 'The WhatsApp report sharing is genius. I just send daily summary to my accountant. Done.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-  { id: 'f6', customer_name: 'Kojo Adjei', business_name: 'Adjei Spare Parts', testimonial: 'I trust the numbers now. No more arguing with myself about how much I made.', rating: 5, media_url: null, media_type: null, avatar_url: null },
-];
-
 const ACCENTS = ['from-emerald-400 to-emerald-600', 'from-blue-400 to-blue-600', 'from-amber-400 to-amber-500', 'from-emerald-500 to-blue-500'];
 
 function initials(name: string) {
@@ -31,21 +21,42 @@ function initials(name: string) {
 }
 
 export function ReviewsSection() {
-  const [reviews, setReviews] = useState<Review[]>(FALLBACK);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('marketing_reviews')
-        .select('id, customer_name, business_name, testimonial, rating, media_url, media_type, avatar_url')
+        .select('id, customer_name, business_name, testimonial, rating, media_url, media_type, avatar_url, sort_order, created_at')
         .eq('visible', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
-      if (data && data.length) setReviews(data as Review[]);
+
+      if (error) {
+        console.error('[ReviewsSection] fetch error', error);
+      }
+
+      const rows = (data || []) as Review[];
+      // De-duplicate defensively by id
+      const seen = new Set<string>();
+      const unique = rows.filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      });
+
+      console.log('[ReviewsSection] fetched', rows.length, 'rows; unique', unique.length, 'ids:', unique.map((r) => r.id));
+      setReviews(unique);
+      setLoaded(true);
     })();
   }, []);
 
-  const doubled = [...reviews, ...reviews];
+  // Only enable infinite marquee when we have enough cards to fill the row.
+  const enableMarquee = reviews.length > 6;
+  const marqueeItems = useMemo(() => (enableMarquee ? [...reviews, ...reviews] : reviews), [enableMarquee, reviews]);
+
+  if (loaded && reviews.length === 0) return null;
 
   return (
     <section id="reviews" className="relative py-24 sm:py-32 bg-[#faf7f1] overflow-hidden">
@@ -62,21 +73,41 @@ export function ReviewsSection() {
       </div>
 
       <div className="mt-16 relative">
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#faf7f1] to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#faf7f1] to-transparent z-10 pointer-events-none" />
-
-        <motion.div
-          animate={{ x: ['0%', '-50%'] }}
-          transition={{ duration: Math.max(40, reviews.length * 8), repeat: Infinity, ease: 'linear' }}
-          className="flex gap-6 w-max px-5 sm:px-8"
-        >
-          {doubled.map((r, i) => {
-            const isMediaCard = !!r.media_url && i % 2 === 0;
-            return isMediaCard
-              ? <MediaCard key={`${r.id}-${i}`} review={r} />
-              : <TextCard key={`${r.id}-${i}`} review={r} accent={ACCENTS[i % ACCENTS.length]} />;
-          })}
-        </motion.div>
+        {enableMarquee ? (
+          <>
+            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+            <motion.div
+              animate={{ x: ['0%', '-50%'] }}
+              transition={{ duration: Math.max(40, reviews.length * 8), repeat: Infinity, ease: 'linear' }}
+              className="flex gap-6 w-max px-5 sm:px-8"
+            >
+              {marqueeItems.map((r, i) => {
+                // Cloned slides (second half) are decorative — hide from assistive tech
+                const isClone = i >= reviews.length;
+                const useMedia = !!r.media_url && i % 2 === 0;
+                return (
+                  <div key={`${r.id}-${i}`} aria-hidden={isClone ? true : undefined}>
+                    {useMedia
+                      ? <MediaCard review={r} />
+                      : <TextCard review={r} accent={ACCENTS[i % ACCENTS.length]} />}
+                  </div>
+                );
+              })}
+            </motion.div>
+          </>
+        ) : (
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
+            <div className="flex flex-wrap justify-center gap-6">
+              {reviews.map((r, i) => {
+                const useMedia = !!r.media_url && i % 2 === 0;
+                return useMedia
+                  ? <MediaCard key={r.id} review={r} />
+                  : <TextCard key={r.id} review={r} accent={ACCENTS[i % ACCENTS.length]} />;
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
