@@ -26,6 +26,7 @@ import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
 import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { DynamicLineChart } from '@/components/reports/DynamicLineChart';
+import { calculateReportCumulativeFinancials, isDefaultLiveDashboardReport } from '@/lib/report-calculations';
 
 type RawReportData = {
   sales: any[];
@@ -281,6 +282,27 @@ export default function ReportsPage() {
     });
   }, [filtered, raw.products, recognizedSaleItems]);
 
+  const cumulativeReportFinancials = useMemo(
+    () =>
+      calculateReportCumulativeFinancials({
+        data: raw,
+        to,
+        openingCashBalance: financials.openingCash,
+      }),
+    [financials.openingCash, raw, to],
+  );
+
+  const usesLiveDashboardMoney = isDefaultLiveDashboardReport({
+    year,
+    currentYear,
+    monthEnabled,
+    useCustomRange,
+  });
+
+  const reportAvailableBusinessMoney = usesLiveDashboardMoney
+    ? financials.availableBusinessMoney
+    : cumulativeReportFinancials.availableBusinessMoney;
+
   const openingStockMovements = useMemo(
     () =>
       raw.stockMovements.filter(
@@ -419,9 +441,9 @@ export default function ReportsPage() {
         from,
         to,
         openingCashBalance: financials.openingCash,
-        availableBusinessMoneyOverride: financials.availableBusinessMoney,
+        availableBusinessMoneyOverride: reportAvailableBusinessMoney,
       }),
-    [financials.availableBusinessMoney, financials.openingCash, from, openingStockMovements, raw, to],
+    [financials.openingCash, from, openingStockMovements, raw, reportAvailableBusinessMoney, to],
   );
 
   const yearOptions = useMemo(() => {
@@ -547,7 +569,7 @@ export default function ReportsPage() {
         <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-8">
           <ReportMetric
             label="Available Business Money"
-            value={financialsLoading ? 'Loading…' : formatCurrency(financials.availableBusinessMoney)}
+            value={financialsLoading ? 'Loading…' : formatCurrency(reportAvailableBusinessMoney)}
           />
           <ReportMetric label="Sales Revenue" value={formatCurrency(reportStats.paidSalesRevenue)} />
           <ReportMetric label="COGS" value={formatCurrency(reportStats.cogs)} />

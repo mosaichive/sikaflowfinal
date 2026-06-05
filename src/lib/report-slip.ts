@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import sikaflowLogo from '@/assets/sikaflow-logo.png';
 import notoSansFontUrl from '@/assets/fonts/NotoSans-VariableFont.ttf';
 import { formatCurrency } from '@/lib/constants';
-import { calculateFinancialSnapshot, getPaidAmount, isRecognizedSale, isRestockExpenseRow } from '@/lib/sales-inventory';
+import { calculateFinancialSnapshot, getPaidAmount, isCancelledStatus, isRecognizedSale, isRestockExpenseRow } from '@/lib/sales-inventory';
 
 export type ReportRangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 
@@ -145,6 +145,9 @@ function orderedTransactions({
   openingStockMovements = [],
 }: Pick<ReportSourceArgs, 'sales' | 'expenses' | 'otherIncome' | 'savings' | 'investments' | 'fundings' | 'restocks' | 'openingStockMovements'>) {
   const nonRestockExpenses = expenses.filter((expense) => !isRestockExpenseRow(expense));
+  const deductibleRestocks = restocks.filter(
+    (restock) => !isCancelledStatus(restock.status) && restock.is_opening_stock !== true,
+  );
   const rows: BaseTransaction[] = [
     ...openingStockMovements.map((movement) => ({
       date: movement.movement_date,
@@ -218,7 +221,7 @@ function orderedTransactions({
       moneyIn: Number(funding.amount ?? 0),
       moneyOut: 0,
     })),
-    ...restocks.map((restock) => ({
+    ...deductibleRestocks.map((restock) => ({
       date: restock.restock_date,
       timestamp: asTimestamp(restock.restock_date),
       reference: transactionRef('RST', restock.reference, restock.id),
@@ -305,6 +308,7 @@ export function buildReportStatement({
     investments: filteredInvestments,
     investorFunds: filteredFundings,
     restocks: filteredRestocks,
+    openingCashBalance,
   });
 
   const totalMoneyIn = rows.reduce((sum, row) => sum + row.moneyIn, 0);
