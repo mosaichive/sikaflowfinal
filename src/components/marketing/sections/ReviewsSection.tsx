@@ -75,9 +75,9 @@ export function ReviewsSection() {
     })
   ), [reviews]);
 
-  // Only enable infinite marquee when we have enough cards to fill the row.
-  const enableMarquee = showcaseItems.length > 6;
-  const marqueeItems = useMemo(() => (enableMarquee ? [...showcaseItems, ...showcaseItems] : showcaseItems), [enableMarquee, showcaseItems]);
+  const marqueeBaseItems = useMemo(() => buildMarqueeBase(showcaseItems), [showcaseItems]);
+  const marqueeItems = useMemo(() => [...marqueeBaseItems, ...marqueeBaseItems], [marqueeBaseItems]);
+  const marqueeDuration = Math.max(72, marqueeBaseItems.length * 12);
 
   if (loaded && reviews.length === 0) return null;
 
@@ -95,48 +95,43 @@ export function ReviewsSection() {
         </div>
       </div>
 
-      <div className="mt-16 relative">
-        {enableMarquee ? (
-          <>
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#faf7f1] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#faf7f1] to-transparent z-10 pointer-events-none" />
-            <motion.div
-              animate={{ x: ['0%', '-50%'] }}
-              transition={{ duration: Math.max(40, reviews.length * 8), repeat: Infinity, ease: 'linear' }}
-              className="flex gap-6 w-max px-5 sm:px-8"
-            >
-              {marqueeItems.map((item, i) => {
-                // Cloned slides (second half) are decorative — hide from assistive tech
-                const isClone = i >= showcaseItems.length;
-                return (
-                  <div key={`${item.key}-${i}`} aria-hidden={isClone ? true : undefined}>
-                    {item.kind === 'media'
-                      ? <MediaCard review={item.review} />
-                      : <TextCard review={item.review} accent={ACCENTS[i % ACCENTS.length]} />}
-                  </div>
-                );
-              })}
-            </motion.div>
-          </>
-        ) : (
-          <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            <div className="flex flex-wrap justify-center gap-6">
-              {showcaseItems.map((item, i) => {
-                return item.kind === 'media'
-                  ? <MediaCard key={item.key} review={item.review} />
-                  : <TextCard key={item.key} review={item.review} accent={ACCENTS[i % ACCENTS.length]} />;
-              })}
-            </div>
-          </div>
-        )}
+      <div className="mt-12 relative">
+        <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#faf7f1] to-transparent z-10 pointer-events-none" />
+        <motion.div
+          animate={{ x: ['0%', '-50%'] }}
+          transition={{ duration: marqueeDuration, repeat: Infinity, ease: 'linear' }}
+          className="flex w-max gap-4 px-5 sm:gap-5 sm:px-8"
+        >
+          {marqueeItems.map((item, i) => {
+            const isClone = i >= marqueeBaseItems.length;
+            return (
+              <div key={`${item.key}-${i}`} aria-hidden={isClone ? true : undefined}>
+                {item.kind === 'media'
+                  ? <MediaCard review={item.review} />
+                  : <TextCard review={item.review} accent={ACCENTS[i % ACCENTS.length]} />}
+              </div>
+            );
+          })}
+        </motion.div>
       </div>
     </section>
   );
 }
 
+function buildMarqueeBase(items: ShowcaseItem[]) {
+  if (items.length === 0) return [];
+
+  const base: ShowcaseItem[] = [];
+  while (base.length < 6) {
+    base.push(...items);
+  }
+  return base;
+}
+
 function MediaCard({ review }: { review: Review }) {
   return (
-    <div className="w-[300px] sm:w-[360px] h-[440px] shrink-0 rounded-[32px] overflow-hidden relative shadow-[0_20px_60px_-20px_rgba(0,0,0,0.25)] bg-slate-100">
+    <div className="w-[220px] sm:w-[260px] lg:w-[300px] h-[320px] sm:h-[360px] shrink-0 rounded-[24px] overflow-hidden relative shadow-[0_18px_45px_-24px_rgba(0,0,0,0.28)] bg-slate-100">
       {review.media_type === 'video' && review.media_url ? (
         <video
           src={review.media_url}
@@ -146,13 +141,13 @@ function MediaCard({ review }: { review: Review }) {
       ) : (
         <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full object-cover" />
       )}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-5">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
         <div className="flex items-center gap-2 mb-1">
           {Array.from({ length: review.rating }).map((_, k) => (
-            <Star key={k} className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+            <Star key={k} className="h-3 w-3 fill-amber-300 text-amber-300" />
           ))}
         </div>
-        <p className="text-white font-semibold text-base">{review.customer_name}</p>
+        <p className="text-white font-semibold text-sm">{review.customer_name}</p>
         {review.business_name && <p className="text-white/80 text-xs">{review.business_name}</p>}
       </div>
     </div>
@@ -161,18 +156,20 @@ function MediaCard({ review }: { review: Review }) {
 
 function TextCard({ review, accent }: { review: Review; accent: string }) {
   return (
-    <div className="w-[320px] sm:w-[380px] h-[440px] shrink-0 rounded-[32px] bg-white border border-slate-200/80 p-7 flex flex-col shadow-[0_20px_60px_-30px_rgba(0,0,0,0.18)]">
-      <div className="flex gap-1 mb-4">
+    <div className="w-[250px] sm:w-[300px] lg:w-[330px] h-[320px] sm:h-[360px] shrink-0 rounded-[24px] bg-white border border-slate-200/80 p-5 sm:p-6 flex flex-col shadow-[0_18px_45px_-26px_rgba(0,0,0,0.2)]">
+      <div className="flex gap-1 mb-3">
         {Array.from({ length: review.rating }).map((_, k) => (
-          <Star key={k} className="h-4 w-4 fill-amber-400 text-amber-400" />
+          <Star key={k} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
         ))}
       </div>
-      <p className="text-slate-800 text-[17px] leading-relaxed flex-1">“{normalizeTestimonial(review.testimonial)}”</p>
-      <div className="mt-6 flex items-center gap-3">
+      <p className="text-slate-800 text-sm sm:text-[15px] leading-relaxed flex-1 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:9] [-webkit-box-orient:vertical]">
+        “{normalizeTestimonial(review.testimonial)}”
+      </p>
+      <div className="mt-5 flex items-center gap-3">
         {review.avatar_url ? (
-          <img src={review.avatar_url} alt={review.customer_name} className="h-11 w-11 rounded-full object-cover" />
+          <img src={review.avatar_url} alt={review.customer_name} className="h-9 w-9 rounded-full object-cover" />
         ) : (
-          <div className={`h-11 w-11 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-xs font-bold text-white`}>
+          <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-[11px] font-bold text-white`}>
             {initials(review.customer_name)}
           </div>
         )}
