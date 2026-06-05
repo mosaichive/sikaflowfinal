@@ -58,41 +58,39 @@ export function MarketingLayout() {
   };
 
   return (
-    <div className="kt-marketing min-h-screen bg-[#05060f] text-white antialiased overflow-x-hidden">
+    <div className="kt-marketing min-h-screen bg-[#4a4a4a] text-white antialiased overflow-x-hidden">
       {/* Sticky Navbar */}
-      <header
-        className={cn(
-          'fixed top-0 inset-x-0 z-50 transition-all duration-300',
-          scrolled
-            ? 'backdrop-blur-xl bg-[#05060f]/70 border-b border-white/10'
-            : 'bg-transparent',
-        )}
-      >
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+      <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
+        <div
+          className={cn(
+            'mx-auto flex h-[72px] max-w-7xl items-center justify-between rounded-full bg-white px-4 text-slate-950 shadow-[0_18px_45px_-28px_rgba(0,0,0,0.65)] transition-all duration-300 sm:h-20 sm:px-7',
+            scrolled && 'shadow-[0_22px_60px_-30px_rgba(0,0,0,0.75)]',
+          )}
+        >
           <button onClick={() => handleNav('/')} className="flex items-center gap-2.5 group">
-            <Logo className="h-8 w-8" />
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
+            <Logo className="h-8 w-8 sm:h-9 sm:w-9" />
+            <span className="font-bold text-lg tracking-tight text-slate-950 sm:text-xl">
               KudiTrack
             </span>
           </button>
 
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
               <button
                 key={l.href}
                 onClick={() => handleNav(l.href)}
-                className="px-4 py-2 text-sm text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                className="text-[15px] font-medium text-slate-700 transition-colors hover:text-slate-950"
               >
                 {l.label}
               </button>
             ))}
           </nav>
 
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-4">
             {user ? (
               <Button
                 onClick={() => navigate('/dashboard')}
-                className="bg-white text-black hover:bg-white/90 rounded-full px-5 h-10 font-semibold"
+                className="h-14 rounded-full bg-[#ffcc00] px-8 text-base font-bold text-slate-950 hover:bg-[#f1bd00]"
               >
                 Open Dashboard <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
@@ -100,15 +98,15 @@ export function MarketingLayout() {
               <>
                 <button
                   onClick={() => navigate('/sign-in')}
-                  className="text-sm text-white/80 hover:text-white px-4 py-2"
+                  className="h-14 rounded-full bg-slate-100 px-8 text-base font-semibold text-slate-950 transition-colors hover:bg-slate-200"
                 >
                   Login
                 </button>
                 <Button
                   onClick={() => navigate('/sign-up')}
-                  className="bg-gradient-to-r from-violet-500 to-cyan-400 text-black hover:opacity-90 rounded-full px-5 h-10 font-semibold shadow-[0_0_30px_-5px_rgba(139,92,246,0.6)]"
+                  className="h-14 rounded-full bg-[#ffcc00] px-8 text-base font-bold text-slate-950 shadow-none hover:bg-[#f1bd00]"
                 >
-                  Get Started
+                  Get started
                 </Button>
               </>
             )}
@@ -116,7 +114,7 @@ export function MarketingLayout() {
 
           <button
             onClick={() => setOpen((v) => !v)}
-            className="lg:hidden p-2 rounded-lg text-white/80 hover:bg-white/5"
+            className="rounded-full p-3 text-slate-950 transition-colors hover:bg-slate-100 lg:hidden"
             aria-label="Toggle menu"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -129,14 +127,14 @@ export function MarketingLayout() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden overflow-hidden bg-[#05060f]/95 backdrop-blur-xl border-t border-white/10"
+              className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-[2rem] bg-white text-slate-950 shadow-[0_18px_45px_-28px_rgba(0,0,0,0.65)] lg:hidden"
             >
               <div className="px-5 py-4 space-y-1">
                 {NAV_LINKS.map((l) => (
                   <button
                     key={l.href}
                     onClick={() => handleNav(l.href)}
-                    className="block w-full text-left px-4 py-3 rounded-lg text-white/80 hover:bg-white/5"
+                    className="block w-full rounded-2xl px-4 py-3 text-left font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                   >
                     {l.label}
                   </button>
@@ -145,24 +143,23 @@ export function MarketingLayout() {
                   {user ? (
                     <Button
                       onClick={() => { setOpen(false); navigate('/dashboard'); }}
-                      className="col-span-2 bg-white text-black hover:bg-white/90 rounded-full"
+                      className="col-span-2 h-12 rounded-full bg-[#ffcc00] font-bold text-slate-950 hover:bg-[#f1bd00]"
                     >
                       Open Dashboard
                     </Button>
                   ) : (
                     <>
                       <Button
-                        variant="outline"
                         onClick={() => { setOpen(false); navigate('/sign-in'); }}
-                        className="rounded-full border-white/20 bg-transparent text-white hover:bg-white/5"
+                        className="h-12 rounded-full bg-slate-100 font-semibold text-slate-950 hover:bg-slate-200"
                       >
                         Login
                       </Button>
                       <Button
                         onClick={() => { setOpen(false); navigate('/sign-up'); }}
-                        className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 text-black"
+                        className="h-12 rounded-full bg-[#ffcc00] font-bold text-slate-950 hover:bg-[#f1bd00]"
                       >
-                        Get Started
+                        Get started
                       </Button>
                     </>
                   )}
@@ -173,7 +170,7 @@ export function MarketingLayout() {
         </AnimatePresence>
       </header>
 
-      <main className="pt-16">
+      <main className="pt-24 sm:pt-28">
         <Outlet />
       </main>
 
