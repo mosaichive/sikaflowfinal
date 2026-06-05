@@ -16,8 +16,18 @@ type Review = {
 
 const ACCENTS = ['from-emerald-400 to-emerald-600', 'from-blue-400 to-blue-600', 'from-amber-400 to-amber-500', 'from-emerald-500 to-blue-500'];
 
+type ShowcaseItem = {
+  key: string;
+  kind: 'media' | 'text';
+  review: Review;
+};
+
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || '•';
+}
+
+function normalizeTestimonial(text: string) {
+  return text.trim().replace(/^"+|"+$/g, '');
 }
 
 export function ReviewsSection() {
@@ -52,9 +62,22 @@ export function ReviewsSection() {
     })();
   }, []);
 
+  const showcaseItems = useMemo<ShowcaseItem[]>(() => (
+    reviews.flatMap((review) => {
+      const items: ShowcaseItem[] = [];
+
+      if (review.media_url) {
+        items.push({ key: `${review.id}-media`, kind: 'media', review });
+      }
+
+      items.push({ key: `${review.id}-text`, kind: 'text', review });
+      return items;
+    })
+  ), [reviews]);
+
   // Only enable infinite marquee when we have enough cards to fill the row.
-  const enableMarquee = reviews.length > 6;
-  const marqueeItems = useMemo(() => (enableMarquee ? [...reviews, ...reviews] : reviews), [enableMarquee, reviews]);
+  const enableMarquee = showcaseItems.length > 6;
+  const marqueeItems = useMemo(() => (enableMarquee ? [...showcaseItems, ...showcaseItems] : showcaseItems), [enableMarquee, showcaseItems]);
 
   if (loaded && reviews.length === 0) return null;
 
@@ -82,15 +105,14 @@ export function ReviewsSection() {
               transition={{ duration: Math.max(40, reviews.length * 8), repeat: Infinity, ease: 'linear' }}
               className="flex gap-6 w-max px-5 sm:px-8"
             >
-              {marqueeItems.map((r, i) => {
+              {marqueeItems.map((item, i) => {
                 // Cloned slides (second half) are decorative — hide from assistive tech
-                const isClone = i >= reviews.length;
-                const useMedia = !!r.media_url && i % 2 === 0;
+                const isClone = i >= showcaseItems.length;
                 return (
-                  <div key={`${r.id}-${i}`} aria-hidden={isClone ? true : undefined}>
-                    {useMedia
-                      ? <MediaCard review={r} />
-                      : <TextCard review={r} accent={ACCENTS[i % ACCENTS.length]} />}
+                  <div key={`${item.key}-${i}`} aria-hidden={isClone ? true : undefined}>
+                    {item.kind === 'media'
+                      ? <MediaCard review={item.review} />
+                      : <TextCard review={item.review} accent={ACCENTS[i % ACCENTS.length]} />}
                   </div>
                 );
               })}
@@ -99,11 +121,10 @@ export function ReviewsSection() {
         ) : (
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="flex flex-wrap justify-center gap-6">
-              {reviews.map((r, i) => {
-                const useMedia = !!r.media_url && i % 2 === 0;
-                return useMedia
-                  ? <MediaCard key={r.id} review={r} />
-                  : <TextCard key={r.id} review={r} accent={ACCENTS[i % ACCENTS.length]} />;
+              {showcaseItems.map((item, i) => {
+                return item.kind === 'media'
+                  ? <MediaCard key={item.key} review={item.review} />
+                  : <TextCard key={item.key} review={item.review} accent={ACCENTS[i % ACCENTS.length]} />;
               })}
             </div>
           </div>
@@ -146,7 +167,7 @@ function TextCard({ review, accent }: { review: Review; accent: string }) {
           <Star key={k} className="h-4 w-4 fill-amber-400 text-amber-400" />
         ))}
       </div>
-      <p className="text-slate-800 text-[17px] leading-relaxed flex-1">"{review.testimonial}"</p>
+      <p className="text-slate-800 text-[17px] leading-relaxed flex-1">“{normalizeTestimonial(review.testimonial)}”</p>
       <div className="mt-6 flex items-center gap-3">
         {review.avatar_url ? (
           <img src={review.avatar_url} alt={review.customer_name} className="h-11 w-11 rounded-full object-cover" />
