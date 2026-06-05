@@ -9,7 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
+  getReviewMediaStyle,
+  normalizeReviewMediaAdjustment,
+  type ReviewMediaFit,
+} from '@/lib/review-media';
 
 type ReviewRow = {
   id: string;
@@ -19,6 +26,10 @@ type ReviewRow = {
   rating: number;
   media_url: string | null;
   media_type: 'image' | 'video' | null;
+  media_fit?: ReviewMediaFit | null;
+  media_position_x?: number | null;
+  media_position_y?: number | null;
+  media_zoom?: number | null;
   avatar_url: string | null;
   visible: boolean;
   sort_order: number;
@@ -32,8 +43,48 @@ const MAX_SIZE = 50 * 1024 * 1024;
 function empty(order: number): Draft {
   return {
     customer_name: '', business_name: '', testimonial: '', rating: 5,
-    media_url: null, media_type: null, avatar_url: null, visible: true, sort_order: order,
+    media_url: null,
+    media_type: null,
+    ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
+    avatar_url: null,
+    visible: true,
+    sort_order: order,
   };
+}
+
+function MediaAdjustmentSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = '',
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  const displayValue = step < 1 ? value.toFixed(2) : Math.round(value);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <span className="text-xs font-medium text-foreground">{displayValue}{suffix}</span>
+      </div>
+      <Slider
+        min={min}
+        max={max}
+        step={step}
+        value={[value]}
+        onValueChange={(next) => onChange(next[0] ?? value)}
+      />
+    </div>
+  );
 }
 
 export default function PlatformReviewsPage() {
@@ -60,7 +111,10 @@ export default function PlatformReviewsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const startNew = () => { setDraft(empty(rows.length)); setOpen(true); };
-  const startEdit = (r: ReviewRow) => { setDraft({ ...r }); setOpen(true); };
+  const startEdit = (r: ReviewRow) => {
+    setDraft({ ...r, ...normalizeReviewMediaAdjustment(r) });
+    setOpen(true);
+  };
 
   const onUpload = async (file: File) => {
     if (file.size > MAX_SIZE) return toast({ title: 'File too large (max 50MB)', variant: 'destructive' });
@@ -72,7 +126,7 @@ export default function PlatformReviewsPage() {
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false, contentType: file.type });
       if (error) throw error;
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      setDraft((d) => ({ ...d, media_url: pub.publicUrl, media_type: kind }));
+      setDraft((d) => ({ ...d, media_url: pub.publicUrl, media_type: kind, ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT }));
     } catch (e: any) {
       toast({ title: 'Upload failed', description: e.message, variant: 'destructive' });
     } finally {
@@ -107,6 +161,7 @@ export default function PlatformReviewsPage() {
       rating: draft.rating,
       media_url: draft.media_url,
       media_type: draft.media_type,
+      ...normalizeReviewMediaAdjustment(draft),
       avatar_url: draft.avatar_url,
       visible: draft.visible,
       sort_order: draft.sort_order,
@@ -144,6 +199,11 @@ export default function PlatformReviewsPage() {
     void load();
   };
 
+  const mediaAdjustment = normalizeReviewMediaAdjustment(draft);
+  const setMediaAdjustment = (patch: Partial<ReturnType<typeof normalizeReviewMediaAdjustment>>) => {
+    setDraft((current) => ({ ...current, ...normalizeReviewMediaAdjustment({ ...current, ...patch }) }));
+  };
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
@@ -163,9 +223,9 @@ export default function PlatformReviewsPage() {
             <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
               <div className="h-14 w-14 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
                 {r.media_type === 'video' && r.media_url ? (
-                  <video src={r.media_url} className="h-full w-full object-cover" muted />
+                  <video src={r.media_url} className="h-full w-full" style={getReviewMediaStyle(r)} muted />
                 ) : r.media_url ? (
-                  <img src={r.media_url} alt="" className="h-full w-full object-cover" />
+                  <img src={r.media_url} alt="" className="h-full w-full" style={getReviewMediaStyle(r)} />
                 ) : (
                   <span className="text-xs text-muted-foreground">No media</span>
                 )}
@@ -237,10 +297,10 @@ export default function PlatformReviewsPage() {
             <div>
               <Label>Media (image or video)</Label>
               {draft.media_url && (
-                <div className="mt-2 h-40 rounded-lg overflow-hidden bg-secondary">
+                <div className="mt-2 h-48 rounded-lg overflow-hidden bg-secondary">
                   {draft.media_type === 'video'
-                    ? <video src={draft.media_url} className="h-full w-full object-cover" muted autoPlay loop playsInline />
-                    : <img src={draft.media_url} alt="" className="h-full w-full object-cover" />}
+                    ? <video src={draft.media_url} className="h-full w-full transition-transform duration-200" style={getReviewMediaStyle(mediaAdjustment)} muted autoPlay loop playsInline />
+                    : <img src={draft.media_url} alt="" className="h-full w-full transition-transform duration-200" style={getReviewMediaStyle(mediaAdjustment)} />}
                 </div>
               )}
               <label className="mt-2 flex items-center gap-2 cursor-pointer">
@@ -252,9 +312,63 @@ export default function PlatformReviewsPage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
                 />
                 {draft.media_url && (
-                  <Button variant="ghost" size="sm" onClick={() => setDraft({ ...draft, media_url: null, media_type: null })}>Remove</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDraft({ ...draft, media_url: null, media_type: null, ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT })}>Remove</Button>
                 )}
               </label>
+              {draft.media_url && (
+                <div className="mt-3 rounded-xl border border-border bg-secondary/20 p-3 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Media adjustment</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDraft((current) => ({ ...current, ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['cover', 'contain'] as ReviewMediaFit[]).map((fit) => (
+                      <Button
+                        key={fit}
+                        type="button"
+                        variant={mediaAdjustment.media_fit === fit ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setMediaAdjustment({ media_fit: fit })}
+                        className="capitalize"
+                      >
+                        {fit}
+                      </Button>
+                    ))}
+                  </div>
+                  <MediaAdjustmentSlider
+                    label="Horizontal focus"
+                    value={mediaAdjustment.media_position_x}
+                    min={0}
+                    max={100}
+                    suffix="%"
+                    onChange={(value) => setMediaAdjustment({ media_position_x: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Vertical focus"
+                    value={mediaAdjustment.media_position_y}
+                    min={0}
+                    max={100}
+                    suffix="%"
+                    onChange={(value) => setMediaAdjustment({ media_position_y: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Zoom"
+                    value={mediaAdjustment.media_zoom}
+                    min={1}
+                    max={3}
+                    step={0.05}
+                    suffix="x"
+                    onChange={(value) => setMediaAdjustment({ media_zoom: value })}
+                  />
+                </div>
+              )}
             </div>
 
             <div>

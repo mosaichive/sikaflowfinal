@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getReviewMediaStyle, type ReviewMediaFit } from '@/lib/review-media';
 
 type Review = {
   id: string;
@@ -11,6 +12,10 @@ type Review = {
   rating: number;
   media_url: string | null;
   media_type: 'image' | 'video' | null;
+  media_fit?: ReviewMediaFit | null;
+  media_position_x?: number | null;
+  media_position_y?: number | null;
+  media_zoom?: number | null;
   avatar_url: string | null;
 };
 
@@ -38,7 +43,7 @@ export function ReviewsSection() {
     (async () => {
       const { data, error } = await (supabase as any)
         .from('marketing_reviews')
-        .select('id, customer_name, business_name, testimonial, rating, media_url, media_type, avatar_url, sort_order, created_at')
+        .select('*')
         .eq('visible', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -135,11 +140,12 @@ function MediaCard({ review }: { review: Review }) {
       {review.media_type === 'video' && review.media_url ? (
         <video
           src={review.media_url}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full"
+          style={getReviewMediaStyle(review)}
           autoPlay muted loop playsInline
         />
       ) : (
-        <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full" style={getReviewMediaStyle(review)} />
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
         <div className="flex items-center gap-2 mb-1">
