@@ -79,13 +79,14 @@ export function FeaturesSection() {
   const navigate = useNavigate();
 
   return (
-    <section id="features" className="relative py-24 sm:py-32">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-950/10 to-transparent pointer-events-none" />
+    <section id="features" className="relative bg-white py-24 text-slate-950 sm:py-32">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-50/70 to-transparent pointer-events-none" />
       <div className="relative max-w-7xl mx-auto px-5 sm:px-8">
         <SectionHeader
           eyebrow="Features"
           title="Everything you need to run a smarter business"
           sub="From the corner shop to a growing distributor — track, decide, and grow without spreadsheets."
+          tone="light"
         />
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-16">
@@ -96,10 +97,10 @@ export function FeaturesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-80px' }}
               transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              className={`group relative rounded-[28px] border border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:border-white/20 hover:shadow-[0_30px_80px_-20px_rgba(139,92,246,0.5)] ${i === 1 ? 'md:col-span-2 lg:col-span-1' : ''}`}
+              className={`group relative overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] transition-all duration-500 hover:-translate-y-2 hover:border-slate-300 hover:shadow-[0_32px_90px_-50px_rgba(15,23,42,0.55)] ${i === 1 ? 'md:col-span-2 lg:col-span-1' : ''}`}
             >
               {/* Ambient gradient glow */}
-              <div className={`absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br ${cat.glow} blur-3xl opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
+              <div className={`absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br ${cat.glow} blur-3xl opacity-20 group-hover:opacity-35 transition-opacity duration-700`} />
 
               {/* Image block */}
               <div className={`relative m-3 rounded-[20px] overflow-hidden aspect-[4/3] bg-gradient-to-br ${cat.gradient}`}>
@@ -130,20 +131,20 @@ export function FeaturesSection() {
 
               {/* Content */}
               <div className="relative p-6 pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40 mb-2">{cat.eyebrow}</p>
-                <h3 className="text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-white">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">{cat.eyebrow}</p>
+                <h3 className="text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-slate-950">
                   {cat.title}{' '}
-                  <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent italic">
+                  <span className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent italic">
                     {cat.highlight}
                   </span>
                 </h3>
-                <p className="mt-2 text-sm text-white/60">{cat.subtitle}</p>
+                <p className="mt-2 text-sm text-slate-600">{cat.subtitle}</p>
 
                 <ul className="mt-5 space-y-2.5">
                   {cat.features.map((f) => (
-                    <li key={f.label} className="flex items-center gap-3 text-sm text-white/80">
-                      <span className={`flex items-center justify-center h-7 w-7 rounded-lg bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors`}>
-                        <f.icon className="h-3.5 w-3.5 text-white/80" />
+                    <li key={f.label} className="flex items-center gap-3 text-sm text-slate-700">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 transition-colors group-hover:border-slate-300">
+                        <f.icon className="h-3.5 w-3.5 text-slate-700" />
                       </span>
                       {f.label}
                     </li>
@@ -168,7 +169,7 @@ export function FeaturesSection() {
           >
             Start Tracking Today <ArrowRight className="ml-1.5 h-4 w-4" />
           </Button>
-          <p className="text-xs text-white/40">Free to start • No credit card required</p>
+          <p className="text-xs text-slate-500">Free to start • No credit card required</p>
         </motion.div>
       </div>
     </section>
@@ -253,7 +254,10 @@ export function SectionHeader({
   title,
   sub,
   center = true,
-}: { eyebrow?: string; title: string; sub?: string; center?: boolean }) {
+  tone = 'dark',
+}: { eyebrow?: string; title: string; sub?: string; center?: boolean; tone?: 'dark' | 'light' }) {
+  const isLight = tone === 'light';
+
   return (
     <div className={center ? 'text-center max-w-3xl mx-auto' : 'max-w-3xl'}>
       {eyebrow && (
@@ -261,7 +265,7 @@ export function SectionHeader({
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300 mb-3"
+          className={`text-xs font-semibold uppercase tracking-[0.2em] mb-3 ${isLight ? 'text-emerald-700' : 'text-violet-300'}`}
         >
           {eyebrow}
         </motion.p>
@@ -271,7 +275,7 @@ export function SectionHeader({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
+        className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${isLight ? 'text-slate-950' : 'text-white'}`}
       >
         {title}
       </motion.h2>
@@ -281,7 +285,7 @@ export function SectionHeader({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="mt-4 text-base sm:text-lg text-white/65 leading-relaxed"
+          className={`mt-4 text-base sm:text-lg leading-relaxed ${isLight ? 'text-slate-600' : 'text-white/65'}`}
         >
           {sub}
         </motion.p>

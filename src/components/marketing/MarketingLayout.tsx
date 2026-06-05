@@ -58,7 +58,7 @@ export function MarketingLayout() {
   };
 
   return (
-    <div className="kt-marketing min-h-screen bg-[#3f3f3f] text-white antialiased overflow-x-hidden">
+    <div className="kt-marketing min-h-screen bg-[#363636] text-white antialiased overflow-x-hidden">
       {/* Sticky Navbar */}
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
         <div
