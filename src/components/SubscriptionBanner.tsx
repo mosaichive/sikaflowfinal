@@ -15,11 +15,16 @@ interface Announcement {
 
 const dismissedKey = (id: string) => `ann_dismissed_${id}`;
 
-export function SubscriptionBanner() {
+export function SubscriptionBanner({ showAnnouncements = true }: { showAnnouncements?: boolean }) {
   const { subscription, daysRemaining, hasAccess, isReadOnly } = useSubscription();
   const [anns, setAnns] = useState<Announcement[]>([]);
 
   useEffect(() => {
+    if (!showAnnouncements) {
+      setAnns([]);
+      return;
+    }
+
     (async () => {
       const { data } = await supabase
         .from('announcements')
@@ -30,7 +35,7 @@ export function SubscriptionBanner() {
       const list = ((data ?? []) as unknown) as Announcement[];
       setAnns(list.filter((a) => !localStorage.getItem(dismissedKey(a.id))));
     })();
-  }, []);
+  }, [showAnnouncements]);
 
   const dismiss = (id: string) => {
     localStorage.setItem(dismissedKey(id), '1');

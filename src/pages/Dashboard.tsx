@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, HandCoins, Package, Plus, Receipt, ShoppingCart, Sparkles, TrendingUp, WalletCards } from 'lucide-react';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, Boxes, HandCoins, Package, Plus, Receipt, ShoppingCart, Sparkles, TrendingUp, WalletCards } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
@@ -16,7 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA, calculateBusinessFinancials } from '@/lib/business-money';
@@ -803,7 +802,7 @@ export default function Dashboard() {
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6">
-        <SubscriptionBanner />
+        <SubscriptionBanner showAnnouncements={false} />
 
         {/* HEADER */}
         <motion.section
@@ -878,15 +877,6 @@ export default function Dashboard() {
                   ))}
                 </SelectContent>
               </Select>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/announcements" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors">
-                    <Bell className="h-4 w-4" />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>Announcements</TooltipContent>
-              </Tooltip>
 
               {hasModule('sales') ? (
                 <Button asChild size="sm" className="rounded-full gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 hover:opacity-95 shadow-md shadow-primary/30">

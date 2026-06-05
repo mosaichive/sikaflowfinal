@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, Megaphone, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, FileClock
+  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, FileClock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,7 +28,6 @@ const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] =
   { title: 'Savings', url: '/savings', icon: PiggyBank, module: 'savings' },
   { title: 'Reports', url: '/reports', icon: BarChart3, module: 'reports' },
   { title: 'Staff / Users', url: '/staff', icon: Shield, module: 'staff' },
-  { title: 'Announcements', url: '/announcements', icon: Megaphone, module: 'announcements' },
   { title: 'Support', url: '/support', icon: LifeBuoy, module: 'dashboard' },
   { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
