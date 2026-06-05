@@ -1,7 +1,6 @@
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
-import { SectionHeader } from './FeaturesSection';
 
 const FAQ = [
   { q: 'How does KudiTrack work?', a: 'KudiTrack runs on your phone and computer. You record sales, restocks, and expenses; KudiTrack does the math and shows your real profit, stock levels, and cash position in real time.' },
@@ -14,25 +13,31 @@ const FAQ = [
 
 export function FaqSection() {
   return (
-    <section id="faq" className="relative py-24 sm:py-32">
+    <section id="faq" className="relative bg-white py-24 text-slate-900 sm:py-32">
       <div className="max-w-3xl mx-auto px-5 sm:px-8">
-        <SectionHeader
-          eyebrow="FAQ"
-          title="Frequently asked questions"
-          sub="Everything you need to know before getting started."
-        />
+        <div className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+            FAQ
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+            Frequently asked questions
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
+            Everything you need to know before getting started.
+          </p>
+        </div>
 
         <Accordion type="single" collapsible className="mt-10 space-y-3">
           {FAQ.map((item, i) => (
             <AccordionItem
               key={i}
               value={`item-${i}`}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur px-5 [&[data-state=open]]:bg-white/[0.06]"
+              className="rounded-2xl border border-slate-200 bg-white px-5 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.35)] [&[data-state=open]]:bg-slate-50"
             >
-              <AccordionTrigger className="text-left text-sm sm:text-base font-medium hover:no-underline py-5 text-white">
+              <AccordionTrigger className="py-5 text-left text-sm font-semibold text-slate-950 hover:no-underline sm:text-base">
                 {item.q}
               </AccordionTrigger>
-              <AccordionContent className="text-sm text-white/70 pb-5 leading-relaxed">
+              <AccordionContent className="pb-5 text-sm leading-relaxed text-slate-600">
                 {item.a}
               </AccordionContent>
             </AccordionItem>

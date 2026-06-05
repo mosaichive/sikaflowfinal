@@ -19,7 +19,7 @@ export function ProblemSection() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7 }}
-            className="relative rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-900/35 to-[#4a4a4a] p-7 overflow-hidden"
+            className="relative rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-900/35 to-[#3f3f3f] p-7 overflow-hidden"
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-rose-300/80">Before KudiTrack</p>
             <h3 className="mt-2 text-2xl font-bold">The old way</h3>
@@ -30,7 +30,7 @@ export function ProblemSection() {
               <ProblemRow icon={Calculator} text='"How much did I really make?" — no clear answer' />
             </div>
             {/* Decorative scribble */}
-            <div className="mt-8 rounded-xl border border-rose-500/20 bg-[#4a4a4a]/70 p-4 font-mono text-xs text-rose-100/80 leading-loose">
+            <div className="mt-8 rounded-xl border border-rose-500/20 bg-[#3f3f3f]/70 p-4 font-mono text-xs text-rose-100/80 leading-loose">
               <div className="line-through opacity-70">Rice — 480</div>
               <div className="line-through opacity-70">Sugar — 18 ?? 28 ??</div>
               <div>Coke — ??</div>
@@ -44,7 +44,7 @@ export function ProblemSection() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="relative rounded-3xl border border-emerald-500/25 bg-gradient-to-br from-emerald-900/35 to-[#4a4a4a] p-7 overflow-hidden"
+            className="relative rounded-3xl border border-emerald-500/25 bg-gradient-to-br from-emerald-900/35 to-[#3f3f3f] p-7 overflow-hidden"
           >
             <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-emerald-500/20 blur-3xl" />
             <div className="relative">
@@ -59,7 +59,7 @@ export function ProblemSection() {
                 <SolutionRow text="One dashboard for the whole business" />
               </div>
               {/* Mini dashboard */}
-              <div className="mt-8 rounded-xl border border-emerald-500/20 bg-[#4a4a4a]/75 p-4">
+              <div className="mt-8 rounded-xl border border-emerald-500/20 bg-[#3f3f3f]/75 p-4">
                 <div className="flex justify-between text-xs">
                   <span className="text-white/60">Today's profit</span>
                   <span className="text-emerald-300 font-bold">GHS 1,820</span>

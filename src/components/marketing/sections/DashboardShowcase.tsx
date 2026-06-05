@@ -214,10 +214,10 @@ function VideoPreview() {
       transition={{ duration: 0.35 }}
       className="mt-6"
     >
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#4a4a4a]/90 shadow-[0_30px_90px_-40px_rgba(34,211,238,0.55)]">
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#3f3f3f]/90 shadow-[0_30px_90px_-40px_rgba(34,211,238,0.55)]">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-cyan-400/10" />
         <video
-          className="relative aspect-video w-full bg-[#4a4a4a] object-contain"
+          className="relative aspect-video w-full bg-[#3f3f3f] object-contain"
           src="/kuditrack-ads.mp4"
           poster="/kuditrack-demo-poster.png"
           controls
@@ -251,7 +251,7 @@ function MobileMockup() {
       exit={{ opacity: 0, x: 24, y: 24 }}
       viewport={{ once: true }}
       transition={{ duration: 0.8, delay: 0.3 }}
-      className="hidden xl:block absolute -right-6 -bottom-10 w-56 rounded-[2rem] border border-white/15 bg-[#4a4a4a]/90 p-3 shadow-2xl backdrop-blur"
+      className="hidden xl:block absolute -right-6 -bottom-10 w-56 rounded-[2rem] border border-white/15 bg-[#3f3f3f]/90 p-3 shadow-2xl backdrop-blur"
     >
       <div className="h-72 rounded-[1.4rem] bg-gradient-to-br from-violet-900/40 to-cyan-900/40 p-4">
         <p className="text-[10px] uppercase tracking-widest text-white/50">Mobile</p>
