@@ -212,6 +212,10 @@ export default function PlatformReviewsPage() {
   const setMediaAdjustment = (patch: Partial<ReturnType<typeof normalizeReviewMediaAdjustment>>) => {
     setDraft((current) => ({ ...current, ...normalizeReviewMediaAdjustment({ ...current, ...patch }) }));
   };
+  const avatarAdjustment = normalizeReviewAvatarAdjustment(draft);
+  const setAvatarAdjustment = (patch: Partial<ReturnType<typeof normalizeReviewAvatarAdjustment>>) => {
+    setDraft((current) => ({ ...current, ...normalizeReviewAvatarAdjustment({ ...current, ...patch }) }));
+  };
 
   return (
     <div className="space-y-6 max-w-5xl">
