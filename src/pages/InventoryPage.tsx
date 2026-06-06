@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -698,15 +698,31 @@ export default function InventoryPage() {
 
     setDamageSaving(true);
     try {
-      const { error } = await supabase.rpc('record_damaged_goods' as any, {
+      const rpcArgs = {
+        _business_id: businessId,
+        _damage_date: new Date(`${damageForm.damage_date}T00:00:00`).toISOString(),
+        _notes: damageForm.notes || null,
         _product_id: selectedDamageProduct.id,
         _quantity: quantity,
         _reason: damageForm.reason,
-        _damage_date: new Date(`${damageForm.damage_date}T00:00:00`).toISOString(),
-        _notes: damageForm.notes || null,
-        _business_id: businessId,
         _recorded_by_name: displayName || user.email || '',
-      });
+      };
+
+      const result = await supabase.rpc('record_damaged_goods_v2' as any, rpcArgs);
+      let error = result.error;
+
+      if (error && isMissingDamagedGoodsSchemaError(error)) {
+        const fallback = await supabase.rpc('record_damaged_goods' as any, {
+          _product_id: selectedDamageProduct.id,
+          _quantity: quantity,
+          _reason: damageForm.reason,
+          _damage_date: rpcArgs._damage_date,
+          _notes: rpcArgs._notes,
+          _business_id: businessId,
+          _recorded_by_name: rpcArgs._recorded_by_name,
+        });
+        error = fallback.error;
+      }
 
       if (error) throw error;
 
@@ -830,6 +846,9 @@ export default function InventoryPage() {
           <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>{editingRestock ? 'Edit Restock' : 'Add Restock'}</DialogTitle>
+              <DialogDescription>
+                Add inventory quantity and cost details. Normal restocks affect cash, while opening stock does not.
+              </DialogDescription>
             </DialogHeader>
             <form className="space-y-4" onSubmit={saveRestock}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -932,6 +951,9 @@ export default function InventoryPage() {
           <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>Record Damaged Goods</DialogTitle>
+              <DialogDescription>
+                Deduct unsellable stock as inventory loss without changing sales, profit, other income, or available business money.
+              </DialogDescription>
             </DialogHeader>
             <form className="space-y-4" onSubmit={saveDamagedGoods}>
               <div className="grid gap-4 md:grid-cols-2">
