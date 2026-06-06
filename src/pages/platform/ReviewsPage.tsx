@@ -387,7 +387,11 @@ export default function PlatformReviewsPage() {
             <div>
               <Label>Customer avatar (optional)</Label>
               <div className="flex items-center gap-3 mt-2">
-                {draft.avatar_url && <img src={draft.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />}
+                {draft.avatar_url && (
+                  <div className="h-16 w-16 rounded-full overflow-hidden bg-secondary">
+                    <img src={draft.avatar_url} alt="" className="h-full w-full transition-transform duration-200" style={getReviewAvatarStyle(avatarAdjustment)} />
+                  </div>
+                )}
                 <label>
                   <Button variant="outline" size="sm" disabled={uploading} asChild>
                     <span><Upload className="h-4 w-4 mr-2" />{draft.avatar_url ? 'Replace' : 'Upload'}</span>
@@ -397,7 +401,57 @@ export default function PlatformReviewsPage() {
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadAvatar(f); e.target.value = ''; }}
                   />
                 </label>
+                {draft.avatar_url && (
+                  <Button variant="ghost" size="sm" onClick={() => setDraft({ ...draft, avatar_url: null, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT })}>Remove</Button>
+                )}
               </div>
+              {draft.avatar_url && (
+                <div className="mt-3 rounded-xl border border-border bg-secondary/20 p-3 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Avatar adjustment</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDraft((current) => ({ ...current, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['cover', 'contain'] as ReviewMediaFit[]).map((fit) => (
+                      <Button
+                        key={fit}
+                        type="button"
+                        variant={avatarAdjustment.avatar_fit === fit ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setAvatarAdjustment({ avatar_fit: fit })}
+                        className="capitalize"
+                      >
+                        {fit}
+                      </Button>
+                    ))}
+                  </div>
+                  <MediaAdjustmentSlider
+                    label="Horizontal focus"
+                    value={avatarAdjustment.avatar_position_x}
+                    min={0} max={100} suffix="%"
+                    onChange={(value) => setAvatarAdjustment({ avatar_position_x: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Vertical focus"
+                    value={avatarAdjustment.avatar_position_y}
+                    min={0} max={100} suffix="%"
+                    onChange={(value) => setAvatarAdjustment({ avatar_position_y: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Zoom"
+                    value={avatarAdjustment.avatar_zoom}
+                    min={1} max={3} step={0.05} suffix="x"
+                    onChange={(value) => setAvatarAdjustment({ avatar_zoom: value })}
+                  />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
