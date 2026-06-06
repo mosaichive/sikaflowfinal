@@ -44,7 +44,9 @@ export function ReviewsSection() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const fetchReviews = async () => {
       const { data, error } = await (supabase as any)
         .from('marketing_reviews')
         .select('*')
@@ -52,23 +54,35 @@ export function ReviewsSection() {
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('[ReviewsSection] fetch error', error);
-      }
+      if (cancelled) return;
+      if (error) console.error('[ReviewsSection] fetch error', error);
 
       const rows = (data || []) as Review[];
-      // De-duplicate defensively by id
       const seen = new Set<string>();
       const unique = rows.filter((r) => {
         if (seen.has(r.id)) return false;
         seen.add(r.id);
         return true;
       });
-
-      console.log('[ReviewsSection] fetched', rows.length, 'rows; unique', unique.length, 'ids:', unique.map((r) => r.id));
       setReviews(unique);
       setLoaded(true);
-    })();
+    };
+
+    void fetchReviews();
+
+    const channel = supabase
+      .channel('marketing_reviews_public')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'marketing_reviews' },
+        () => { void fetchReviews(); },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const showcaseItems = useMemo<ShowcaseItem[]>(() => (
@@ -146,10 +160,10 @@ function MediaCard({ review }: { review: Review }) {
           src={review.media_url}
           className="absolute inset-0 h-full w-full"
           style={getReviewMediaStyle(review)}
-          autoPlay muted loop playsInline
+          autoPlay muted loop playsInline preload="metadata"
         />
       ) : (
-        <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full" style={getReviewMediaStyle(review)} />
+        <img src={review.media_url!} alt={review.customer_name} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full" style={getReviewMediaStyle(review)} />
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
         <div className="flex items-center gap-2 mb-1">
@@ -178,7 +192,7 @@ function TextCard({ review, accent }: { review: Review; accent: string }) {
       <div className="mt-5 flex items-center gap-3">
         {review.avatar_url ? (
           <div className="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0">
-            <img src={review.avatar_url} alt={review.customer_name} className="h-full w-full" style={getReviewAvatarStyle(review)} />
+            <img src={review.avatar_url} alt={review.customer_name} loading="lazy" decoding="async" className="h-full w-full" style={getReviewAvatarStyle(review)} />
           </div>
         ) : (
           <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-[11px] font-bold text-white`}>
