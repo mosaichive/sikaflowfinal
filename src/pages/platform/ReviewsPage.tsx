@@ -12,8 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import {
+  DEFAULT_REVIEW_AVATAR_ADJUSTMENT,
   DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
+  getReviewAvatarStyle,
   getReviewMediaStyle,
+  normalizeReviewAvatarAdjustment,
   normalizeReviewMediaAdjustment,
   type ReviewMediaFit,
 } from '@/lib/review-media';
@@ -31,6 +34,10 @@ type ReviewRow = {
   media_position_y?: number | null;
   media_zoom?: number | null;
   avatar_url: string | null;
+  avatar_fit?: ReviewMediaFit | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  avatar_zoom?: number | null;
   visible: boolean;
   sort_order: number;
 };
