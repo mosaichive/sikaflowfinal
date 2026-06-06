@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { getReviewMediaStyle, type ReviewMediaFit } from '@/lib/review-media';
+import { getReviewAvatarStyle, getReviewMediaStyle, type ReviewMediaFit } from '@/lib/review-media';
 
 type Review = {
   id: string;
@@ -17,6 +17,10 @@ type Review = {
   media_position_y?: number | null;
   media_zoom?: number | null;
   avatar_url: string | null;
+  avatar_fit?: ReviewMediaFit | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  avatar_zoom?: number | null;
 };
 
 const ACCENTS = ['from-emerald-400 to-emerald-600', 'from-blue-400 to-blue-600', 'from-amber-400 to-amber-500', 'from-emerald-500 to-blue-500'];
