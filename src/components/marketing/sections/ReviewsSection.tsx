@@ -44,7 +44,9 @@ export function ReviewsSection() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const fetchReviews = async () => {
       const { data, error } = await (supabase as any)
         .from('marketing_reviews')
         .select('*')
@@ -52,23 +54,35 @@ export function ReviewsSection() {
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('[ReviewsSection] fetch error', error);
-      }
+      if (cancelled) return;
+      if (error) console.error('[ReviewsSection] fetch error', error);
 
       const rows = (data || []) as Review[];
-      // De-duplicate defensively by id
       const seen = new Set<string>();
       const unique = rows.filter((r) => {
         if (seen.has(r.id)) return false;
         seen.add(r.id);
         return true;
       });
-
-      console.log('[ReviewsSection] fetched', rows.length, 'rows; unique', unique.length, 'ids:', unique.map((r) => r.id));
       setReviews(unique);
       setLoaded(true);
-    })();
+    };
+
+    void fetchReviews();
+
+    const channel = supabase
+      .channel('marketing_reviews_public')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'marketing_reviews' },
+        () => { void fetchReviews(); },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const showcaseItems = useMemo<ShowcaseItem[]>(() => (
