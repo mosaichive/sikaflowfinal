@@ -28,6 +28,7 @@ import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { DynamicLineChart } from '@/components/reports/DynamicLineChart';
 import { calculateReportCumulativeFinancials, isDefaultLiveDashboardReport } from '@/lib/report-calculations';
 import {
+  buildDamagedGoodsRowsFromStockMovements,
   calculateDamagedGoodsSummary,
   groupDamagedGoodsByProduct,
   getDamagedGoodsValue,
@@ -185,6 +186,15 @@ export default function ReportsPage() {
       supabase.from('damaged_goods' as any).select('*').order('damage_date', { ascending: false }),
     ]);
 
+    const productsData = productsRes.status === 'fulfilled' ? (productsRes.value ?? []) : [];
+    const stockMovementsData = stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [];
+    const damagedGoodsData =
+      damagedGoodsRes.status === 'fulfilled' && !damagedGoodsRes.value.error
+        ? (damagedGoodsRes.value.data ?? [])
+        : damagedGoodsRes.status === 'fulfilled' && isMissingDamagedGoodsSchemaError(damagedGoodsRes.value.error)
+          ? buildDamagedGoodsRowsFromStockMovements(stockMovementsData, productsData)
+          : [];
+
     setRaw({
       sales: salesRes.status === 'fulfilled' && !salesRes.value.error ? (salesRes.value.data ?? []) : [],
       saleItems: itemsRes.status === 'fulfilled' && !itemsRes.value.error ? (itemsRes.value.data ?? []) : [],
@@ -194,9 +204,9 @@ export default function ReportsPage() {
       funding: funRes.status === 'fulfilled' && !funRes.value.error ? (funRes.value.data ?? []) : [],
       restocks: restockRes.status === 'fulfilled' && !restockRes.value.error ? (restockRes.value.data ?? []) : [],
       otherIncome: otherIncomeRes.status === 'fulfilled' && !otherIncomeRes.value.error ? (otherIncomeRes.value.data ?? []) : [],
-      products: productsRes.status === 'fulfilled' ? (productsRes.value ?? []) : [],
-      stockMovements: stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [],
-      damagedGoods: damagedGoodsRes.status === 'fulfilled' && !damagedGoodsRes.value.error ? (damagedGoodsRes.value.data ?? []) : [],
+      products: productsData,
+      stockMovements: stockMovementsData,
+      damagedGoods: damagedGoodsData,
     });
     if (salesRes.status === 'rejected') logSupabaseError('reports.load.sales', salesRes.reason, { businessId });
     if (itemsRes.status === 'rejected') logSupabaseError('reports.load.saleItems', itemsRes.reason, { businessId });

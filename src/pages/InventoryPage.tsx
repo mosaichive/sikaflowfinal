@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   calculateDamagedGoodsSummary,
   DAMAGE_REASONS,
+  buildDamagedGoodsRowsFromStockMovements,
   groupDamagedGoodsByProduct,
   getDamagedGoodsValue,
   isMissingDamagedGoodsSchemaError,
@@ -35,6 +36,8 @@ import {
   loadProductsCompat,
   loadStockMovementsCompat,
   logSupabaseError,
+  rememberCachedProduct,
+  updateProductRecord,
   updateRestockRecord,
 } from '@/lib/workspace';
 
@@ -198,15 +201,20 @@ export default function InventoryPage() {
         : Promise.resolve({ data: [], error: null }),
     ]);
 
+    let nextProducts: ProductRow[] = [];
+    let nextMovements: StockMovementRow[] = [];
+
     if (productsRes.status === 'fulfilled') {
-      setProducts(productsRes.value as ProductRow[]);
+      nextProducts = productsRes.value as ProductRow[];
+      setProducts(nextProducts);
     } else {
       logSupabaseError('inventory.load.products', productsRes.reason);
       setProducts([]);
     }
 
     if (movementsRes.status === 'fulfilled') {
-      setMovements(movementsRes.value as StockMovementRow[]);
+      nextMovements = movementsRes.value as StockMovementRow[];
+      setMovements(nextMovements);
     } else {
       logSupabaseError('inventory.load.movements', movementsRes.reason);
       setMovements([]);
@@ -220,7 +228,13 @@ export default function InventoryPage() {
     }
 
     if (damagedRes.status === 'fulfilled') {
-      setDamagedGoods((damagedRes.value.error ? [] : ((damagedRes.value.data || []) as DamagedGoodsRow[])) ?? []);
+      if (damagedRes.value.error && isMissingDamagedGoodsSchemaError(damagedRes.value.error)) {
+        setDamagedGoods(
+          buildDamagedGoodsRowsFromStockMovements(nextMovements, nextProducts) as DamagedGoodsRow[],
+        );
+      } else {
+        setDamagedGoods((damagedRes.value.error ? [] : ((damagedRes.value.data || []) as DamagedGoodsRow[])) ?? []);
+      }
       if (damagedRes.value.error && !isMissingDamagedGoodsSchemaError(damagedRes.value.error)) {
         logSupabaseError('inventory.load.damagedGoods', damagedRes.value.error, { businessId, ownerUserId });
       }
@@ -712,16 +726,77 @@ export default function InventoryPage() {
       let error = result.error;
 
       if (error && isMissingDamagedGoodsSchemaError(error)) {
-        const fallback = await supabase.rpc('record_damaged_goods' as any, {
-          _product_id: selectedDamageProduct.id,
-          _quantity: quantity,
-          _reason: damageForm.reason,
-          _damage_date: rpcArgs._damage_date,
-          _notes: rpcArgs._notes,
-          _business_id: businessId,
-          _recorded_by_name: rpcArgs._recorded_by_name,
-        });
-        error = fallback.error;
+        const quantityAfter = currentStock - quantity;
+        const referenceId =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${selectedDamageProduct.id}-${Date.now()}`;
+        const recordedByName = displayName || user.email || '';
+        const movementNote = `Damaged goods: ${damageForm.reason}${damageForm.notes.trim() ? ` - ${damageForm.notes.trim()}` : ''}`;
+
+        let stockDeducted = false;
+        try {
+          await updateProductRecord(selectedDamageProduct.id, {
+            quantity: quantityAfter,
+          });
+          stockDeducted = true;
+
+          if (businessId) {
+            rememberCachedProduct(businessId, {
+              ...selectedDamageProduct,
+              business_id: businessId,
+              quantity: quantityAfter,
+            });
+          }
+
+          const movementResult = await insertStockMovementCompat({
+            user_id: ownerUserId ?? user.id,
+            business_id: businessId,
+            product_id: selectedDamageProduct.id,
+            change: -Math.abs(quantity),
+            reason: 'damaged_stock',
+            note: movementNote,
+            reference_id: referenceId,
+            added_by_name: recordedByName,
+            movement_type: 'damaged_stock',
+            quantity_change: -Math.abs(quantity),
+            quantity_after: quantityAfter,
+            unit_cost: toNumber(selectedDamageProduct.cost_price),
+            unit_price: 0,
+            source_table: 'damaged_goods',
+            source_id: referenceId,
+            created_by: user.id,
+            created_by_name: recordedByName,
+            movement_date: rpcArgs._damage_date,
+          });
+
+          if (!movementResult.inserted) {
+            throw new Error('Stock loss could not be recorded in movement history.');
+          }
+        } catch (fallbackError) {
+          if (stockDeducted) {
+            try {
+              await updateProductRecord(selectedDamageProduct.id, {
+                quantity: currentStock,
+              });
+              if (businessId) {
+                rememberCachedProduct(businessId, {
+                  ...selectedDamageProduct,
+                  business_id: businessId,
+                  quantity: currentStock,
+                });
+              }
+            } catch (rollbackError) {
+              logSupabaseError('inventory.saveDamagedGoods.rollbackStock', rollbackError, {
+                businessId,
+                productId: selectedDamageProduct.id,
+              });
+            }
+          }
+          throw fallbackError;
+        }
+
+        error = null;
       }
 
       if (error) throw error;

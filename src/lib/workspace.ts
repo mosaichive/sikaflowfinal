@@ -1066,7 +1066,13 @@ export function getErrorMessage(error: unknown, fallback = 'Please try again.') 
 
 export function logSupabaseError(context: string, error: unknown, extra?: Record<string, unknown>) {
   const normalized = (error ?? {}) as SupabaseErrorLike;
-  console.error(`[KudiTrack:${context}]`, {
+  const fallbackMode = typeof extra?.fallbackMode === 'string' ? extra.fallbackMode : '';
+  const isExpectedSchemaFallback =
+    fallbackMode === 'insertWithoutOptionalColumn'
+    || fallbackMode === 'updateWithoutOptionalColumn';
+  const logger = isExpectedSchemaFallback ? console.info : console.error;
+
+  logger(`[KudiTrack:${context}]`, {
     message: normalized.message ?? (error instanceof Error ? error.message : 'Unknown error'),
     details: normalized.details ?? null,
     code: normalized.code ?? null,
