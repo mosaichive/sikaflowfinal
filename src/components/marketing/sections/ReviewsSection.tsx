@@ -177,7 +177,9 @@ function TextCard({ review, accent }: { review: Review; accent: string }) {
       </p>
       <div className="mt-5 flex items-center gap-3">
         {review.avatar_url ? (
-          <img src={review.avatar_url} alt={review.customer_name} className="h-9 w-9 rounded-full object-cover" />
+          <div className="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0">
+            <img src={review.avatar_url} alt={review.customer_name} className="h-full w-full" style={getReviewAvatarStyle(review)} />
+          </div>
         ) : (
           <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-[11px] font-bold text-white`}>
             {initials(review.customer_name)}
