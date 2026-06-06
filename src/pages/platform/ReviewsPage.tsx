@@ -151,7 +151,7 @@ export default function PlatformReviewsPage() {
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false, contentType: file.type });
       if (error) throw error;
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      setDraft((d) => ({ ...d, avatar_url: pub.publicUrl }));
+      setDraft((d) => ({ ...d, avatar_url: pub.publicUrl, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT }));
     } catch (e: any) {
       toast({ title: 'Upload failed', description: e.message, variant: 'destructive' });
     } finally {
