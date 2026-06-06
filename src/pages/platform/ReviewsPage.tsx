@@ -120,7 +120,7 @@ export default function PlatformReviewsPage() {
 
   const startNew = () => { setDraft(empty(rows.length)); setOpen(true); };
   const startEdit = (r: ReviewRow) => {
-    setDraft({ ...r, ...normalizeReviewMediaAdjustment(r) });
+    setDraft({ ...r, ...normalizeReviewMediaAdjustment(r), ...normalizeReviewAvatarAdjustment(r) });
     setOpen(true);
   };
 
