@@ -16,6 +16,10 @@ describe('resolveStaffModules', () => {
     ]);
   });
 
+  it('includes damaged goods in the manager default preset', () => {
+    expect(resolveStaffModules('manager', undefined)).toContain('damaged_goods');
+  });
+
   it('drops unknown module values from stored permissions', () => {
     expect(resolveStaffModules('staff', ['sales', 'unknown', 'expenses'])).toEqual(['sales', 'expenses']);
   });

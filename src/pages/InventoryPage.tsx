@@ -15,12 +15,20 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { supabase } from '@/integrations/supabase/client';
-import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
+import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS, STOCK_MOVEMENT_TYPES } from '@/lib/constants';
 import { toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
-import { AlertTriangle, Boxes, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Boxes, History, PackageMinus, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
 import { recomputeProductStock } from '@/lib/sale-items-schema';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  calculateDamagedGoodsSummary,
+  DAMAGE_REASONS,
+  groupDamagedGoodsByProduct,
+  getDamagedGoodsValue,
+  isMissingDamagedGoodsSchemaError,
+  type DamageReason,
+} from '@/lib/damaged-goods';
 import {
   insertRestockRecord,
   insertStockMovementCompat,
@@ -71,6 +79,25 @@ type RestockRow = {
   status: string;
 };
 
+type DamagedGoodsRow = {
+  id: string;
+  business_id: string;
+  user_id: string;
+  product_id: string;
+  product_name: string;
+  category: string | null;
+  quantity: number;
+  quantity_after: number;
+  reason: DamageReason | string;
+  damage_date: string;
+  notes: string | null;
+  unit_cost: number | string;
+  total_value: number | string;
+  recorded_by: string | null;
+  recorded_by_name: string | null;
+  created_at: string;
+};
+
 type InventoryHistoryRow = {
   id: string;
   entryType: 'opening_stock' | 'restock';
@@ -104,17 +131,28 @@ function extractRestockExpenseId(description: string | null | undefined) {
   return match?.[1] ?? null;
 }
 
+function inDateFilter(value: string | null | undefined, from: string, to: string) {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (from && timestamp < new Date(`${from}T00:00:00`).getTime()) return false;
+  if (to && timestamp > new Date(`${to}T23:59:59`).getTime()) return false;
+  return true;
+}
+
 export default function InventoryPage() {
-  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId } = useAuth();
+  const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId, hasModule } = useAuth();
   const { businessId } = useBusiness();
   const { financials, loading: financialsLoading } = useBusinessFinancials();
   const { toast } = useToast();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [movements, setMovements] = useState<StockMovementRow[]>([]);
   const [restocks, setRestocks] = useState<RestockRow[]>([]);
+  const [damagedGoods, setDamagedGoods] = useState<DamagedGoodsRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [damageDialogOpen, setDamageDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [damageSaving, setDamageSaving] = useState(false);
   const [editingRestock, setEditingRestock] = useState<RestockRow | null>(null);
   const [deletingRestockId, setDeletingRestockId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -127,20 +165,36 @@ export default function InventoryPage() {
     description: '',
     is_opening_stock: false,
   });
+  const [damageForm, setDamageForm] = useState({
+    product_id: '',
+    quantity: '1',
+    reason: '',
+    damage_date: new Date().toISOString().slice(0, 10),
+    notes: '',
+  });
+  const [damageProductFilter, setDamageProductFilter] = useState('all');
+  const [damageReasonFilter, setDamageReasonFilter] = useState('all');
+  const [damageDateFrom, setDamageDateFrom] = useState('');
+  const [damageDateTo, setDamageDateTo] = useState('');
 
   const canManage = isAdmin || isManager;
+  const canRecordDamage = hasModule('damaged_goods');
   const [recomputing, setRecomputing] = useState(false);
   const userId = user?.id ?? null;
+  const ownerUserId = effectiveBusinessOwnerId ?? userId;
 
   const load = useCallback(async () => {
-    const [productsRes, movementsRes, restocksRes, expensesRes] = await Promise.allSettled([
+    const [productsRes, movementsRes, restocksRes, damagedRes, expensesRes] = await Promise.allSettled([
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(100, businessId),
-      userId
-        ? supabase.from('restocks').select('*').eq('user_id', userId).order('restock_date', { ascending: false })
+      ownerUserId
+        ? supabase.from('restocks').select('*').eq('user_id', ownerUserId).order('restock_date', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
-      userId
-        ? supabase.from('expenses').select('*').eq('user_id', userId)
+      ownerUserId
+        ? supabase.from('damaged_goods' as any).select('*').eq('user_id', ownerUserId).order('damage_date', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      ownerUserId
+        ? supabase.from('expenses').select('*').eq('user_id', ownerUserId)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -159,19 +213,29 @@ export default function InventoryPage() {
     }
 
     if (restocksRes.status === 'fulfilled') {
-      setRestocks(((restocksRes.value.data || []) as RestockRow[]) ?? []);
+      setRestocks((restocksRes.value.error ? [] : ((restocksRes.value.data || []) as RestockRow[])) ?? []);
     } else {
       logSupabaseError('inventory.load.restocks', restocksRes.reason);
       setRestocks([]);
     }
 
+    if (damagedRes.status === 'fulfilled') {
+      setDamagedGoods((damagedRes.value.error ? [] : ((damagedRes.value.data || []) as DamagedGoodsRow[])) ?? []);
+      if (damagedRes.value.error && !isMissingDamagedGoodsSchemaError(damagedRes.value.error)) {
+        logSupabaseError('inventory.load.damagedGoods', damagedRes.value.error, { businessId, ownerUserId });
+      }
+    } else {
+      logSupabaseError('inventory.load.damagedGoods', damagedRes.reason);
+      setDamagedGoods([]);
+    }
+
     if (expensesRes.status === 'fulfilled') {
-      setExpenses(((expensesRes.value.data || []) as ExpenseRow[]) ?? []);
+      setExpenses((expensesRes.value.error ? [] : ((expensesRes.value.data || []) as ExpenseRow[])) ?? []);
     } else {
       logSupabaseError('inventory.load.expenses', expensesRes.reason);
       setExpenses([]);
     }
-  }, [businessId, userId]);
+  }, [businessId, ownerUserId]);
 
   const handleRecomputeStock = useCallback(async () => {
     setRecomputing(true);
@@ -197,20 +261,22 @@ export default function InventoryPage() {
 
   useEffect(() => {
     void load();
-    if (!userId) return;
+    if (!ownerUserId) return;
     const channel = supabase
       .channel('inventory-v2')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${userId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'damaged_goods', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load, userId]);
+  }, [load, ownerUserId]);
 
   const selectedProduct = products.find((product) => product.id === form.product_id) || null;
+  const selectedDamageProduct = products.find((product) => product.id === damageForm.product_id) || null;
   const inventoryProducts = useMemo(
     () => [...products].sort((left, right) => left.name.localeCompare(right.name)),
     [products],
@@ -231,6 +297,44 @@ export default function InventoryPage() {
   const restockStockValueCost = useMemo(
     () => Math.max(0, Number(form.quantity || 0)) * Math.max(0, Number(form.unit_cost || 0)),
     [form.quantity, form.unit_cost],
+  );
+  const damagePreviewValue = useMemo(
+    () => Math.max(0, Number(damageForm.quantity || 0)) * Math.max(0, toNumber(selectedDamageProduct?.cost_price ?? 0)),
+    [damageForm.quantity, selectedDamageProduct],
+  );
+  const filteredDamagedGoods = useMemo(
+    () =>
+      damagedGoods.filter((entry) => {
+        if (damageProductFilter !== 'all' && entry.product_id !== damageProductFilter) return false;
+        if (damageReasonFilter !== 'all' && entry.reason !== damageReasonFilter) return false;
+        if ((damageDateFrom || damageDateTo) && !inDateFilter(entry.damage_date, damageDateFrom, damageDateTo)) return false;
+        return true;
+      }),
+    [damageDateFrom, damageDateTo, damageProductFilter, damageReasonFilter, damagedGoods],
+  );
+  const damagedGoodsSummary = useMemo(
+    () => calculateDamagedGoodsSummary(filteredDamagedGoods),
+    [filteredDamagedGoods],
+  );
+  const damagedGoodsByProduct = useMemo(
+    () => groupDamagedGoodsByProduct(filteredDamagedGoods),
+    [filteredDamagedGoods],
+  );
+  const movementTypeLabels = useMemo(
+    () =>
+      new Map([
+        ...STOCK_MOVEMENT_TYPES.map((type) => [type.value, type.label] as const),
+        ['sold', 'Sale'] as const,
+        ['damaged_stock', 'Damaged Goods'] as const,
+      ]),
+    [],
+  );
+  const stockMovementHistory = useMemo(
+    () =>
+      [...movements]
+        .sort((left, right) => new Date(right.movement_date).getTime() - new Date(left.movement_date).getTime())
+        .slice(0, 50),
+    [movements],
   );
 
   useEffect(() => {
@@ -357,6 +461,21 @@ export default function InventoryPage() {
   const openCreateRestock = () => {
     resetForm();
     setDialogOpen(true);
+  };
+
+  const resetDamageForm = () => {
+    setDamageForm({
+      product_id: '',
+      quantity: '1',
+      reason: '',
+      damage_date: new Date().toISOString().slice(0, 10),
+      notes: '',
+    });
+  };
+
+  const openRecordDamage = () => {
+    resetDamageForm();
+    setDamageDialogOpen(true);
   };
 
   const openEditRestock = (restock: RestockRow) => {
@@ -546,6 +665,73 @@ export default function InventoryPage() {
     }
   };
 
+  const saveDamagedGoods = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user || !businessId || !selectedDamageProduct || !canRecordDamage) return;
+
+    const quantity = Number(damageForm.quantity || 0);
+    const currentStock = toNumber(selectedDamageProduct.quantity);
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast({ title: 'Damaged quantity must be greater than 0', variant: 'destructive' });
+      return;
+    }
+
+    if (!Number.isInteger(quantity)) {
+      toast({ title: 'Damaged quantity must be a whole number', variant: 'destructive' });
+      return;
+    }
+
+    if (quantity > currentStock) {
+      toast({
+        title: 'Insufficient stock',
+        description: `Only ${currentStock} item(s) are currently available for ${selectedDamageProduct.name}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!damageForm.reason) {
+      toast({ title: 'Choose a reason for damage', variant: 'destructive' });
+      return;
+    }
+
+    setDamageSaving(true);
+    try {
+      const { error } = await supabase.rpc('record_damaged_goods' as any, {
+        _product_id: selectedDamageProduct.id,
+        _quantity: quantity,
+        _reason: damageForm.reason,
+        _damage_date: new Date(`${damageForm.damage_date}T00:00:00`).toISOString(),
+        _notes: damageForm.notes || null,
+        _business_id: businessId,
+        _recorded_by_name: displayName || user.email || '',
+      });
+
+      if (error) throw error;
+
+      setDamageDialogOpen(false);
+      resetDamageForm();
+      toast({
+        title: 'Damaged goods recorded',
+        description: `${quantity} item(s) were deducted from ${selectedDamageProduct.name}. Business money, sales, and profit were not changed.`,
+      });
+      void load();
+    } catch (error) {
+      logSupabaseError('inventory.saveDamagedGoods', error, {
+        businessId,
+        productId: selectedDamageProduct.id,
+      });
+      toast({
+        title: 'Could not record damaged goods',
+        description: getErrorMessage(error, 'Please check the quantity and try again.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setDamageSaving(false);
+    }
+  };
+
   const deleteRestock = async (restock: RestockRow) => {
     if (!businessId || !canManage) return;
     const confirmed = window.confirm(`Delete restock for ${restock.product_name}? This will adjust stock immediately.`);
@@ -621,6 +807,12 @@ export default function InventoryPage() {
                 ) : null}
                 <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
               </div>
+            ) : null}
+            {canRecordDamage ? (
+              <Button variant="outline" onClick={openRecordDamage}>
+                <PackageMinus className="mr-2 h-4 w-4" />
+                Damaged Goods
+              </Button>
             ) : null}
           </div>
         </section>
@@ -736,6 +928,93 @@ export default function InventoryPage() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={damageDialogOpen} onOpenChange={setDamageDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>Record Damaged Goods</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={saveDamagedGoods}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Select
+                    value={damageForm.product_id}
+                    onValueChange={(value) => setDamageForm((current) => ({ ...current, product_id: value }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choose product" /></SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} • {product.quantity} in stock
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Damage Date</Label>
+                  <Input
+                    type="date"
+                    value={damageForm.damage_date}
+                    onChange={(event) => setDamageForm((current) => ({ ...current, damage_date: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Damaged Quantity</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={damageForm.quantity}
+                    onChange={(event) => setDamageForm((current) => ({ ...current, quantity: event.target.value }))}
+                  />
+                  {selectedDamageProduct ? (
+                    <p className="text-xs text-muted-foreground">{selectedDamageProduct.quantity} item(s) currently available</p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label>Reason</Label>
+                  <Select
+                    value={damageForm.reason}
+                    onValueChange={(value) => setDamageForm((current) => ({ ...current, reason: value }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choose reason" /></SelectTrigger>
+                    <SelectContent>
+                      {DAMAGE_REASONS.map((reason) => (
+                        <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Estimated Stock Loss</Label>
+                  <Input value={formatCurrency(damagePreviewValue)} readOnly />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    rows={3}
+                    value={damageForm.notes}
+                    onChange={(event) => setDamageForm((current) => ({ ...current, notes: event.target.value }))}
+                    placeholder="Add batch, supplier, or incident details"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-200">Damaged goods money logic</p>
+                <p className="text-xs text-muted-foreground">
+                  This deducts stock and records inventory loss only. It does not add sales, profit, other income, or available business money.
+                </p>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={damageSaving}>
+                {damageSaving ? 'Recording...' : 'Record Damaged Goods'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <div className="space-y-4">
           <Card className="border-border/70">
             <CardHeader>
@@ -790,6 +1069,160 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+
+          {canRecordDamage || damagedGoods.length > 0 ? (
+            <Card className="border-amber-500/25">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <PackageMinus className="h-5 w-5 text-amber-500" />
+                    Damaged Goods
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Track damaged stock as inventory loss. It reduces stock only, not sales, income, profit, or cash.
+                  </p>
+                </div>
+                {canRecordDamage ? (
+                  <Button onClick={openRecordDamage}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Record Damage
+                  </Button>
+                ) : null}
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Damaged Quantity</p>
+                    <p className="mt-2 text-2xl font-semibold">{damagedGoodsSummary.quantity}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Estimated Stock Loss</p>
+                    <p className="mt-2 text-2xl font-semibold">{formatCurrency(damagedGoodsSummary.value)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Products Affected</p>
+                    <p className="mt-2 text-2xl font-semibold">{damagedGoodsByProduct.length}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label>Product</Label>
+                    <Select value={damageProductFilter} onValueChange={setDamageProductFilter}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All products</SelectItem>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason</Label>
+                    <Select value={damageReasonFilter} onValueChange={setDamageReasonFilter}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All reasons</SelectItem>
+                        {DAMAGE_REASONS.map((reason) => (
+                          <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>From</Label>
+                    <Input type="date" value={damageDateFrom} onChange={(event) => setDamageDateFrom(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>To</Label>
+                    <Input type="date" value={damageDateTo} onChange={(event) => setDamageDateTo(event.target.value)} />
+                  </div>
+                </div>
+
+                {(damageProductFilter !== 'all' || damageReasonFilter !== 'all' || damageDateFrom || damageDateTo) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setDamageProductFilter('all');
+                      setDamageReasonFilter('all');
+                      setDamageDateFrom('');
+                      setDamageDateTo('');
+                    }}
+                  >
+                    Clear damaged goods filters
+                  </Button>
+                ) : null}
+
+                {damagedGoodsByProduct.length > 0 ? (
+                  <div className="overflow-hidden rounded-2xl border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Total Damaged</TableHead>
+                          <TableHead>Estimated Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {damagedGoodsByProduct.map((entry) => (
+                          <TableRow key={entry.productId}>
+                            <TableCell className="font-medium">{entry.productName}</TableCell>
+                            <TableCell>{entry.quantity}</TableCell>
+                            <TableCell>{formatCurrency(entry.value)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+
+                {filteredDamagedGoods.length > 0 ? (
+                  <div className="overflow-x-auto rounded-2xl border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Reason</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Stock After</TableHead>
+                          <TableHead>Recorded By</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredDamagedGoods.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>{new Date(entry.damage_date).toLocaleDateString('en-GH')}</TableCell>
+                            <TableCell className="font-medium">{entry.product_name}</TableCell>
+                            <TableCell>{entry.quantity}</TableCell>
+                            <TableCell>
+                              <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                {entry.reason}
+                              </span>
+                            </TableCell>
+                            <TableCell>{formatCurrency(getDamagedGoodsValue(entry))}</TableCell>
+                            <TableCell>{entry.quantity_after}</TableCell>
+                            <TableCell>{entry.recorded_by_name || '—'}</TableCell>
+                            <TableCell className="max-w-[240px] truncate">{entry.notes || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={<PackageMinus className="h-7 w-7 text-muted-foreground" />}
+                    title="No damaged goods recorded"
+                    description="Damaged goods history will appear here with reason, recorder, and estimated stock loss."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="border-border/70">
             <CardHeader>
@@ -872,6 +1305,68 @@ export default function InventoryPage() {
                   icon={<PackagePlus className="h-7 w-7 text-muted-foreground" />}
                   title="No restocks yet"
                   description="Opening Stock and restocks will appear here with deduction status, payment details, and edit/delete actions."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-primary" />
+                Stock Movement History
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {stockMovementHistory.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity Change</TableHead>
+                        <TableHead>Stock After</TableHead>
+                        <TableHead>Unit Cost</TableHead>
+                        <TableHead>Recorded By</TableHead>
+                        <TableHead>Note</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockMovementHistory.map((movement) => {
+                        const product = movement.product_id ? products.find((row) => row.id === movement.product_id) : null;
+                        const typeLabel = movementTypeLabels.get(movement.movement_type) ?? movement.movement_type;
+                        const isDamage = movement.movement_type === 'damaged_stock';
+                        const quantityChange = toNumber(movement.quantity_change);
+
+                        return (
+                          <TableRow key={movement.id}>
+                            <TableCell>{new Date(movement.movement_date).toLocaleDateString('en-GH')}</TableCell>
+                            <TableCell>
+                              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${isDamage ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>
+                                {typeLabel}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium">{product?.name || '—'}</TableCell>
+                            <TableCell className={quantityChange < 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600 dark:text-emerald-400'}>
+                              {quantityChange > 0 ? `+${quantityChange}` : quantityChange}
+                            </TableCell>
+                            <TableCell>{movement.quantity_after ?? '—'}</TableCell>
+                            <TableCell>{formatCurrency(toNumber(movement.unit_cost ?? 0))}</TableCell>
+                            <TableCell>{movement.created_by_name || '—'}</TableCell>
+                            <TableCell className="max-w-[260px] truncate">{movement.note || '—'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<History className="h-7 w-7 text-muted-foreground" />}
+                  title="No stock movements yet"
+                  description="Opening stock, restocks, sales, damaged goods, and manual adjustments will appear here."
                 />
               )}
             </CardContent>

@@ -19,6 +19,10 @@ describe('getFirstAssignedModulePath', () => {
     expect(getFirstAssignedModulePath(['inventory'])).toBe('/inventory');
   });
 
+  it('can land on Damaged Goods when it is the only assigned section', () => {
+    expect(getFirstAssignedModulePath(['damaged_goods'])).toBe('/damaged-goods');
+  });
+
   it('returns null when no sections are assigned', () => {
     expect(getFirstAssignedModulePath([] as ModuleKey[])).toBeNull();
   });

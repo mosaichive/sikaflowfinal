@@ -27,6 +27,12 @@ import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { DynamicLineChart } from '@/components/reports/DynamicLineChart';
 import { calculateReportCumulativeFinancials, isDefaultLiveDashboardReport } from '@/lib/report-calculations';
+import {
+  calculateDamagedGoodsSummary,
+  groupDamagedGoodsByProduct,
+  getDamagedGoodsValue,
+  isMissingDamagedGoodsSchemaError,
+} from '@/lib/damaged-goods';
 
 type RawReportData = {
   sales: any[];
@@ -39,6 +45,7 @@ type RawReportData = {
   otherIncome: any[];
   products: any[];
   stockMovements: any[];
+  damagedGoods: any[];
 };
 
 function formatDateInput(date: Date) {
@@ -152,6 +159,7 @@ export default function ReportsPage() {
     otherIncome: [],
     products: [],
     stockMovements: [],
+    damagedGoods: [],
   });
 
   const { from, to } = useMemo(
@@ -163,7 +171,7 @@ export default function ReportsPage() {
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
-    const [salesRes, itemsRes, expRes, savRes, invRes, funRes, restockRes, otherIncomeRes, productsRes, stockMovementsRes] = await Promise.allSettled([
+    const [salesRes, itemsRes, expRes, savRes, invRes, funRes, restockRes, otherIncomeRes, productsRes, stockMovementsRes, damagedGoodsRes] = await Promise.allSettled([
       supabase.from('sales').select('*').order('sale_date', { ascending: false }),
       supabase.from('sale_items').select('*'),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -174,19 +182,21 @@ export default function ReportsPage() {
       supabase.from('other_income' as any).select('*').order('income_date', { ascending: false }),
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(500, businessId),
+      supabase.from('damaged_goods' as any).select('*').order('damage_date', { ascending: false }),
     ]);
 
     setRaw({
-      sales: salesRes.status === 'fulfilled' ? (salesRes.value.data ?? []) : [],
-      saleItems: itemsRes.status === 'fulfilled' ? (itemsRes.value.data ?? []) : [],
-      expenses: expRes.status === 'fulfilled' ? (expRes.value.data ?? []) : [],
-      savings: savRes.status === 'fulfilled' ? (savRes.value.data ?? []) : [],
-      investments: invRes.status === 'fulfilled' ? (invRes.value.data ?? []) : [],
-      funding: funRes.status === 'fulfilled' ? (funRes.value.data ?? []) : [],
-      restocks: restockRes.status === 'fulfilled' ? (restockRes.value.data ?? []) : [],
-      otherIncome: otherIncomeRes.status === 'fulfilled' ? (otherIncomeRes.value.data ?? []) : [],
+      sales: salesRes.status === 'fulfilled' && !salesRes.value.error ? (salesRes.value.data ?? []) : [],
+      saleItems: itemsRes.status === 'fulfilled' && !itemsRes.value.error ? (itemsRes.value.data ?? []) : [],
+      expenses: expRes.status === 'fulfilled' && !expRes.value.error ? (expRes.value.data ?? []) : [],
+      savings: savRes.status === 'fulfilled' && !savRes.value.error ? (savRes.value.data ?? []) : [],
+      investments: invRes.status === 'fulfilled' && !invRes.value.error ? (invRes.value.data ?? []) : [],
+      funding: funRes.status === 'fulfilled' && !funRes.value.error ? (funRes.value.data ?? []) : [],
+      restocks: restockRes.status === 'fulfilled' && !restockRes.value.error ? (restockRes.value.data ?? []) : [],
+      otherIncome: otherIncomeRes.status === 'fulfilled' && !otherIncomeRes.value.error ? (otherIncomeRes.value.data ?? []) : [],
       products: productsRes.status === 'fulfilled' ? (productsRes.value ?? []) : [],
       stockMovements: stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [],
+      damagedGoods: damagedGoodsRes.status === 'fulfilled' && !damagedGoodsRes.value.error ? (damagedGoodsRes.value.data ?? []) : [],
     });
     if (salesRes.status === 'rejected') logSupabaseError('reports.load.sales', salesRes.reason, { businessId });
     if (itemsRes.status === 'rejected') logSupabaseError('reports.load.saleItems', itemsRes.reason, { businessId });
@@ -198,6 +208,14 @@ export default function ReportsPage() {
     if (otherIncomeRes.status === 'rejected') logSupabaseError('reports.load.otherIncome', otherIncomeRes.reason, { businessId });
     if (productsRes.status === 'rejected') logSupabaseError('reports.load.products', productsRes.reason, { businessId });
     if (stockMovementsRes.status === 'rejected') logSupabaseError('reports.load.stockMovements', stockMovementsRes.reason, { businessId });
+    if (damagedGoodsRes.status === 'rejected') logSupabaseError('reports.load.damagedGoods', damagedGoodsRes.reason, { businessId });
+    if (
+      damagedGoodsRes.status === 'fulfilled'
+      && damagedGoodsRes.value.error
+      && !isMissingDamagedGoodsSchemaError(damagedGoodsRes.value.error)
+    ) {
+      logSupabaseError('reports.load.damagedGoods', damagedGoodsRes.value.error, { businessId });
+    }
     setLoading(false);
   }, [businessId]);
 
@@ -215,6 +233,7 @@ export default function ReportsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, () => { void fetchReport(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'damaged_goods' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'savings' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'investments' }, () => { void fetchReport(); })
       .subscribe();
@@ -235,6 +254,7 @@ export default function ReportsPage() {
         investments: [],
         funding: [],
         restocks: [],
+        damagedGoods: [],
       };
     }
 
@@ -250,6 +270,7 @@ export default function ReportsPage() {
       investments: raw.investments.filter((entry) => inDateRange(entry.investment_date, from, to)),
       funding: raw.funding.filter((entry) => inDateRange(entry.date_received, from, to)),
       restocks: raw.restocks.filter((entry) => inDateRange(entry.restock_date, from, to)),
+      damagedGoods: raw.damagedGoods.filter((entry) => inDateRange(entry.damage_date, from, to)),
     };
   }, [from, invalidRange, raw, to]);
 
@@ -281,6 +302,16 @@ export default function ReportsPage() {
       restocks: filtered.restocks,
     });
   }, [filtered, raw.products, recognizedSaleItems]);
+
+  const damagedGoodsSummary = useMemo(
+    () => calculateDamagedGoodsSummary(filtered.damagedGoods),
+    [filtered.damagedGoods],
+  );
+
+  const damagedGoodsByProduct = useMemo(
+    () => groupDamagedGoodsByProduct(filtered.damagedGoods),
+    [filtered.damagedGoods],
+  );
 
   const cumulativeReportFinancials = useMemo(
     () =>
@@ -566,7 +597,7 @@ export default function ReportsPage() {
 
         {invalidRange ? <p className="text-sm text-destructive">The start date must be before the end date.</p> : null}
 
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-8">
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-10">
           <ReportMetric
             label="Available Business Money"
             value={financialsLoading ? 'Loading…' : formatCurrency(reportAvailableBusinessMoney)}
@@ -577,6 +608,8 @@ export default function ReportsPage() {
           <ReportMetric label="Profit" value={formatCurrency(reportStats.profit)} />
           <ReportMetric label="Opening Stock" value={formatCurrency(openingStockValue)} />
           <ReportMetric label="Restock Spending" value={formatCurrency(reportStats.totalRestockSpending)} />
+          <ReportMetric label="Damaged Qty" value={String(damagedGoodsSummary.quantity)} />
+          <ReportMetric label="Stock Loss" value={formatCurrency(damagedGoodsSummary.value)} />
           <ReportMetric label="Stock Value (Cost)" value={financialsLoading ? 'Loading…' : formatCurrency(financials.stockValue)} />
         </div>
 
@@ -597,6 +630,85 @@ export default function ReportsPage() {
           restocks={filtered.restocks}
           products={raw.products}
         />
+
+        <Card className="overflow-hidden border-amber-500/25">
+          <CardHeader className="border-b border-border/60 bg-muted/20">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <PackageSearch className="h-4 w-4 text-amber-500" />
+              Damaged Goods Report
+            </CardTitle>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Inventory loss from damaged goods in this report range. This is not sales revenue, profit, other income, or cash movement.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5 p-4 sm:p-6">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <ReportMetric label="Total Damaged Quantity" value={String(damagedGoodsSummary.quantity)} />
+              <ReportMetric label="Estimated Stock Loss" value={formatCurrency(damagedGoodsSummary.value)} tone="text-amber-600 dark:text-amber-300" />
+              <ReportMetric label="Affected Products" value={String(damagedGoodsByProduct.length)} />
+            </div>
+
+            {damagedGoodsByProduct.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Total Damaged</TableHead>
+                      <TableHead>Estimated Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {damagedGoodsByProduct.map((entry) => (
+                      <TableRow key={entry.productId}>
+                        <TableCell className="font-medium">{entry.productName}</TableCell>
+                        <TableCell>{entry.quantity}</TableCell>
+                        <TableCell>{formatCurrency(entry.value)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : null}
+
+            {filtered.damagedGoods.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border border-border">
+                <div className="max-h-[360px] overflow-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Recorded By</TableHead>
+                        <TableHead className="text-right">Estimated Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.damagedGoods.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{new Date(entry.damage_date).toLocaleDateString('en-GH')}</TableCell>
+                          <TableCell className="font-medium">{entry.product_name || 'Unknown product'}</TableCell>
+                          <TableCell>{entry.quantity}</TableCell>
+                          <TableCell>{entry.reason || '—'}</TableCell>
+                          <TableCell>{entry.recorded_by_name || '—'}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(getDamagedGoodsValue(entry))}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                icon={<PackageSearch className="h-7 w-7 text-muted-foreground" />}
+                title="No damaged goods in this range"
+                description="Record damaged goods from Inventory to see stock-loss reporting here."
+              />
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="overflow-hidden border-primary/25">
           <CardHeader className="flex flex-col gap-4 border-b border-border/60 bg-muted/20 sm:flex-row sm:items-start sm:justify-between">

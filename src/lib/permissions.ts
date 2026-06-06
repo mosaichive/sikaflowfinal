@@ -7,6 +7,7 @@ export type ModuleKey =
   | 'sales'
   | 'products'
   | 'inventory'
+  | 'damaged_goods'
   | 'customers'
   | 'orders'
   | 'other_income'
@@ -22,6 +23,7 @@ export const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'sales', label: 'Sales / POS' },
   { key: 'products', label: 'Products' },
   { key: 'inventory', label: 'Inventory' },
+  { key: 'damaged_goods', label: 'Damaged Goods' },
   { key: 'customers', label: 'Customers' },
   { key: 'orders', label: 'Orders' },
   { key: 'other_income', label: 'Other Income' },
@@ -35,7 +37,7 @@ export const ALL_MODULES: { key: ModuleKey; label: string }[] = [
 
 export const ROLE_PRESETS: Record<string, ModuleKey[]> = {
   admin: ALL_MODULES.map((m) => m.key),
-  manager: ['dashboard', 'sales', 'products', 'inventory', 'customers', 'orders', 'other_income', 'expenses', 'savings', 'reports', 'announcements'],
+  manager: ['dashboard', 'sales', 'products', 'inventory', 'damaged_goods', 'customers', 'orders', 'other_income', 'expenses', 'savings', 'reports', 'announcements'],
   salesperson: ['dashboard', 'sales', 'customers', 'orders', 'announcements'],
   cashier: ['dashboard', 'sales', 'customers', 'announcements'],
   distributor: ['dashboard', 'inventory', 'orders', 'announcements'],

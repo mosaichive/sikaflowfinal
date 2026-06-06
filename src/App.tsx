@@ -189,6 +189,7 @@ const App = () => (
                 <Route path="/sales" element={<ProtectedRoute><RequireModule module="sales"><SalesPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><RequireModule module="products"><ProductsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/inventory" element={<ProtectedRoute><RequireModule module="inventory"><InventoryPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/damaged-goods" element={<ProtectedRoute><RequireModule module="damaged_goods"><InventoryPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute><RequireModule module="customers"><CustomersPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/orders" element={<ProtectedRoute><RequireModule module="orders"><OrdersPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/other-income" element={<ProtectedRoute><RequireModule module="other_income"><OtherIncomePage /></RequireModule></ProtectedRoute>} />

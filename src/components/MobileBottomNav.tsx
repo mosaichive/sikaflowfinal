@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, Boxes, MoreHorizontal, Users, BarChart3, CreditCard, Settings, LogOut, Moon, Sun, X, ClipboardList, Banknote, Megaphone, Shield, PiggyBank } from 'lucide-react';
+import { Home, ShoppingCart, Boxes, MoreHorizontal, Users, BarChart3, CreditCard, Settings, LogOut, Moon, Sun, X, ClipboardList, Banknote, Megaphone, Shield, PiggyBank, AlertTriangle } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
@@ -18,6 +18,7 @@ const PRIMARY = [
 const MORE_ITEMS = [
   { to: '/customers', label: 'Customers', icon: Users, module: 'customers' as ModuleKey },
   { to: '/products', label: 'Products', icon: Boxes, module: 'products' as ModuleKey },
+  { to: '/damaged-goods', label: 'Damaged Goods', icon: AlertTriangle, module: 'damaged_goods' as ModuleKey },
   { to: '/other-income', label: 'Other Income', icon: Banknote, module: 'other_income' as ModuleKey },
   { to: '/expenses', label: 'Expenses', icon: CreditCard, module: 'expenses' as ModuleKey },
   { to: '/savings', label: 'Savings', icon: PiggyBank, module: 'savings' as ModuleKey },

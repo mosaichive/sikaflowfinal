@@ -11,6 +11,7 @@ export const STAFF_LANDING_ROUTES: readonly ModuleRoute[] = [
   { module: 'sales', path: '/sales', label: 'Sales / POS' },
   { module: 'products', path: '/products', label: 'Products' },
   { module: 'inventory', path: '/inventory', label: 'Inventory' },
+  { module: 'damaged_goods', path: '/damaged-goods', label: 'Damaged Goods' },
   { module: 'customers', path: '/customers', label: 'Customers' },
   { module: 'orders', path: '/orders', label: 'Orders' },
   { module: 'other_income', path: '/other-income', label: 'Other Income' },
