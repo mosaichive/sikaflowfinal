@@ -163,7 +163,7 @@ function MediaCard({ review }: { review: Review }) {
           autoPlay muted loop playsInline
         />
       ) : (
-        <img src={review.media_url!} alt={review.customer_name} className="absolute inset-0 h-full w-full" style={getReviewMediaStyle(review)} />
+        <img src={review.media_url!} alt={review.customer_name} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full" style={getReviewMediaStyle(review)} />
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
         <div className="flex items-center gap-2 mb-1">
