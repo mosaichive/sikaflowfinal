@@ -54,6 +54,7 @@ function empty(order: number): Draft {
     media_type: null,
     ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
     avatar_url: null,
+    ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT,
     visible: true,
     sort_order: order,
   };
