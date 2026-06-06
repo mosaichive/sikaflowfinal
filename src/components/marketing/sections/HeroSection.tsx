@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -74,14 +74,17 @@ const FLYERS = [
 
 export function HeroSection() {
   const [active, setActive] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return;
+
     const t = setInterval(
       () => setActive((v) => (v + 1) % SLIDES.length),
       4500,
     );
     return () => clearInterval(t);
-  }, []);
+  }, [reduceMotion]);
 
   const slide = SLIDES[active];
   const Icon = slide.icon;
@@ -321,15 +324,19 @@ export function HeroSection() {
 
 function FlyerSlider() {
   const [activeFlyer, setActiveFlyer] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const showThumbnails = useShowFlyerThumbnails();
   const flyer = FLYERS[activeFlyer];
 
   useEffect(() => {
+    if (reduceMotion) return;
+
     const timer = window.setInterval(() => {
       setActiveFlyer((current) => (current + 1) % FLYERS.length);
     }, 5200);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [reduceMotion]);
 
   const moveFlyer = (direction: 1 | -1) => {
     setActiveFlyer(
@@ -342,7 +349,7 @@ function FlyerSlider() {
       initial={{ opacity: 0, y: 28 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.7, delay: 0.45 }}
-      className="relative mt-14 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 shadow-[0_30px_110px_-50px_rgba(34,211,238,0.55)] backdrop-blur-xl sm:mt-16 sm:p-5"
+      className="relative mt-10 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 shadow-[0_30px_110px_-50px_rgba(34,211,238,0.55)] backdrop-blur-xl sm:mt-16 sm:rounded-[2rem] sm:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(139,92,246,0.22),transparent_34%),radial-gradient(circle_at_82%_26%,rgba(34,211,238,0.18),transparent_32%)]" />
       <div className="relative flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-center">
@@ -351,7 +358,7 @@ function FlyerSlider() {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200/80">
               Campaign flyers
             </p>
-            <h2 className="mt-2 max-w-xl text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <h2 className="mt-2 max-w-xl text-xl font-bold tracking-tight text-white sm:text-3xl">
               Share-ready KudiTrack creatives in motion.
             </h2>
           </div>
@@ -392,7 +399,7 @@ function FlyerSlider() {
           </div>
         </div>
 
-        <div className="relative mx-auto w-full max-w-[430px] lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <div className="relative mx-auto w-full max-w-[320px] sm:max-w-[430px] lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <div className="absolute -inset-5 rounded-[2.4rem] bg-gradient-to-br from-violet-500/25 via-cyan-400/10 to-emerald-400/20 blur-2xl" />
           <div className="relative overflow-hidden rounded-[1.7rem] border border-white/15 bg-black/20 p-2 shadow-2xl">
             <AnimatePresence mode="wait">
@@ -405,20 +412,48 @@ function FlyerSlider() {
                 exit={{ opacity: 0, x: -36, scale: 0.98 }}
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="aspect-[1248/1748] w-full rounded-[1.25rem] bg-white object-cover"
-                loading={activeFlyer === 0 ? "eager" : "lazy"}
+                loading="lazy"
+                decoding="async"
+                width={1248}
+                height={1748}
               />
             </AnimatePresence>
           </div>
         </div>
 
-        <FlyerThumbnails
-          activeFlyer={activeFlyer}
-          onSelect={setActiveFlyer}
-          className="lg:col-start-1 lg:row-start-2"
-        />
+        {showThumbnails ? (
+          <FlyerThumbnails
+            activeFlyer={activeFlyer}
+            onSelect={setActiveFlyer}
+            className="lg:col-start-1 lg:row-start-2"
+          />
+        ) : null}
       </div>
     </motion.div>
   );
+}
+
+function useShowFlyerThumbnails() {
+  const [showThumbnails, setShowThumbnails] = useState(() => (
+    typeof window === "undefined"
+      ? false
+      : window.innerWidth >= 640
+  ));
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 640px)");
+    const update = () => setShowThumbnails(window.innerWidth >= 640);
+
+    update();
+    query.addEventListener("change", update);
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      query.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return showThumbnails;
 }
 
 function FlyerThumbnails({
@@ -449,6 +484,9 @@ function FlyerThumbnails({
             alt=""
             className="aspect-[1248/1748] w-full rounded-xl object-cover opacity-80 transition group-hover:scale-[1.02] group-hover:opacity-100"
             loading="lazy"
+            decoding="async"
+            width={1248}
+            height={1748}
           />
         </button>
       ))}

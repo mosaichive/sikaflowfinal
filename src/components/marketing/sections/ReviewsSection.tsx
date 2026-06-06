@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,10 +40,37 @@ function normalizeTestimonial(text: string) {
 }
 
 export function ReviewsSection() {
+  const sectionRef = useRef<HTMLElement | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(false);
 
   useEffect(() => {
+    if (shouldLoad) return;
+
+    const section = sectionRef.current;
+    if (!section || !('IntersectionObserver' in window)) {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [shouldLoad]);
+
+  useEffect(() => {
+    if (!shouldLoad) return;
+
     let cancelled = false;
 
     const fetchReviews = async () => {
@@ -83,7 +110,7 @@ export function ReviewsSection() {
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [shouldLoad]);
 
   const showcaseItems = useMemo<ShowcaseItem[]>(() => (
     reviews.flatMap((review) => {
@@ -105,7 +132,7 @@ export function ReviewsSection() {
   if (loaded && reviews.length === 0) return null;
 
   return (
-    <section id="reviews" className="relative py-24 sm:py-32 bg-[#faf7f1] overflow-hidden">
+    <section ref={sectionRef} id="reviews" className="relative py-24 sm:py-32 bg-[#faf7f1] overflow-hidden">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Customer love</p>

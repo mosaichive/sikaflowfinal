@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,46 +8,48 @@ import { AuthProvider, useAuth, type AppRole } from "@/context/AuthContext";
 import { BusinessProvider, useBusiness } from "@/context/BusinessContext";
 import { BusinessFinancialsProvider } from "@/context/BusinessFinancialsContext";
 import { SubscriptionProvider, useSubscription } from "@/context/SubscriptionContext";
-import { SignInPage, SignUpPage } from "./pages/SignInPage";
-import AuthCallbackPage from "./pages/AuthCallbackPage";
-import Dashboard from "./pages/Dashboard";
-import SalesPage from "./pages/SalesPage";
-import ProductsPage from "./pages/ProductsPage";
-import InventoryPage from "./pages/InventoryPage";
-import CustomersPage from "./pages/CustomersPage";
-import ExpensesPage from "./pages/ExpensesPage";
-import ReportsPage from "./pages/ReportsPage";
-import SettingsPage from "./pages/SettingsPage";
-import SavingsPage from "./pages/SavingsPage";
-import BillingPage from "./pages/BillingPage";
-import SupportPage from "./pages/SupportPage";
-import OtherIncomePage from "./pages/OtherIncomePage";
-import OrdersPage from "./pages/OrdersPage";
-import StaffUsersPage from "./pages/StaffUsersPage";
-import TenantAnnouncementsPage from "./pages/AnnouncementsPage";
-import PlatformLayout from "./pages/platform/PlatformLayout";
-import PlatformDashboard from "./pages/platform/PlatformDashboard";
-import BusinessesPage from "./pages/platform/BusinessesPage";
-import SubscriptionsPage from "./pages/platform/SubscriptionsPage";
-import PaymentsPage from "./pages/platform/PaymentsPage";
-import PaymentMethodsPage from "./pages/platform/PaymentMethodsPage";
-import PlatformAnnouncementsPage from "./pages/platform/AnnouncementsPage";
-import AdsPage from "./pages/platform/AdsPage";
-import ReferralsPage from "./pages/platform/ReferralsPage";
-import PlatformSupportPage from "./pages/platform/PlatformSupportPage";
-import NotFound from "./pages/NotFound";
-import InviteAcceptPage from "./pages/InviteAcceptPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import PhoneLoginPage from "./pages/PhoneLoginPage";
 import { BrandLoader } from "./components/BrandLoader";
 import { RequireModule } from "./components/RequireModule";
 import { MarketingLayout } from "./components/marketing/MarketingLayout";
-import MarketingHome from "./pages/marketing/HomePage";
-import PlatformFeedbackPage from "./pages/platform/FeedbackPage";
-import PlatformAdApplicationsPage from "./pages/platform/AdApplicationsPage";
-import PlatformReviewsPage from "./pages/platform/ReviewsPage";
 import { getFirstAssignedModulePath } from "@/lib/module-navigation";
+
+const SignInPage = lazy(() => import("./pages/SignInPage").then((m) => ({ default: m.SignInPage })));
+const SignUpPage = lazy(() => import("./pages/SignInPage").then((m) => ({ default: m.SignUpPage })));
+const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const SalesPage = lazy(() => import("./pages/SalesPage"));
+const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const InventoryPage = lazy(() => import("./pages/InventoryPage"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const SavingsPage = lazy(() => import("./pages/SavingsPage"));
+const BillingPage = lazy(() => import("./pages/BillingPage"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
+const OtherIncomePage = lazy(() => import("./pages/OtherIncomePage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const StaffUsersPage = lazy(() => import("./pages/StaffUsersPage"));
+const TenantAnnouncementsPage = lazy(() => import("./pages/AnnouncementsPage"));
+const PlatformLayout = lazy(() => import("./pages/platform/PlatformLayout"));
+const PlatformDashboard = lazy(() => import("./pages/platform/PlatformDashboard"));
+const BusinessesPage = lazy(() => import("./pages/platform/BusinessesPage"));
+const SubscriptionsPage = lazy(() => import("./pages/platform/SubscriptionsPage"));
+const PaymentsPage = lazy(() => import("./pages/platform/PaymentsPage"));
+const PaymentMethodsPage = lazy(() => import("./pages/platform/PaymentMethodsPage"));
+const PlatformAnnouncementsPage = lazy(() => import("./pages/platform/AnnouncementsPage"));
+const AdsPage = lazy(() => import("./pages/platform/AdsPage"));
+const ReferralsPage = lazy(() => import("./pages/platform/ReferralsPage"));
+const PlatformSupportPage = lazy(() => import("./pages/platform/PlatformSupportPage"));
+const PlatformFeedbackPage = lazy(() => import("./pages/platform/FeedbackPage"));
+const PlatformAdApplicationsPage = lazy(() => import("./pages/platform/AdApplicationsPage"));
+const PlatformReviewsPage = lazy(() => import("./pages/platform/ReviewsPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const PhoneLoginPage = lazy(() => import("./pages/PhoneLoginPage"));
+const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
@@ -134,6 +137,14 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RouteLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <BrandLoader text="Loading..." size="md" />
+    </div>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -144,6 +155,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <Suspense fallback={<RouteLoader />}>
                 <Routes>
                 <Route path="/sign-in/*" element={<AuthRoute><SignInPage /></AuthRoute>} />
                 <Route path="/sign-up/*" element={<AuthRoute><SignUpPage /></AuthRoute>} />
@@ -203,6 +215,7 @@ const App = () => (
                 <Route path="/billing" element={<ProtectedRoute adminOnly allowReadOnly><BillingPage /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
                 </Routes>
+                </Suspense>
               </BrowserRouter>
             </SubscriptionProvider>
           </BusinessFinancialsProvider>

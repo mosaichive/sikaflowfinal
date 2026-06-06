@@ -12,6 +12,8 @@ import { CtaSection } from '@/components/marketing/sections/CtaSection';
 import { FeedbackSection } from '@/components/marketing/sections/FeedbackSection';
 import { getMarketingSeo } from '@/lib/seo';
 
+const deferredSectionClass = '[content-visibility:auto] [contain-intrinsic-size:900px]';
+
 export default function MarketingHome() {
   const location = useLocation();
   const seo = getMarketingSeo(location.pathname);
@@ -21,14 +23,14 @@ export default function MarketingHome() {
       <SEO {...seo} />
       <h1 className="sr-only">KudiTrack — Track Sales, Control Stock, Know Your Money</h1>
       <HeroSection />
-      <FeaturesSection />
-      <ProblemSection />
-      <DashboardShowcase />
-      <ReviewsSection />
-      <AdvertiseSection />
-      <FaqSection />
-      <CtaSection />
-      <FeedbackSection />
+      <div className={deferredSectionClass}><FeaturesSection /></div>
+      <div className={deferredSectionClass}><ProblemSection /></div>
+      <div className={deferredSectionClass}><DashboardShowcase /></div>
+      <div className={deferredSectionClass}><ReviewsSection /></div>
+      <div className={deferredSectionClass}><AdvertiseSection /></div>
+      <div className={deferredSectionClass}><FaqSection /></div>
+      <div className={deferredSectionClass}><CtaSection /></div>
+      <div className={deferredSectionClass}><FeedbackSection /></div>
     </>
   );
 }
