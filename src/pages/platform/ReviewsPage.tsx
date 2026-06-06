@@ -171,6 +171,7 @@ export default function PlatformReviewsPage() {
       media_type: draft.media_type,
       ...normalizeReviewMediaAdjustment(draft),
       avatar_url: draft.avatar_url,
+      ...normalizeReviewAvatarAdjustment(draft),
       visible: draft.visible,
       sort_order: draft.sort_order,
     };
