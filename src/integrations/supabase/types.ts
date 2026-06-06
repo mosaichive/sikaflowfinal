@@ -373,7 +373,11 @@ export type Database = {
       }
       marketing_reviews: {
         Row: {
+          avatar_fit: string
+          avatar_position_x: number
+          avatar_position_y: number
           avatar_url: string | null
+          avatar_zoom: number
           business_name: string | null
           created_at: string
           created_by: string | null
@@ -388,7 +392,11 @@ export type Database = {
           visible: boolean
         }
         Insert: {
+          avatar_fit?: string
+          avatar_position_x?: number
+          avatar_position_y?: number
           avatar_url?: string | null
+          avatar_zoom?: number
           business_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -403,7 +411,11 @@ export type Database = {
           visible?: boolean
         }
         Update: {
+          avatar_fit?: string
+          avatar_position_x?: number
+          avatar_position_y?: number
           avatar_url?: string | null
+          avatar_zoom?: number
           business_name?: string | null
           created_at?: string
           created_by?: string | null
