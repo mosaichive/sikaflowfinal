@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { getReviewMediaStyle, type ReviewMediaFit } from '@/lib/review-media';
+import { getReviewAvatarStyle, getReviewMediaStyle, type ReviewMediaFit } from '@/lib/review-media';
 
 type Review = {
   id: string;
@@ -17,6 +17,10 @@ type Review = {
   media_position_y?: number | null;
   media_zoom?: number | null;
   avatar_url: string | null;
+  avatar_fit?: ReviewMediaFit | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  avatar_zoom?: number | null;
 };
 
 const ACCENTS = ['from-emerald-400 to-emerald-600', 'from-blue-400 to-blue-600', 'from-amber-400 to-amber-500', 'from-emerald-500 to-blue-500'];
@@ -173,7 +177,9 @@ function TextCard({ review, accent }: { review: Review; accent: string }) {
       </p>
       <div className="mt-5 flex items-center gap-3">
         {review.avatar_url ? (
-          <img src={review.avatar_url} alt={review.customer_name} className="h-9 w-9 rounded-full object-cover" />
+          <div className="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0">
+            <img src={review.avatar_url} alt={review.customer_name} className="h-full w-full" style={getReviewAvatarStyle(review)} />
+          </div>
         ) : (
           <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center text-[11px] font-bold text-white`}>
             {initials(review.customer_name)}

@@ -12,8 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import {
+  DEFAULT_REVIEW_AVATAR_ADJUSTMENT,
   DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
+  getReviewAvatarStyle,
   getReviewMediaStyle,
+  normalizeReviewAvatarAdjustment,
   normalizeReviewMediaAdjustment,
   type ReviewMediaFit,
 } from '@/lib/review-media';
@@ -31,6 +34,10 @@ type ReviewRow = {
   media_position_y?: number | null;
   media_zoom?: number | null;
   avatar_url: string | null;
+  avatar_fit?: ReviewMediaFit | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  avatar_zoom?: number | null;
   visible: boolean;
   sort_order: number;
 };
@@ -47,6 +54,7 @@ function empty(order: number): Draft {
     media_type: null,
     ...DEFAULT_REVIEW_MEDIA_ADJUSTMENT,
     avatar_url: null,
+    ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT,
     visible: true,
     sort_order: order,
   };
@@ -112,7 +120,7 @@ export default function PlatformReviewsPage() {
 
   const startNew = () => { setDraft(empty(rows.length)); setOpen(true); };
   const startEdit = (r: ReviewRow) => {
-    setDraft({ ...r, ...normalizeReviewMediaAdjustment(r) });
+    setDraft({ ...r, ...normalizeReviewMediaAdjustment(r), ...normalizeReviewAvatarAdjustment(r) });
     setOpen(true);
   };
 
@@ -143,7 +151,7 @@ export default function PlatformReviewsPage() {
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false, contentType: file.type });
       if (error) throw error;
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      setDraft((d) => ({ ...d, avatar_url: pub.publicUrl }));
+      setDraft((d) => ({ ...d, avatar_url: pub.publicUrl, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT }));
     } catch (e: any) {
       toast({ title: 'Upload failed', description: e.message, variant: 'destructive' });
     } finally {
@@ -163,6 +171,7 @@ export default function PlatformReviewsPage() {
       media_type: draft.media_type,
       ...normalizeReviewMediaAdjustment(draft),
       avatar_url: draft.avatar_url,
+      ...normalizeReviewAvatarAdjustment(draft),
       visible: draft.visible,
       sort_order: draft.sort_order,
     };
@@ -202,6 +211,10 @@ export default function PlatformReviewsPage() {
   const mediaAdjustment = normalizeReviewMediaAdjustment(draft);
   const setMediaAdjustment = (patch: Partial<ReturnType<typeof normalizeReviewMediaAdjustment>>) => {
     setDraft((current) => ({ ...current, ...normalizeReviewMediaAdjustment({ ...current, ...patch }) }));
+  };
+  const avatarAdjustment = normalizeReviewAvatarAdjustment(draft);
+  const setAvatarAdjustment = (patch: Partial<ReturnType<typeof normalizeReviewAvatarAdjustment>>) => {
+    setDraft((current) => ({ ...current, ...normalizeReviewAvatarAdjustment({ ...current, ...patch }) }));
   };
 
   return (
@@ -374,7 +387,11 @@ export default function PlatformReviewsPage() {
             <div>
               <Label>Customer avatar (optional)</Label>
               <div className="flex items-center gap-3 mt-2">
-                {draft.avatar_url && <img src={draft.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />}
+                {draft.avatar_url && (
+                  <div className="h-16 w-16 rounded-full overflow-hidden bg-secondary">
+                    <img src={draft.avatar_url} alt="" className="h-full w-full transition-transform duration-200" style={getReviewAvatarStyle(avatarAdjustment)} />
+                  </div>
+                )}
                 <label>
                   <Button variant="outline" size="sm" disabled={uploading} asChild>
                     <span><Upload className="h-4 w-4 mr-2" />{draft.avatar_url ? 'Replace' : 'Upload'}</span>
@@ -384,7 +401,57 @@ export default function PlatformReviewsPage() {
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadAvatar(f); e.target.value = ''; }}
                   />
                 </label>
+                {draft.avatar_url && (
+                  <Button variant="ghost" size="sm" onClick={() => setDraft({ ...draft, avatar_url: null, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT })}>Remove</Button>
+                )}
               </div>
+              {draft.avatar_url && (
+                <div className="mt-3 rounded-xl border border-border bg-secondary/20 p-3 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Avatar adjustment</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDraft((current) => ({ ...current, ...DEFAULT_REVIEW_AVATAR_ADJUSTMENT }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['cover', 'contain'] as ReviewMediaFit[]).map((fit) => (
+                      <Button
+                        key={fit}
+                        type="button"
+                        variant={avatarAdjustment.avatar_fit === fit ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setAvatarAdjustment({ avatar_fit: fit })}
+                        className="capitalize"
+                      >
+                        {fit}
+                      </Button>
+                    ))}
+                  </div>
+                  <MediaAdjustmentSlider
+                    label="Horizontal focus"
+                    value={avatarAdjustment.avatar_position_x}
+                    min={0} max={100} suffix="%"
+                    onChange={(value) => setAvatarAdjustment({ avatar_position_x: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Vertical focus"
+                    value={avatarAdjustment.avatar_position_y}
+                    min={0} max={100} suffix="%"
+                    onChange={(value) => setAvatarAdjustment({ avatar_position_y: value })}
+                  />
+                  <MediaAdjustmentSlider
+                    label="Zoom"
+                    value={avatarAdjustment.avatar_zoom}
+                    min={1} max={3} step={0.05} suffix="x"
+                    onChange={(value) => setAvatarAdjustment({ avatar_zoom: value })}
+                  />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
