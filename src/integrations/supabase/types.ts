@@ -383,8 +383,12 @@ export type Database = {
           created_by: string | null
           customer_name: string
           id: string
+          media_fit: string
+          media_position_x: number
+          media_position_y: number
           media_type: string | null
           media_url: string | null
+          media_zoom: number
           rating: number
           sort_order: number
           testimonial: string
@@ -402,8 +406,12 @@ export type Database = {
           created_by?: string | null
           customer_name: string
           id?: string
+          media_fit?: string
+          media_position_x?: number
+          media_position_y?: number
           media_type?: string | null
           media_url?: string | null
+          media_zoom?: number
           rating?: number
           sort_order?: number
           testimonial?: string
@@ -421,8 +429,12 @@ export type Database = {
           created_by?: string | null
           customer_name?: string
           id?: string
+          media_fit?: string
+          media_position_x?: number
+          media_position_y?: number
           media_type?: string | null
           media_url?: string | null
+          media_zoom?: number
           rating?: number
           sort_order?: number
           testimonial?: string
