@@ -458,6 +458,26 @@ export default function InventoryPage() {
     );
   }, [movements, products, restocks]);
 
+  const filteredInventoryHistory = useMemo(() => {
+    const term = restockSearch.trim().toLowerCase();
+    return inventoryHistory.filter((entry) => {
+      if (term) {
+        const hay = `${entry.productName} ${entry.category} ${entry.noteReference ?? ''} ${entry.createdByName ?? ''}`.toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      if ((restockDateFrom || restockDateTo) && !inDateFilter(entry.date, restockDateFrom, restockDateTo)) return false;
+      return true;
+    });
+  }, [inventoryHistory, restockSearch, restockDateFrom, restockDateTo]);
+
+  const restockTotalPages = Math.max(1, Math.ceil(filteredInventoryHistory.length / PAGE_SIZE));
+  const pagedInventoryHistory = useMemo(
+    () => filteredInventoryHistory.slice((restockPage - 1) * PAGE_SIZE, restockPage * PAGE_SIZE),
+    [filteredInventoryHistory, restockPage],
+  );
+
+  useEffect(() => { setRestockPage(1); }, [restockSearch, restockDateFrom, restockDateTo]);
+
   const getStockStatus = useCallback((product: ProductRow) => {
     const quantity = toNumber(product.quantity);
     const threshold = toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0);
