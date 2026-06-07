@@ -1164,7 +1164,7 @@ export default function InventoryPage() {
         </Dialog>
 
         <div className="space-y-4">
-          <div className="inline-flex w-full flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-1 sm:w-auto sm:flex-row">
+          <div className="inline-flex w-full flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-1 sm:w-auto sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               variant={inventoryTab === 'current' ? 'default' : 'ghost'}
@@ -1183,7 +1183,29 @@ export default function InventoryPage() {
               <PackageMinus className="mr-2 h-4 w-4" />
               Damaged Goods
             </Button>
+            <Button
+              type="button"
+              variant={inventoryTab === 'restocks' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('restocks')}
+            >
+              <PackagePlus className="mr-2 h-4 w-4" />
+              Restock History
+            </Button>
+            <Button
+              type="button"
+              variant={inventoryTab === 'movements' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('movements')}
+            >
+              <History className="mr-2 h-4 w-4" />
+              Stock Movement History
+            </Button>
           </div>
+
+          <div className="animate-in fade-in-50 duration-200">
+          </div>
+
 
           {inventoryTab === 'current' ? (
           <Card className="border-border/70">
