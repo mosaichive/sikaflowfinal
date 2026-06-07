@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS, STOCK_MOVEMENT_TYPES } from '@/lib/constants';
 import { toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
-import { AlertTriangle, Boxes, History, PackageMinus, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Boxes, ChevronLeft, ChevronRight, History, PackageMinus, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
 import { recomputeProductStock } from '@/lib/sale-items-schema';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
