@@ -181,6 +181,7 @@ export default function InventoryPage() {
   const [damageDateTo, setDamageDateTo] = useState('');
 
   const canManage = isAdmin || isManager;
+  const [inventoryTab, setInventoryTab] = useState<'current' | 'damaged'>('current');
   const canRecordDamage = hasModule('damaged_goods');
   const [recomputing, setRecomputing] = useState(false);
   const userId = user?.id ?? null;
