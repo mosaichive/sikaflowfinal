@@ -359,11 +359,28 @@ export default function InventoryPage() {
   );
   const stockMovementHistory = useMemo(
     () =>
-      [...movements]
-        .sort((left, right) => new Date(right.movement_date).getTime() - new Date(left.movement_date).getTime())
-        .slice(0, 50),
+      [...movements].sort(
+        (left, right) => new Date(right.movement_date).getTime() - new Date(left.movement_date).getTime(),
+      ),
     [movements],
   );
+
+  const filteredMovementHistory = useMemo(() => {
+    return stockMovementHistory.filter((movement) => {
+      if (movementProductFilter !== 'all' && movement.product_id !== movementProductFilter) return false;
+      if (movementTypeFilter !== 'all' && movement.movement_type !== movementTypeFilter) return false;
+      if ((movementDateFrom || movementDateTo) && !inDateFilter(movement.movement_date, movementDateFrom, movementDateTo)) return false;
+      return true;
+    });
+  }, [stockMovementHistory, movementProductFilter, movementTypeFilter, movementDateFrom, movementDateTo]);
+
+  const movementTotalPages = Math.max(1, Math.ceil(filteredMovementHistory.length / PAGE_SIZE));
+  const pagedMovementHistory = useMemo(
+    () => filteredMovementHistory.slice((movementPage - 1) * PAGE_SIZE, movementPage * PAGE_SIZE),
+    [filteredMovementHistory, movementPage],
+  );
+
+  useEffect(() => { setMovementPage(1); }, [movementProductFilter, movementTypeFilter, movementDateFrom, movementDateTo]);
 
   useEffect(() => {
     if (!selectedProduct) return;
