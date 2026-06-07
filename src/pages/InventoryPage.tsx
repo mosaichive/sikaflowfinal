@@ -1189,8 +1189,9 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
 
-          {canRecordDamage || damagedGoods.length > 0 ? (
+          {inventoryTab === 'damaged' && (canRecordDamage || damagedGoods.length > 0) ? (
             <Card className="border-amber-500/25">
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
