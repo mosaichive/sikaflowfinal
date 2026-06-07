@@ -181,6 +181,7 @@ export default function InventoryPage() {
   const [damageDateTo, setDamageDateTo] = useState('');
 
   const canManage = isAdmin || isManager;
+  const [inventoryTab, setInventoryTab] = useState<'current' | 'damaged'>('current');
   const canRecordDamage = hasModule('damaged_goods');
   const [recomputing, setRecomputing] = useState(false);
   const userId = user?.id ?? null;
@@ -1113,6 +1114,28 @@ export default function InventoryPage() {
         </Dialog>
 
         <div className="space-y-4">
+          <div className="inline-flex w-full flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-1 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              variant={inventoryTab === 'current' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('current')}
+            >
+              <Boxes className="mr-2 h-4 w-4" />
+              Current Stock
+            </Button>
+            <Button
+              type="button"
+              variant={inventoryTab === 'damaged' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('damaged')}
+            >
+              <PackageMinus className="mr-2 h-4 w-4" />
+              Damaged Goods
+            </Button>
+          </div>
+
+          {inventoryTab === 'current' ? (
           <Card className="border-border/70">
             <CardHeader>
               <CardTitle>Current Stock</CardTitle>
@@ -1166,8 +1189,9 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
 
-          {canRecordDamage || damagedGoods.length > 0 ? (
+          {inventoryTab === 'damaged' && (canRecordDamage || damagedGoods.length > 0) ? (
             <Card className="border-amber-500/25">
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
