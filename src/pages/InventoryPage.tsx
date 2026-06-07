@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS, STOCK_MOVEMENT_TYPES } from '@/lib/constants';
 import { toNumber } from '@/lib/sales-inventory';
 import { AVAILABLE_BUSINESS_MONEY_FORMULA } from '@/lib/business-money';
-import { AlertTriangle, Boxes, History, PackageMinus, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Boxes, ChevronLeft, ChevronRight, History, PackageMinus, PackagePlus, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
 import { recomputeProductStock } from '@/lib/sale-items-schema';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -181,7 +181,20 @@ export default function InventoryPage() {
   const [damageDateTo, setDamageDateTo] = useState('');
 
   const canManage = isAdmin || isManager;
-  const [inventoryTab, setInventoryTab] = useState<'current' | 'damaged'>('current');
+  type InventoryTab = 'current' | 'damaged' | 'restocks' | 'movements';
+  const [inventoryTab, setInventoryTab] = useState<InventoryTab>('current');
+  // Restock history filters
+  const [restockSearch, setRestockSearch] = useState('');
+  const [restockDateFrom, setRestockDateFrom] = useState('');
+  const [restockDateTo, setRestockDateTo] = useState('');
+  const [restockPage, setRestockPage] = useState(1);
+  // Movement history filters
+  const [movementProductFilter, setMovementProductFilter] = useState('all');
+  const [movementTypeFilter, setMovementTypeFilter] = useState('all');
+  const [movementDateFrom, setMovementDateFrom] = useState('');
+  const [movementDateTo, setMovementDateTo] = useState('');
+  const [movementPage, setMovementPage] = useState(1);
+  const PAGE_SIZE = 20;
   const canRecordDamage = hasModule('damaged_goods');
   const [recomputing, setRecomputing] = useState(false);
   const userId = user?.id ?? null;
@@ -346,11 +359,28 @@ export default function InventoryPage() {
   );
   const stockMovementHistory = useMemo(
     () =>
-      [...movements]
-        .sort((left, right) => new Date(right.movement_date).getTime() - new Date(left.movement_date).getTime())
-        .slice(0, 50),
+      [...movements].sort(
+        (left, right) => new Date(right.movement_date).getTime() - new Date(left.movement_date).getTime(),
+      ),
     [movements],
   );
+
+  const filteredMovementHistory = useMemo(() => {
+    return stockMovementHistory.filter((movement) => {
+      if (movementProductFilter !== 'all' && movement.product_id !== movementProductFilter) return false;
+      if (movementTypeFilter !== 'all' && movement.movement_type !== movementTypeFilter) return false;
+      if ((movementDateFrom || movementDateTo) && !inDateFilter(movement.movement_date, movementDateFrom, movementDateTo)) return false;
+      return true;
+    });
+  }, [stockMovementHistory, movementProductFilter, movementTypeFilter, movementDateFrom, movementDateTo]);
+
+  const movementTotalPages = Math.max(1, Math.ceil(filteredMovementHistory.length / PAGE_SIZE));
+  const pagedMovementHistory = useMemo(
+    () => filteredMovementHistory.slice((movementPage - 1) * PAGE_SIZE, movementPage * PAGE_SIZE),
+    [filteredMovementHistory, movementPage],
+  );
+
+  useEffect(() => { setMovementPage(1); }, [movementProductFilter, movementTypeFilter, movementDateFrom, movementDateTo]);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -427,6 +457,26 @@ export default function InventoryPage() {
       (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
     );
   }, [movements, products, restocks]);
+
+  const filteredInventoryHistory = useMemo(() => {
+    const term = restockSearch.trim().toLowerCase();
+    return inventoryHistory.filter((entry) => {
+      if (term) {
+        const hay = `${entry.productName} ${entry.category} ${entry.noteReference ?? ''} ${entry.createdByName ?? ''}`.toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      if ((restockDateFrom || restockDateTo) && !inDateFilter(entry.date, restockDateFrom, restockDateTo)) return false;
+      return true;
+    });
+  }, [inventoryHistory, restockSearch, restockDateFrom, restockDateTo]);
+
+  const restockTotalPages = Math.max(1, Math.ceil(filteredInventoryHistory.length / PAGE_SIZE));
+  const pagedInventoryHistory = useMemo(
+    () => filteredInventoryHistory.slice((restockPage - 1) * PAGE_SIZE, restockPage * PAGE_SIZE),
+    [filteredInventoryHistory, restockPage],
+  );
+
+  useEffect(() => { setRestockPage(1); }, [restockSearch, restockDateFrom, restockDateTo]);
 
   const getStockStatus = useCallback((product: ProductRow) => {
     const quantity = toNumber(product.quantity);
@@ -1114,7 +1164,7 @@ export default function InventoryPage() {
         </Dialog>
 
         <div className="space-y-4">
-          <div className="inline-flex w-full flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-1 sm:w-auto sm:flex-row">
+          <div className="inline-flex w-full flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-1 sm:w-auto sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               variant={inventoryTab === 'current' ? 'default' : 'ghost'}
@@ -1133,7 +1183,29 @@ export default function InventoryPage() {
               <PackageMinus className="mr-2 h-4 w-4" />
               Damaged Goods
             </Button>
+            <Button
+              type="button"
+              variant={inventoryTab === 'restocks' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('restocks')}
+            >
+              <PackagePlus className="mr-2 h-4 w-4" />
+              Restock History
+            </Button>
+            <Button
+              type="button"
+              variant={inventoryTab === 'movements' ? 'default' : 'ghost'}
+              className="justify-center sm:w-auto"
+              onClick={() => setInventoryTab('movements')}
+            >
+              <History className="mr-2 h-4 w-4" />
+              Stock Movement History
+            </Button>
           </div>
+
+
+
+
 
           {inventoryTab === 'current' ? (
           <Card className="border-border/70">
@@ -1345,12 +1417,45 @@ export default function InventoryPage() {
             </Card>
           ) : null}
 
-          <Card className="border-border/70">
+          {inventoryTab === 'restocks' ? (
+          <Card className="border-border/70 animate-in fade-in-50 duration-200">
             <CardHeader>
-              <CardTitle>Restock History</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <PackagePlus className="h-5 w-5 text-primary" />
+                Restock History
+              </CardTitle>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Search</Label>
+                  <Input
+                    placeholder="Product, note, supplier…"
+                    value={restockSearch}
+                    onChange={(event) => setRestockSearch(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input type="date" value={restockDateFrom} onChange={(event) => setRestockDateFrom(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input type="date" value={restockDateTo} onChange={(event) => setRestockDateTo(event.target.value)} />
+                </div>
+              </div>
+              {(restockSearch || restockDateFrom || restockDateTo) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 w-fit"
+                  onClick={() => { setRestockSearch(''); setRestockDateFrom(''); setRestockDateTo(''); }}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="p-0">
-              {restocks.length > 0 ? (
+              {filteredInventoryHistory.length > 0 ? (
+                <>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -1370,7 +1475,7 @@ export default function InventoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {inventoryHistory.map((entry) => {
+                      {pagedInventoryHistory.map((entry) => {
                         const isOpeningStock = entry.entryType === 'opening_stock';
                         return (
                           <TableRow key={entry.id}>
@@ -1421,6 +1526,20 @@ export default function InventoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Page {restockPage} of {restockTotalPages} · {filteredInventoryHistory.length} entries
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={restockPage <= 1} onClick={() => setRestockPage((p) => Math.max(1, p - 1))}>
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={restockPage >= restockTotalPages} onClick={() => setRestockPage((p) => Math.min(restockTotalPages, p + 1))}>
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                </>
               ) : (
                 <EmptyState
                   icon={<PackagePlus className="h-7 w-7 text-muted-foreground" />}
@@ -1430,50 +1549,112 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
 
-          <Card className="border-border/70">
+
+          {inventoryTab === 'movements' ? (
+          <Card className="border-border/70 animate-in fade-in-50 duration-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-primary" />
                 Stock Movement History
               </CardTitle>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Select value={movementProductFilter} onValueChange={setMovementProductFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All products</SelectItem>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Movement Type</Label>
+                  <Select value={movementTypeFilter} onValueChange={setMovementTypeFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All types</SelectItem>
+                      {Array.from(movementTypeLabels.entries()).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input type="date" value={movementDateFrom} onChange={(event) => setMovementDateFrom(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input type="date" value={movementDateTo} onChange={(event) => setMovementDateTo(event.target.value)} />
+                </div>
+              </div>
+              {(movementProductFilter !== 'all' || movementTypeFilter !== 'all' || movementDateFrom || movementDateTo) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 w-fit"
+                  onClick={() => { setMovementProductFilter('all'); setMovementTypeFilter('all'); setMovementDateFrom(''); setMovementDateTo(''); }}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="p-0">
-              {stockMovementHistory.length > 0 ? (
+              {filteredMovementHistory.length > 0 ? (
+                <>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Date &amp; Time</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Product</TableHead>
-                        <TableHead>Quantity Change</TableHead>
-                        <TableHead>Stock After</TableHead>
+                        <TableHead>Change</TableHead>
+                        <TableHead>Previous</TableHead>
+                        <TableHead>New</TableHead>
                         <TableHead>Unit Cost</TableHead>
-                        <TableHead>Recorded By</TableHead>
-                        <TableHead>Note</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockMovementHistory.map((movement) => {
+                      {pagedMovementHistory.map((movement) => {
                         const product = movement.product_id ? products.find((row) => row.id === movement.product_id) : null;
                         const typeLabel = movementTypeLabels.get(movement.movement_type as any) ?? movement.movement_type;
-                        const isDamage = movement.movement_type === 'damaged_stock';
                         const quantityChange = toNumber(movement.quantity_change);
-
+                        const newQty = toNumber(movement.quantity_after);
+                        const prevQty = newQty - quantityChange;
+                        const isAdjustment = movement.movement_type === 'manual_adjustment';
+                        const isIncoming = quantityChange > 0;
+                        const typeClass = isAdjustment
+                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                          : isIncoming
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-300';
+                        const changeClass = isAdjustment
+                          ? 'font-semibold text-amber-600 dark:text-amber-300'
+                          : isIncoming
+                            ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+                            : 'font-semibold text-rose-600 dark:text-rose-400';
                         return (
                           <TableRow key={movement.id}>
-                            <TableCell>{new Date(movement.movement_date).toLocaleDateString('en-GH')}</TableCell>
+                            <TableCell className="whitespace-nowrap">{new Date(movement.movement_date).toLocaleString('en-GH')}</TableCell>
                             <TableCell>
-                              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${isDamage ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>
+                              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${typeClass}`}>
                                 {typeLabel}
                               </span>
                             </TableCell>
                             <TableCell className="font-medium">{product?.name || '—'}</TableCell>
-                            <TableCell className={quantityChange < 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600 dark:text-emerald-400'}>
+                            <TableCell className={changeClass}>
                               {quantityChange > 0 ? `+${quantityChange}` : quantityChange}
                             </TableCell>
-                            <TableCell>{movement.quantity_after ?? '—'}</TableCell>
+                            <TableCell>{prevQty}</TableCell>
+                            <TableCell>{newQty}</TableCell>
                             <TableCell>{formatCurrency(toNumber(movement.unit_cost ?? 0))}</TableCell>
                             <TableCell>{movement.created_by_name || '—'}</TableCell>
                             <TableCell className="max-w-[260px] truncate">{movement.note || '—'}</TableCell>
@@ -1483,6 +1664,20 @@ export default function InventoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Page {movementPage} of {movementTotalPages} · {filteredMovementHistory.length} entries
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={movementPage <= 1} onClick={() => setMovementPage((p) => Math.max(1, p - 1))}>
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={movementPage >= movementTotalPages} onClick={() => setMovementPage((p) => Math.min(movementTotalPages, p + 1))}>
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                </>
               ) : (
                 <EmptyState
                   icon={<History className="h-7 w-7 text-muted-foreground" />}
@@ -1492,6 +1687,7 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
         </div>
       </div>
     </AppLayout>
