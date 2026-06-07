@@ -1457,7 +1457,7 @@ export default function InventoryPage() {
                     <TableBody>
                       {stockMovementHistory.map((movement) => {
                         const product = movement.product_id ? products.find((row) => row.id === movement.product_id) : null;
-                        const typeLabel = movementTypeLabels.get(movement.movement_type) ?? movement.movement_type;
+                        const typeLabel = movementTypeLabels.get(movement.movement_type as any) ?? movement.movement_type;
                         const isDamage = movement.movement_type === 'damaged_stock';
                         const quantityChange = toNumber(movement.quantity_change);
 
