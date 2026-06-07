@@ -1203,8 +1203,8 @@ export default function InventoryPage() {
             </Button>
           </div>
 
-          <div className="animate-in fade-in-50 duration-200">
-          </div>
+
+
 
 
           {inventoryTab === 'current' ? (
