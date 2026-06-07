@@ -1417,12 +1417,45 @@ export default function InventoryPage() {
             </Card>
           ) : null}
 
-          <Card className="border-border/70">
+          {inventoryTab === 'restocks' ? (
+          <Card className="border-border/70 animate-in fade-in-50 duration-200">
             <CardHeader>
-              <CardTitle>Restock History</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <PackagePlus className="h-5 w-5 text-primary" />
+                Restock History
+              </CardTitle>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Search</Label>
+                  <Input
+                    placeholder="Product, note, supplier…"
+                    value={restockSearch}
+                    onChange={(event) => setRestockSearch(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input type="date" value={restockDateFrom} onChange={(event) => setRestockDateFrom(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input type="date" value={restockDateTo} onChange={(event) => setRestockDateTo(event.target.value)} />
+                </div>
+              </div>
+              {(restockSearch || restockDateFrom || restockDateTo) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 w-fit"
+                  onClick={() => { setRestockSearch(''); setRestockDateFrom(''); setRestockDateTo(''); }}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="p-0">
-              {restocks.length > 0 ? (
+              {filteredInventoryHistory.length > 0 ? (
+                <>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -1442,7 +1475,7 @@ export default function InventoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {inventoryHistory.map((entry) => {
+                      {pagedInventoryHistory.map((entry) => {
                         const isOpeningStock = entry.entryType === 'opening_stock';
                         return (
                           <TableRow key={entry.id}>
@@ -1493,6 +1526,20 @@ export default function InventoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Page {restockPage} of {restockTotalPages} · {filteredInventoryHistory.length} entries
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={restockPage <= 1} onClick={() => setRestockPage((p) => Math.max(1, p - 1))}>
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={restockPage >= restockTotalPages} onClick={() => setRestockPage((p) => Math.min(restockTotalPages, p + 1))}>
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                </>
               ) : (
                 <EmptyState
                   icon={<PackagePlus className="h-7 w-7 text-muted-foreground" />}
@@ -1502,6 +1549,8 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
+
 
           <Card className="border-border/70">
             <CardHeader>
