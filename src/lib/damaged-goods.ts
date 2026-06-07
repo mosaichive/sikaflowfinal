@@ -75,7 +75,7 @@ export function getDamagedGoodsValue(entry: DamagedGoodsLike) {
 }
 
 export function calculateDamagedGoodsSummary(entries: DamagedGoodsLike[]) {
-  return entries.reduce(
+  return entries.reduce<{ quantity: number; value: number }>(
     (summary, entry) => ({
       quantity: summary.quantity + toNumber(entry.quantity ?? 0),
       value: summary.value + getDamagedGoodsValue(entry),
