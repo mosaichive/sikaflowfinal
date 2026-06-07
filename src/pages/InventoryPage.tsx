@@ -1552,49 +1552,109 @@ export default function InventoryPage() {
           ) : null}
 
 
-          <Card className="border-border/70">
+          {inventoryTab === 'movements' ? (
+          <Card className="border-border/70 animate-in fade-in-50 duration-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-primary" />
                 Stock Movement History
               </CardTitle>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Select value={movementProductFilter} onValueChange={setMovementProductFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All products</SelectItem>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Movement Type</Label>
+                  <Select value={movementTypeFilter} onValueChange={setMovementTypeFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All types</SelectItem>
+                      {Array.from(movementTypeLabels.entries()).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input type="date" value={movementDateFrom} onChange={(event) => setMovementDateFrom(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input type="date" value={movementDateTo} onChange={(event) => setMovementDateTo(event.target.value)} />
+                </div>
+              </div>
+              {(movementProductFilter !== 'all' || movementTypeFilter !== 'all' || movementDateFrom || movementDateTo) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 w-fit"
+                  onClick={() => { setMovementProductFilter('all'); setMovementTypeFilter('all'); setMovementDateFrom(''); setMovementDateTo(''); }}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="p-0">
-              {stockMovementHistory.length > 0 ? (
+              {filteredMovementHistory.length > 0 ? (
+                <>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Date &amp; Time</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Product</TableHead>
-                        <TableHead>Quantity Change</TableHead>
-                        <TableHead>Stock After</TableHead>
+                        <TableHead>Change</TableHead>
+                        <TableHead>Previous</TableHead>
+                        <TableHead>New</TableHead>
                         <TableHead>Unit Cost</TableHead>
-                        <TableHead>Recorded By</TableHead>
-                        <TableHead>Note</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockMovementHistory.map((movement) => {
+                      {pagedMovementHistory.map((movement) => {
                         const product = movement.product_id ? products.find((row) => row.id === movement.product_id) : null;
                         const typeLabel = movementTypeLabels.get(movement.movement_type as any) ?? movement.movement_type;
-                        const isDamage = movement.movement_type === 'damaged_stock';
                         const quantityChange = toNumber(movement.quantity_change);
-
+                        const newQty = toNumber(movement.quantity_after);
+                        const prevQty = newQty - quantityChange;
+                        const isAdjustment = movement.movement_type === 'manual_adjustment';
+                        const isIncoming = quantityChange > 0;
+                        const typeClass = isAdjustment
+                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                          : isIncoming
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-300';
+                        const changeClass = isAdjustment
+                          ? 'font-semibold text-amber-600 dark:text-amber-300'
+                          : isIncoming
+                            ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+                            : 'font-semibold text-rose-600 dark:text-rose-400';
                         return (
                           <TableRow key={movement.id}>
-                            <TableCell>{new Date(movement.movement_date).toLocaleDateString('en-GH')}</TableCell>
+                            <TableCell className="whitespace-nowrap">{new Date(movement.movement_date).toLocaleString('en-GH')}</TableCell>
                             <TableCell>
-                              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${isDamage ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>
+                              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${typeClass}`}>
                                 {typeLabel}
                               </span>
                             </TableCell>
                             <TableCell className="font-medium">{product?.name || '—'}</TableCell>
-                            <TableCell className={quantityChange < 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600 dark:text-emerald-400'}>
+                            <TableCell className={changeClass}>
                               {quantityChange > 0 ? `+${quantityChange}` : quantityChange}
                             </TableCell>
-                            <TableCell>{movement.quantity_after ?? '—'}</TableCell>
+                            <TableCell>{prevQty}</TableCell>
+                            <TableCell>{newQty}</TableCell>
                             <TableCell>{formatCurrency(toNumber(movement.unit_cost ?? 0))}</TableCell>
                             <TableCell>{movement.created_by_name || '—'}</TableCell>
                             <TableCell className="max-w-[260px] truncate">{movement.note || '—'}</TableCell>
@@ -1604,6 +1664,20 @@ export default function InventoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Page {movementPage} of {movementTotalPages} · {filteredMovementHistory.length} entries
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={movementPage <= 1} onClick={() => setMovementPage((p) => Math.max(1, p - 1))}>
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={movementPage >= movementTotalPages} onClick={() => setMovementPage((p) => Math.min(movementTotalPages, p + 1))}>
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                </>
               ) : (
                 <EmptyState
                   icon={<History className="h-7 w-7 text-muted-foreground" />}
@@ -1613,6 +1687,7 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+          ) : null}
         </div>
       </div>
     </AppLayout>
