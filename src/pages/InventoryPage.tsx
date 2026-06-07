@@ -181,7 +181,20 @@ export default function InventoryPage() {
   const [damageDateTo, setDamageDateTo] = useState('');
 
   const canManage = isAdmin || isManager;
-  const [inventoryTab, setInventoryTab] = useState<'current' | 'damaged'>('current');
+  type InventoryTab = 'current' | 'damaged' | 'restocks' | 'movements';
+  const [inventoryTab, setInventoryTab] = useState<InventoryTab>('current');
+  // Restock history filters
+  const [restockSearch, setRestockSearch] = useState('');
+  const [restockDateFrom, setRestockDateFrom] = useState('');
+  const [restockDateTo, setRestockDateTo] = useState('');
+  const [restockPage, setRestockPage] = useState(1);
+  // Movement history filters
+  const [movementProductFilter, setMovementProductFilter] = useState('all');
+  const [movementTypeFilter, setMovementTypeFilter] = useState('all');
+  const [movementDateFrom, setMovementDateFrom] = useState('');
+  const [movementDateTo, setMovementDateTo] = useState('');
+  const [movementPage, setMovementPage] = useState(1);
+  const PAGE_SIZE = 20;
   const canRecordDamage = hasModule('damaged_goods');
   const [recomputing, setRecomputing] = useState(false);
   const userId = user?.id ?? null;
