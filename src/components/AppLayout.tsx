@@ -151,18 +151,23 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
                   </span>
                 ) : null}
               </button>
-              <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/settings?s=profile')}
+                className="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-secondary cursor-pointer"
+                aria-label="Open profile"
+                title="Profile"
+              >
                 <Avatar className="h-7 w-7">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                   <AvatarFallback className="bg-primary/20 text-primary text-[10px] font-semibold">
                     {displayName?.charAt(0)?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="hidden md:block">
+                <div className="hidden md:block text-left">
                   <p className="text-xs font-medium text-foreground leading-tight">{displayName || 'User'}</p>
                   {profileTitle && <p className="text-[10px] text-muted-foreground leading-tight">{profileTitle}</p>}
                 </div>
-              </div>
+              </button>
             </div>
           </header>
           <EmailVerifyBanner />
