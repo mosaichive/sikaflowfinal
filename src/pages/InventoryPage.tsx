@@ -950,12 +950,6 @@ export default function InventoryPage() {
                 <Button onClick={openCreateRestock}><Plus className="mr-2 h-4 w-4" /> Add Restock</Button>
               </div>
             ) : null}
-            {canRecordDamage ? (
-              <Button variant="outline" onClick={openRecordDamage}>
-                <PackageMinus className="mr-2 h-4 w-4" />
-                Damaged Goods
-              </Button>
-            ) : null}
           </div>
         </section>
 
