@@ -189,24 +189,19 @@ export default function SettingsPage() {
   };
 
   const fetchUsers = async () => {
+    // Team management has moved to its own page (/team). Kept as a no-op here
+    // so any future caller doesn't break.
     if (!businessId) return;
-    // Scope to current business only
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, display_name, phone')
-      .eq('business_id', businessId);
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .eq('business_id', businessId);
-    if (!profiles) return;
-    const roleMap: Record<string, string> = {};
-    (roles || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
-    setUsers(profiles.map((p: any) => ({
-      user_id: p.user_id,
-      display_name: p.display_name || 'Unknown',
-      phone: p.phone,
-      role: roleMap[p.user_id] || 'none',
+    const { data } = await (supabase as any)
+      .from('staff_members')
+      .select('staff_user_id, display_name, email, active, permissions')
+      .eq('business_owner_id', businessId)
+      .eq('active', true);
+    setUsers((data || []).map((row: any) => ({
+      user_id: row.staff_user_id,
+      display_name: row.display_name || row.email || 'Team member',
+      phone: null,
+      role: (row.permissions && row.permissions.role) || 'staff',
     })));
   };
 
