@@ -464,16 +464,25 @@ export default function SettingsPage() {
       return;
     }
     if (!businessId) return;
-    const { data: existing } = await supabase
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('business_id', businessId)
+    // Roles for team members live on staff_members.permissions.
+    const { data: member } = await (supabase as any)
+      .from('staff_members')
+      .select('id, permissions')
+      .eq('business_owner_id', businessId)
+      .eq('staff_user_id', userId)
       .maybeSingle();
-    if (existing) {
-      await supabase.from('user_roles').update({ role: newRole as any }).eq('id', existing.id);
-    } else {
-      await supabase.from('user_roles').insert({ user_id: userId, role: newRole as any, business_id: businessId });
+    if (!member) {
+      toast({ title: 'Team member not found', variant: 'destructive' });
+      return;
+    }
+    const nextPerms = { ...(member.permissions || {}), role: newRole };
+    const { error } = await (supabase as any)
+      .from('staff_members')
+      .update({ permissions: nextPerms })
+      .eq('id', member.id);
+    if (error) {
+      toast({ title: 'Could not update role', description: error.message, variant: 'destructive' });
+      return;
     }
     await logAudit('role_changed', `Changed role for user ${userId} to ${newRole}`);
     toast({ title: 'Role updated' });
