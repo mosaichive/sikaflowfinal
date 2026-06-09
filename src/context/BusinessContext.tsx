@@ -55,7 +55,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       // For owners themselves, it points at their own user id.
       const { data: profile } = await db
         .from('profiles')
-        .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email')
+        .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock')
         .eq('id', ownerUserId)
         .maybeSingle();
 
