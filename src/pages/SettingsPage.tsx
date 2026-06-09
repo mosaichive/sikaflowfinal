@@ -389,8 +389,8 @@ export default function SettingsPage() {
     setSalesInventorySaving(true);
     try {
       const { error } = await supabase
-        .from('businesses' as any)
-        .update({ allow_sales_without_stock: checked })
+        .from('profiles')
+        .update({ allow_sales_without_stock: checked } as any)
         .eq('id', businessId);
 
       if (error) throw error;

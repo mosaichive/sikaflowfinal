@@ -124,7 +124,8 @@ export default function ExpensesPage() {
   const uploadReceipt = async () => {
     if (!receiptFile || !businessId || !user) return null;
     const safeName = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    const path = `${businessId}/${user.id}/${Date.now()}-${safeName}`;
+    // First path segment must equal auth.uid() to satisfy storage RLS.
+    const path = `${user.id}/${businessId}/${Date.now()}-${safeName}`;
     const { error } = await supabase.storage.from('expense-receipts').upload(path, receiptFile, { upsert: true });
     if (error) throw error;
     return { path, name: receiptFile.name };
@@ -145,7 +146,14 @@ export default function ExpensesPage() {
 
     setLoading(true);
     try {
-      const receipt = await uploadReceipt();
+      let receipt: { path: string; name: string } | null = null;
+      let uploadFailed = false;
+      try {
+        receipt = await uploadReceipt();
+      } catch (uploadError) {
+        uploadFailed = true;
+        logSupabaseError('expenses.receipt_upload', uploadError, { businessId, userId: user.id });
+      }
       await insertExpenseRecord({
         user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
@@ -159,7 +167,12 @@ export default function ExpensesPage() {
         recorded_by: user.id,
         recorded_by_name: displayName || user.email || 'Team member',
       });
-      toast({ title: 'Expense recorded', description: 'This expense now reduces available business money and profit.' });
+      toast({
+        title: 'Expense recorded',
+        description: uploadFailed
+          ? 'Saved, but the receipt could not be uploaded. You can attach it again from the expense.'
+          : 'This expense now reduces available business money and profit.',
+      });
       resetForm();
       setOpen(false);
     } catch (error) {

@@ -795,6 +795,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          allow_sales_without_stock: boolean
           avatar_url: string | null
           bio: string | null
           business_name: string | null
@@ -826,6 +827,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_sales_without_stock?: boolean
           avatar_url?: string | null
           bio?: string | null
           business_name?: string | null
@@ -857,6 +859,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_sales_without_stock?: boolean
           avatar_url?: string | null
           bio?: string | null
           business_name?: string | null
