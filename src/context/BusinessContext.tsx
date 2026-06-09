@@ -86,6 +86,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         status: 'active',
         email_verified: true,
         phone_verified: false,
+        allow_sales_without_stock: Boolean(p.allow_sales_without_stock),
       });
     } finally {
       if (loadSeq === loadSeqRef.current) {
