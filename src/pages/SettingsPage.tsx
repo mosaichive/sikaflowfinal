@@ -154,12 +154,11 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchBanks();
     if (isAdmin && businessId) {
-      fetchUsers();
       fetchAuditLogs();
     }
-    if (user) {
+    if (businessId) {
       void (async () => {
-        const { data } = await supabase.from('profiles').select('opening_cash_balance').eq('id', user.id).maybeSingle();
+        const { data } = await supabase.from('profiles').select('opening_cash_balance').eq('id', businessId).maybeSingle();
         if (data) setOpeningCash(String((data as any).opening_cash_balance ?? 0));
       })();
     }
@@ -167,15 +166,16 @@ export default function SettingsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, fetchBanks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, businessId, user]);
+  }, [isAdmin, businessId]);
 
   const handleSaveOpeningCash = async () => {
-    if (!user) return;
+    if (!user || !businessId) return;
     setOpeningCashSaving(true);
     const value = Number(openingCash || 0);
-    const { error } = await supabase.from('profiles').update({ opening_cash_balance: value } as any).eq('id', user.id);
+    // Opening cash lives on the owner's profile, even when an admin team member edits it.
+    const { error } = await supabase.from('profiles').update({ opening_cash_balance: value } as any).eq('id', businessId);
     if (error) {
-      toast({ title: 'Could not save opening cash', description: error.message, variant: 'destructive' });
+      toast({ title: 'Could not save opening cash', description: error.message || 'Please try again.', variant: 'destructive' });
     } else {
       toast({ title: 'Opening cash balance updated' });
       await logAudit('opening_cash_updated', `Set opening cash to ${value}`);
@@ -189,24 +189,19 @@ export default function SettingsPage() {
   };
 
   const fetchUsers = async () => {
+    // Team management has moved to its own page (/team). Kept as a no-op here
+    // so any future caller doesn't break.
     if (!businessId) return;
-    // Scope to current business only
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, display_name, phone')
-      .eq('business_id', businessId);
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .eq('business_id', businessId);
-    if (!profiles) return;
-    const roleMap: Record<string, string> = {};
-    (roles || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
-    setUsers(profiles.map((p: any) => ({
-      user_id: p.user_id,
-      display_name: p.display_name || 'Unknown',
-      phone: p.phone,
-      role: roleMap[p.user_id] || 'none',
+    const { data } = await (supabase as any)
+      .from('staff_members')
+      .select('staff_user_id, display_name, email, active, permissions')
+      .eq('business_owner_id', businessId)
+      .eq('active', true);
+    setUsers((data || []).map((row: any) => ({
+      user_id: row.staff_user_id,
+      display_name: row.display_name || row.email || 'Team member',
+      phone: null,
+      role: (row.permissions && row.permissions.role) || 'staff',
     })));
   };
 
@@ -341,11 +336,11 @@ export default function SettingsPage() {
   };
 
   const handleBusinessLogoUpload = async () => {
-    if (!businessLogoFile || !user) return;
+    if (!businessLogoFile || !businessId) return;
     setBusinessLogoUploading(true);
     try {
-      const ext = businessLogoFile.name.split('.').pop() || 'png';
-      const path = `${user.id}/primary-logo.${ext}`;
+      const ext = (businessLogoFile.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${businessId}/primary-logo.${ext}`;
       const { error: uploadError } = await supabase.storage.from('business-logos').upload(path, businessLogoFile, { upsert: true });
       if (uploadError) throw uploadError;
 
@@ -354,7 +349,7 @@ export default function SettingsPage() {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ logo_url: publicUrl } as any)
-        .eq('id', user.id);
+        .eq('id', businessId);
       if (updateError) throw updateError;
 
       setBusinessLogoFile(null);
@@ -362,18 +357,18 @@ export default function SettingsPage() {
       await refreshBusiness();
       toast({ title: 'Business logo updated' });
     } catch (error: any) {
-      toast({ title: 'Could not update logo', description: error.message || 'Something went wrong', variant: 'destructive' });
+      toast({ title: 'Could not update logo', description: error?.message || 'Something went wrong', variant: 'destructive' });
     } finally {
       setBusinessLogoUploading(false);
     }
   };
 
   const handleRemoveBusinessLogo = async () => {
-    if (!user) return;
+    if (!businessId) return;
     const { error } = await supabase
       .from('profiles')
       .update({ logo_url: null } as any)
-      .eq('id', user.id);
+      .eq('id', businessId);
     if (error) {
       toast({ title: 'Could not remove logo', description: error.message, variant: 'destructive' });
       return;
@@ -469,16 +464,25 @@ export default function SettingsPage() {
       return;
     }
     if (!businessId) return;
-    const { data: existing } = await supabase
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('business_id', businessId)
+    // Roles for team members live on staff_members.permissions.
+    const { data: member } = await (supabase as any)
+      .from('staff_members')
+      .select('id, permissions')
+      .eq('business_owner_id', businessId)
+      .eq('staff_user_id', userId)
       .maybeSingle();
-    if (existing) {
-      await supabase.from('user_roles').update({ role: newRole as any }).eq('id', existing.id);
-    } else {
-      await supabase.from('user_roles').insert({ user_id: userId, role: newRole as any, business_id: businessId });
+    if (!member) {
+      toast({ title: 'Team member not found', variant: 'destructive' });
+      return;
+    }
+    const nextPerms = { ...(member.permissions || {}), role: newRole };
+    const { error } = await (supabase as any)
+      .from('staff_members')
+      .update({ permissions: nextPerms })
+      .eq('id', member.id);
+    if (error) {
+      toast({ title: 'Could not update role', description: error.message, variant: 'destructive' });
+      return;
     }
     await logAudit('role_changed', `Changed role for user ${userId} to ${newRole}`);
     toast({ title: 'Role updated' });
@@ -527,9 +531,15 @@ export default function SettingsPage() {
   const handleExportBackup = async () => {
     if (!businessId) return;
     try {
-      const tables = ['sales', 'sale_items', 'products', 'customers', 'expenses', 'savings', 'investments', 'investor_funding', 'restocks', 'bank_accounts'] as const;
+      // Most tables scope by user_id (= owner id). sales/sale_items also carry business_id.
+      const userScopedTables = ['products', 'customers', 'expenses', 'savings', 'investments', 'investor_funding', 'restocks', 'bank_accounts', 'other_income'] as const;
+      const businessScopedTables = ['sales', 'sale_items'] as const;
       const backup: Record<string, any[]> = {};
-      for (const table of tables) {
+      for (const table of userScopedTables) {
+        const { data } = await supabase.from(table).select('*').eq('user_id', businessId);
+        backup[table] = data || [];
+      }
+      for (const table of businessScopedTables) {
         const { data } = await supabase.from(table).select('*').eq('business_id', businessId);
         backup[table] = data || [];
       }
@@ -540,8 +550,8 @@ export default function SettingsPage() {
       a.href = url; a.download = `${slug}-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'Backup downloaded' });
-    } catch {
-      toast({ title: 'Backup failed', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Backup failed', description: err?.message || 'Please try again.', variant: 'destructive' });
     }
   };
 
