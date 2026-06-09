@@ -154,12 +154,11 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchBanks();
     if (isAdmin && businessId) {
-      fetchUsers();
       fetchAuditLogs();
     }
-    if (user) {
+    if (businessId) {
       void (async () => {
-        const { data } = await supabase.from('profiles').select('opening_cash_balance').eq('id', user.id).maybeSingle();
+        const { data } = await supabase.from('profiles').select('opening_cash_balance').eq('id', businessId).maybeSingle();
         if (data) setOpeningCash(String((data as any).opening_cash_balance ?? 0));
       })();
     }
@@ -167,7 +166,7 @@ export default function SettingsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, fetchBanks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, businessId, user]);
+  }, [isAdmin, businessId]);
 
   const handleSaveOpeningCash = async () => {
     if (!user) return;
