@@ -146,7 +146,14 @@ export default function ExpensesPage() {
 
     setLoading(true);
     try {
-      const receipt = await uploadReceipt();
+      let receipt: { path: string; name: string } | null = null;
+      let uploadFailed = false;
+      try {
+        receipt = await uploadReceipt();
+      } catch (uploadError) {
+        uploadFailed = true;
+        logSupabaseError('expenses.receipt_upload', uploadError, { businessId, userId: user.id });
+      }
       await insertExpenseRecord({
         user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
@@ -160,7 +167,12 @@ export default function ExpensesPage() {
         recorded_by: user.id,
         recorded_by_name: displayName || user.email || 'Team member',
       });
-      toast({ title: 'Expense recorded', description: 'This expense now reduces available business money and profit.' });
+      toast({
+        title: 'Expense recorded',
+        description: uploadFailed
+          ? 'Saved, but the receipt could not be uploaded. You can attach it again from the expense.'
+          : 'This expense now reduces available business money and profit.',
+      });
       resetForm();
       setOpen(false);
     } catch (error) {
