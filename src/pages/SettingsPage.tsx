@@ -531,9 +531,15 @@ export default function SettingsPage() {
   const handleExportBackup = async () => {
     if (!businessId) return;
     try {
-      const tables = ['sales', 'sale_items', 'products', 'customers', 'expenses', 'savings', 'investments', 'investor_funding', 'restocks', 'bank_accounts'] as const;
+      // Most tables scope by user_id (= owner id). sales/sale_items also carry business_id.
+      const userScopedTables = ['products', 'customers', 'expenses', 'savings', 'investments', 'investor_funding', 'restocks', 'bank_accounts', 'other_income'] as const;
+      const businessScopedTables = ['sales', 'sale_items'] as const;
       const backup: Record<string, any[]> = {};
-      for (const table of tables) {
+      for (const table of userScopedTables) {
+        const { data } = await supabase.from(table).select('*').eq('user_id', businessId);
+        backup[table] = data || [];
+      }
+      for (const table of businessScopedTables) {
         const { data } = await supabase.from(table).select('*').eq('business_id', businessId);
         backup[table] = data || [];
       }
@@ -544,8 +550,8 @@ export default function SettingsPage() {
       a.href = url; a.download = `${slug}-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'Backup downloaded' });
-    } catch {
-      toast({ title: 'Backup failed', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Backup failed', description: err?.message || 'Please try again.', variant: 'destructive' });
     }
   };
 
