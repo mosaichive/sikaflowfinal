@@ -336,11 +336,11 @@ export default function SettingsPage() {
   };
 
   const handleBusinessLogoUpload = async () => {
-    if (!businessLogoFile || !user) return;
+    if (!businessLogoFile || !businessId) return;
     setBusinessLogoUploading(true);
     try {
-      const ext = businessLogoFile.name.split('.').pop() || 'png';
-      const path = `${user.id}/primary-logo.${ext}`;
+      const ext = (businessLogoFile.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${businessId}/primary-logo.${ext}`;
       const { error: uploadError } = await supabase.storage.from('business-logos').upload(path, businessLogoFile, { upsert: true });
       if (uploadError) throw uploadError;
 
@@ -349,7 +349,7 @@ export default function SettingsPage() {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ logo_url: publicUrl } as any)
-        .eq('id', user.id);
+        .eq('id', businessId);
       if (updateError) throw updateError;
 
       setBusinessLogoFile(null);
@@ -357,18 +357,18 @@ export default function SettingsPage() {
       await refreshBusiness();
       toast({ title: 'Business logo updated' });
     } catch (error: any) {
-      toast({ title: 'Could not update logo', description: error.message || 'Something went wrong', variant: 'destructive' });
+      toast({ title: 'Could not update logo', description: error?.message || 'Something went wrong', variant: 'destructive' });
     } finally {
       setBusinessLogoUploading(false);
     }
   };
 
   const handleRemoveBusinessLogo = async () => {
-    if (!user) return;
+    if (!businessId) return;
     const { error } = await supabase
       .from('profiles')
       .update({ logo_url: null } as any)
-      .eq('id', user.id);
+      .eq('id', businessId);
     if (error) {
       toast({ title: 'Could not remove logo', description: error.message, variant: 'destructive' });
       return;
