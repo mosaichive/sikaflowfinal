@@ -124,7 +124,8 @@ export default function ExpensesPage() {
   const uploadReceipt = async () => {
     if (!receiptFile || !businessId || !user) return null;
     const safeName = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    const path = `${businessId}/${user.id}/${Date.now()}-${safeName}`;
+    // First path segment must equal auth.uid() to satisfy storage RLS.
+    const path = `${user.id}/${businessId}/${Date.now()}-${safeName}`;
     const { error } = await supabase.storage.from('expense-receipts').upload(path, receiptFile, { upsert: true });
     if (error) throw error;
     return { path, name: receiptFile.name };
