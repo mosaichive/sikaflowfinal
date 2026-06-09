@@ -169,12 +169,13 @@ export default function SettingsPage() {
   }, [isAdmin, businessId]);
 
   const handleSaveOpeningCash = async () => {
-    if (!user) return;
+    if (!user || !businessId) return;
     setOpeningCashSaving(true);
     const value = Number(openingCash || 0);
-    const { error } = await supabase.from('profiles').update({ opening_cash_balance: value } as any).eq('id', user.id);
+    // Opening cash lives on the owner's profile, even when an admin team member edits it.
+    const { error } = await supabase.from('profiles').update({ opening_cash_balance: value } as any).eq('id', businessId);
     if (error) {
-      toast({ title: 'Could not save opening cash', description: error.message, variant: 'destructive' });
+      toast({ title: 'Could not save opening cash', description: error.message || 'Please try again.', variant: 'destructive' });
     } else {
       toast({ title: 'Opening cash balance updated' });
       await logAudit('opening_cash_updated', `Set opening cash to ${value}`);
