@@ -757,6 +757,8 @@ export type Database = {
           cost: number
           created_at: string
           id: string
+          image_url: string | null
+          is_archived: boolean
           low_stock_threshold: number
           name: string
           price: number
@@ -770,6 +772,8 @@ export type Database = {
           cost?: number
           created_at?: string
           id?: string
+          image_url?: string | null
+          is_archived?: boolean
           low_stock_threshold?: number
           name: string
           price?: number
@@ -783,6 +787,8 @@ export type Database = {
           cost?: number
           created_at?: string
           id?: string
+          image_url?: string | null
+          is_archived?: boolean
           low_stock_threshold?: number
           name?: string
           price?: number
@@ -965,7 +971,7 @@ export type Database = {
           status: string
           total_cost: number
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           category?: string
@@ -985,7 +991,7 @@ export type Database = {
           status?: string
           total_cost?: number
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           category?: string
@@ -1005,7 +1011,7 @@ export type Database = {
           status?: string
           total_cost?: number
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
