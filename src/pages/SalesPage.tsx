@@ -371,9 +371,20 @@ export default function SalesPage() {
       }
 
       if (customerName && customerName !== 'Walk-in') {
-        const { data: existing } = await supabase.from('customers').select('id').eq('name', customerName).maybeSingle();
+        const ownerId = effectiveBusinessOwnerId ?? user.id;
+        const { data: existing } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('user_id', ownerId)
+          .ilike('name', customerName)
+          .maybeSingle();
         if (!existing) {
-          await supabase.from('customers').insert({ name: customerName, phone: customerPhone, business_id: businessId });
+          const { error: custErr } = await supabase
+            .from('customers')
+            .insert({ user_id: ownerId, name: customerName, phone: customerPhone || null });
+          if (custErr) {
+            console.warn('[SalesPage] auto-create customer failed', custErr);
+          }
         }
       }
 
