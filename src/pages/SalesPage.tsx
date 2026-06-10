@@ -371,9 +371,20 @@ export default function SalesPage() {
       }
 
       if (customerName && customerName !== 'Walk-in') {
-        const { data: existing } = await supabase.from('customers').select('id').eq('name', customerName).maybeSingle();
+        const ownerId = effectiveBusinessOwnerId ?? user.id;
+        const { data: existing } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('user_id', ownerId)
+          .ilike('name', customerName)
+          .maybeSingle();
         if (!existing) {
-          await supabase.from('customers').insert({ name: customerName, phone: customerPhone, business_id: businessId });
+          const { error: custErr } = await supabase
+            .from('customers')
+            .insert({ user_id: ownerId, name: customerName, phone: customerPhone || null });
+          if (custErr) {
+            console.warn('[SalesPage] auto-create customer failed', custErr);
+          }
         }
       }
 
@@ -469,12 +480,16 @@ export default function SalesPage() {
       }
 
       const newValues = `Items: ${validLines.map((r) => `${r.product!.name}×${r.qty}`).join(', ')}, Total: ${total}`;
-      await supabase.from('audit_log').insert({
+      const { error: auditErr } = await supabase.from('audit_log').insert({
+        user_id: user.id,
         action: 'sale_edited',
         details: `Previous: [${prevValues}] → New: [${newValues}]`,
         performed_by: user.id,
         performed_by_name: displayName || user.email || '',
       });
+      if (auditErr) {
+        console.warn('[SalesPage] audit_log insert failed', auditErr);
+      }
 
       toast({ title: 'Sales transaction updated successfully' });
       setPendingStockOverrideAction(null);
