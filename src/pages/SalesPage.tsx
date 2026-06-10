@@ -480,12 +480,16 @@ export default function SalesPage() {
       }
 
       const newValues = `Items: ${validLines.map((r) => `${r.product!.name}×${r.qty}`).join(', ')}, Total: ${total}`;
-      await supabase.from('audit_log').insert({
+      const { error: auditErr } = await supabase.from('audit_log').insert({
+        user_id: user.id,
         action: 'sale_edited',
         details: `Previous: [${prevValues}] → New: [${newValues}]`,
         performed_by: user.id,
         performed_by_name: displayName || user.email || '',
       });
+      if (auditErr) {
+        console.warn('[SalesPage] audit_log insert failed', auditErr);
+      }
 
       toast({ title: 'Sales transaction updated successfully' });
       setPendingStockOverrideAction(null);
