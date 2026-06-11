@@ -190,7 +190,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('phone-signup-verify-otp', {
         body: {
-          phone: phone.trim(),
+          phone: normalizeGhanaPhone(phone),
           otp: otpCode,
           password,
           full_name: fullName.trim(),
