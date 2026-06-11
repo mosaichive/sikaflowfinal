@@ -46,21 +46,24 @@ export function PhoneVerificationCard() {
 
   const sendOtp = async () => {
     setError('');
-    const trimmed = phone.trim();
-    if (trimmed.length < 9) {
-      setError('Enter a valid phone number.');
+    const normalized = normalizeGhanaPhone(phone);
+    if (!isValidE164(normalized)) {
+      setError('Enter a valid phone number (e.g. 0244123456 or +233244123456).');
       return;
     }
     setSending(true);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke('send-signup-otp', { body: { phone: trimmed } });
+      const { data, error: fnErr } = await supabase.functions.invoke('send-signup-otp', { body: { phone: normalized } });
       if (fnErr) throw fnErr;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast({ title: 'Code sent', description: `Check the SMS sent to ${trimmed}.` });
+      toast({ title: 'Verification code sent', description: `Please check the SMS sent to ${normalized}.` });
+      setPhone(normalized);
       setStep('verify');
       setCooldown(RESEND_COOLDOWN_SEC);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send code.');
+      const message = await getOtpErrorMessage(err);
+      console.error('[phone-verify] send failed', err);
+      setError(message);
     } finally {
       setSending(false);
     }
