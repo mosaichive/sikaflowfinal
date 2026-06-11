@@ -212,7 +212,9 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setPhoneStage('collect');
       setOtpCode('');
     } catch (err) {
-      setError((err as Error).message || 'Invalid or expired code.');
+      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
+      console.error('[phone-signup] verify failed', err);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
