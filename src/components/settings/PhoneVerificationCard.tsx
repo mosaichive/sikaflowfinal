@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 const RESEND_COOLDOWN_SEC = 30;
 
