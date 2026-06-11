@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
+import { getOtpErrorMessage, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 type RoleKey = 'owner' | 'manager' | 'admin';
 type StepKey = 'business' | 'owner' | 'review' | 'verify';
