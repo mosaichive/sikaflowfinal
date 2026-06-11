@@ -1,7 +1,6 @@
-// Send a 6-digit SMS OTP via Africa's Talking for phone verification.
-// Called AFTER the user is signed in.
+// Send a 6-digit SMS OTP via Africa's Talking for phone verification (logged-in user).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendAtSms, normalizePhone, hashCode } from '../_shared/at-sms.ts';
+import { sendAtSms, normalizePhone, hashCode, SmsConfigError, SmsDeliveryError } from '../_shared/at-sms.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,23 +30,39 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: 'Not authenticated' }, 401);
 
-    const { phone: rawPhone } = await req.json();
+    const { phone: rawPhone } = await req.json().catch(() => ({}));
     const phone = normalizePhone(rawPhone);
-    if (!phone || phone.length < 9) return json({ error: 'Valid phone number required' }, 400);
+    if (!phone || !/^\+\d{9,15}$/.test(phone)) {
+      return json({ error: 'Please enter a valid phone number (e.g. 0244123456 or +233244123456).' }, 400);
+    }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Rate limit: max 3 per phone per 10 min
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count } = await admin
       .from('signup_otps')
       .select('*', { count: 'exact', head: true })
       .eq('phone', phone)
       .gte('created_at', tenMinAgo);
-    if ((count || 0) >= 3) return json({ error: 'Too many attempts. Wait 10 minutes.' }, 429);
+    if ((count || 0) >= 3) {
+      return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
+    }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const code_hash = await hashCode(code);
+
+    try {
+      await sendAtSms(phone, `Your KudiTrack verification code is ${code}. It expires in 10 minutes.`);
+    } catch (err) {
+      console.error('[send-signup-otp] sms failed', { phone, userId: user.id, err });
+      if (err instanceof SmsConfigError) {
+        return json({ error: err.message, kind: 'config' }, 503);
+      }
+      if (err instanceof SmsDeliveryError) {
+        return json({ error: err.message, kind: 'delivery' }, 502);
+      }
+      return json({ error: 'Could not send the verification code. Please try again.' }, 502);
+    }
 
     await admin.from('signup_otps').insert({
       phone,
@@ -56,11 +71,9 @@ Deno.serve(async (req) => {
       purpose: 'signup',
     });
 
-    await sendAtSms(phone, `Your KudiTrack verification code is ${code}. It expires in 10 minutes.`);
-
-    return json({ success: true });
+    return json({ success: true, phone });
   } catch (err) {
-    console.error('send-signup-otp error:', err);
+    console.error('[send-signup-otp] internal error', err);
     return json({ error: (err as Error).message || 'Internal error' }, 500);
   }
 });
