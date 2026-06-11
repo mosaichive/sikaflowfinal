@@ -7,6 +7,7 @@ import { lovable } from '@/integrations/lovable/index';
 import { AboutModal } from '@/components/auth/AboutModal';
 import { ContactModal } from '@/components/auth/ContactModal';
 import { SEO } from '@/components/SEO';
+import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
