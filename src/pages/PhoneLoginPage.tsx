@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCw } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -9,32 +9,59 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { SEO } from '@/components/SEO';
+import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
+
+const RESEND_COOLDOWN_SEC = 60;
 
 export function PhoneLoginPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [stage, setStage] = useState<'request' | 'verify'>('request');
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const sendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const requestCode = async (isResend = false) => {
     setError('');
-    setSubmitting(true);
+    const normalized = normalizeGhanaPhone(phone);
+    if (!isValidE164(normalized)) {
+      setError('Please enter a valid phone number (e.g. 0244123456 or +233244123456).');
+      return;
+    }
+    if (isResend) setResending(true); else setSubmitting(true);
     try {
       const { error: fnErr } = await supabase.functions.invoke('phone-login-send-otp', {
-        body: { phone },
+        body: { phone: normalized },
       });
       if (fnErr) throw fnErr;
-      toast({ title: 'Code sent', description: 'If that phone is registered, an SMS code is on its way.' });
+      toast({
+        title: 'Verification code sent',
+        description: `If ${normalized} is registered, an SMS code has been sent. Please check your SMS.`,
+      });
       setStage('verify');
+      setCooldown(RESEND_COOLDOWN_SEC);
     } catch (err) {
-      setError((err as Error).message || 'Failed to send code');
+      const message = await getOtpErrorMessage(err);
+      console.error('[phone-login] send failed', err);
+      setError(message);
     } finally {
       setSubmitting(false);
+      setResending(false);
     }
+  };
+
+  const sendCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    void requestCode(false);
   };
 
   const verifyCode = async (e: React.FormEvent) => {
@@ -42,15 +69,18 @@ export function PhoneLoginPage() {
     setError('');
     setSubmitting(true);
     try {
+      const normalized = normalizeGhanaPhone(phone);
       const { data, error: fnErr } = await supabase.functions.invoke('phone-login-verify-otp', {
-        body: { phone, otp: code, redirect_to: `${window.location.origin}/auth/callback?next=/dashboard` },
+        body: { phone: normalized, otp: code, redirect_to: `${window.location.origin}/auth/callback?next=/dashboard` },
       });
       if (fnErr) throw fnErr;
       const link = (data as { action_link?: string } | null)?.action_link;
       if (!link) throw new Error('Could not start session');
       window.location.href = link;
     } catch (err) {
-      setError((err as Error).message || 'Invalid code');
+      const message = await getOtpErrorMessage(err, 'That code is invalid or expired.');
+      console.error('[phone-login] verify failed', err);
+      setError(message);
       setSubmitting(false);
     }
   };
@@ -90,11 +120,27 @@ export function PhoneLoginPage() {
                     autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+233 24 123 4567"
+                    placeholder="0244 123 4567 or +233244123456"
                     required
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    Ghana numbers can be entered as 024xxxxxxx — we'll convert to +233 automatically.
+                  </p>
                 </div>
-                {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {error}{' '}
+                      <button
+                        type="button"
+                        className="font-medium underline"
+                        onClick={() => navigate('/sign-in')}
+                      >
+                        Use email instead
+                      </button>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <Button type="submit" className="w-full" disabled={submitting}>
                   {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Send code
@@ -115,18 +161,38 @@ export function PhoneLoginPage() {
                     required
                   />
                 </div>
-                {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
                 <Button type="submit" className="w-full" disabled={submitting || code.length !== 6}>
                   {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Verify & sign in
                 </Button>
-                <button
-                  type="button"
-                  className="w-full text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => { setStage('request'); setCode(''); setError(''); }}
-                >
-                  Use a different phone number
-                </button>
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cooldown > 0 || resending}
+                    onClick={() => void requestCode(true)}
+                  >
+                    {resending ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCw className="mr-2 h-3 w-3" />
+                    )}
+                    {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => { setStage('request'); setCode(''); setError(''); }}
+                  >
+                    Use a different number
+                  </button>
+                </div>
               </form>
             )}
 
