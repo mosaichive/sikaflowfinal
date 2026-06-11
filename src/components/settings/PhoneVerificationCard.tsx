@@ -78,7 +78,7 @@ export function PhoneVerificationCard() {
     setVerifying(true);
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('verify-signup-otp', {
-        body: { phone: phone.trim(), otp },
+        body: { phone: normalizeGhanaPhone(phone), otp },
       });
       if (fnErr) throw fnErr;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -87,7 +87,9 @@ export function PhoneVerificationCard() {
       setStep('enter');
       await refreshProfile();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired code.');
+      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
+      console.error('[phone-verify] verify failed', err);
+      setError(message);
     } finally {
       setVerifying(false);
     }
