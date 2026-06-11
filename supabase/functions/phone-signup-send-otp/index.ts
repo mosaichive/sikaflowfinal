@@ -1,7 +1,6 @@
 // Send an SMS OTP for new-user phone signup (no auth required).
-// Stores an OTP record with purpose='signup_new' and user_id=null.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendAtSms, normalizePhone, hashCode } from '../_shared/at-sms.ts';
+import { sendAtSms, normalizePhone, hashCode, SmsConfigError, SmsDeliveryError } from '../_shared/at-sms.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,13 +12,14 @@ const json = (b: unknown, s = 200) =>
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { phone: rawPhone } = await req.json();
+    const { phone: rawPhone } = await req.json().catch(() => ({}));
     const phone = normalizePhone(rawPhone);
-    if (!phone || phone.length < 9) return json({ error: 'Valid phone number required' }, 400);
+    if (!phone || !/^\+\d{9,15}$/.test(phone)) {
+      return json({ error: 'Please enter a valid phone number (e.g. 0244123456 or +233244123456).' }, 400);
+    }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // If a verified profile already uses this phone, block signup.
     const { data: existing } = await admin
       .from('profiles')
       .select('id, phone_verified')
@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
       return json({ error: 'This phone number is already registered. Please sign in instead.' }, 409);
     }
 
-    // Rate limit: max 3 in 10 min per phone for signup_new
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count } = await admin
       .from('signup_otps')
@@ -37,20 +36,32 @@ Deno.serve(async (req) => {
       .eq('phone', phone)
       .eq('purpose', 'signup_new')
       .gte('created_at', tenMinAgo);
-    if ((count || 0) >= 3) return json({ error: 'Too many attempts. Wait 10 minutes.' }, 429);
+    if ((count || 0) >= 3) {
+      return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
+    }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const code_hash = await hashCode(code);
-    await admin.from('signup_otps').insert({
-      phone,
-      code_hash,
-      purpose: 'signup_new',
-    });
 
-    await sendAtSms(phone, `Your KudiTrack signup code is ${code}. It expires in 10 minutes.`);
-    return json({ success: true });
+    // Send SMS FIRST. If delivery fails we do not persist the OTP, so the user
+    // can retry without burning a rate-limit slot and we never claim "sent".
+    try {
+      await sendAtSms(phone, `Your KudiTrack signup code is ${code}. It expires in 10 minutes.`);
+    } catch (err) {
+      console.error('[phone-signup-send-otp] sms failed', { phone, err });
+      if (err instanceof SmsConfigError) {
+        return json({ error: err.message, kind: 'config' }, 503);
+      }
+      if (err instanceof SmsDeliveryError) {
+        return json({ error: err.message, kind: 'delivery' }, 502);
+      }
+      return json({ error: 'Could not send the verification code. Please try again.' }, 502);
+    }
+
+    await admin.from('signup_otps').insert({ phone, code_hash, purpose: 'signup_new' });
+    return json({ success: true, phone });
   } catch (err) {
-    console.error('phone-signup-send-otp error:', err);
+    console.error('[phone-signup-send-otp] internal error', err);
     return json({ error: (err as Error).message || 'Internal error' }, 500);
   }
 });
