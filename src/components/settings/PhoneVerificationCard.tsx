@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 const RESEND_COOLDOWN_SEC = 30;
 
@@ -45,21 +46,24 @@ export function PhoneVerificationCard() {
 
   const sendOtp = async () => {
     setError('');
-    const trimmed = phone.trim();
-    if (trimmed.length < 9) {
-      setError('Enter a valid phone number.');
+    const normalized = normalizeGhanaPhone(phone);
+    if (!isValidE164(normalized)) {
+      setError('Enter a valid phone number (e.g. 0244123456 or +233244123456).');
       return;
     }
     setSending(true);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke('send-signup-otp', { body: { phone: trimmed } });
+      const { data, error: fnErr } = await supabase.functions.invoke('send-signup-otp', { body: { phone: normalized } });
       if (fnErr) throw fnErr;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast({ title: 'Code sent', description: `Check the SMS sent to ${trimmed}.` });
+      toast({ title: 'Verification code sent', description: `Please check the SMS sent to ${normalized}.` });
+      setPhone(normalized);
       setStep('verify');
       setCooldown(RESEND_COOLDOWN_SEC);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send code.');
+      const message = await getOtpErrorMessage(err);
+      console.error('[phone-verify] send failed', err);
+      setError(message);
     } finally {
       setSending(false);
     }
@@ -74,7 +78,7 @@ export function PhoneVerificationCard() {
     setVerifying(true);
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('verify-signup-otp', {
-        body: { phone: phone.trim(), otp },
+        body: { phone: normalizeGhanaPhone(phone), otp },
       });
       if (fnErr) throw fnErr;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -83,7 +87,9 @@ export function PhoneVerificationCard() {
       setStep('enter');
       await refreshProfile();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired code.');
+      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
+      console.error('[phone-verify] verify failed', err);
+      setError(message);
     } finally {
       setVerifying(false);
     }

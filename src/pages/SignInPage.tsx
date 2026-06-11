@@ -7,6 +7,7 @@ import { lovable } from '@/integrations/lovable/index';
 import { AboutModal } from '@/components/auth/AboutModal';
 import { ContactModal } from '@/components/auth/ContactModal';
 import { SEO } from '@/components/SEO';
+import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
@@ -162,18 +163,22 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
   const sendPhoneOtp = async () => {
     setError('');
     if (!fullName.trim()) { setError('Enter your full name.'); return; }
-    if (!phone.trim()) { setError('Enter your phone number.'); return; }
+    const normalized = normalizeGhanaPhone(phone);
+    if (!isValidE164(normalized)) { setError('Enter a valid phone number (e.g. 0244123456 or +233244123456).'); return; }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setSubmitting(true);
     try {
       const { error: fnErr } = await supabase.functions.invoke('phone-signup-send-otp', {
-        body: { phone: phone.trim() },
+        body: { phone: normalized },
       });
       if (fnErr) throw fnErr;
-      toast({ title: 'Code sent', description: 'Enter the 6-digit code we just texted you.' });
+      setPhone(normalized);
+      toast({ title: 'Verification code sent', description: `Please check the SMS sent to ${normalized}.` });
       setPhoneStage('verify');
     } catch (err) {
-      setError((err as Error).message || 'Failed to send code.');
+      const message = await getOtpErrorMessage(err);
+      console.error('[phone-signup] send failed', err);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -185,7 +190,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('phone-signup-verify-otp', {
         body: {
-          phone: phone.trim(),
+          phone: normalizeGhanaPhone(phone),
           otp: otpCode,
           password,
           full_name: fullName.trim(),
@@ -207,7 +212,9 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       setPhoneStage('collect');
       setOtpCode('');
     } catch (err) {
-      setError((err as Error).message || 'Invalid or expired code.');
+      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
+      console.error('[phone-signup] verify failed', err);
+      setError(message);
     } finally {
       setSubmitting(false);
     }

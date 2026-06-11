@@ -1,7 +1,6 @@
 // Send a 6-digit SMS OTP for phone-based password reset.
-// Looks up the verified profile by phone and sends a code.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendAtSms, normalizePhone, hashCode } from '../_shared/at-sms.ts';
+import { sendAtSms, normalizePhone, hashCode, SmsConfigError, SmsDeliveryError } from '../_shared/at-sms.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +12,11 @@ const json = (b: unknown, s = 200) =>
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { phone: rawPhone } = await req.json();
+    const { phone: rawPhone } = await req.json().catch(() => ({}));
     const phone = normalizePhone(rawPhone);
-    if (!phone || phone.length < 9) return json({ error: 'Valid phone number required' }, 400);
+    if (!phone || !/^\+\d{9,15}$/.test(phone)) {
+      return json({ error: 'Please enter a valid phone number (e.g. 0244123456 or +233244123456).' }, 400);
+    }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -25,12 +26,11 @@ Deno.serve(async (req) => {
       .eq('phone', phone)
       .maybeSingle();
 
-    // Don't leak which numbers are registered.
     if (!profile || !profile.phone_verified) {
+      console.log('[password-reset-send-otp] unknown or unverified phone (returning success)', { phone });
       return json({ success: true });
     }
 
-    // Rate limit: 3 attempts per phone per 10 min for password reset.
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count } = await admin
       .from('signup_otps')
@@ -38,10 +38,22 @@ Deno.serve(async (req) => {
       .eq('phone', phone)
       .eq('purpose', 'password_reset')
       .gte('created_at', tenMinAgo);
-    if ((count || 0) >= 3) return json({ error: 'Too many attempts. Wait 10 minutes.' }, 429);
+    if ((count || 0) >= 3) {
+      return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
+    }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const code_hash = await hashCode(code);
+
+    try {
+      await sendAtSms(phone, `Your KudiTrack password reset code is ${code}. It expires in 10 minutes.`);
+    } catch (err) {
+      console.error('[password-reset-send-otp] sms failed', { phone, err });
+      if (err instanceof SmsConfigError) return json({ error: err.message, kind: 'config' }, 503);
+      if (err instanceof SmsDeliveryError) return json({ error: err.message, kind: 'delivery' }, 502);
+      return json({ error: 'Could not send the verification code. Please try again.' }, 502);
+    }
+
     await admin.from('signup_otps').insert({
       phone,
       code_hash,
@@ -49,10 +61,9 @@ Deno.serve(async (req) => {
       purpose: 'password_reset',
     });
 
-    await sendAtSms(phone, `Your KudiTrack password reset code is ${code}. It expires in 10 minutes.`);
     return json({ success: true });
   } catch (err) {
-    console.error('password-reset-send-otp error:', err);
+    console.error('[password-reset-send-otp] internal error', err);
     return json({ error: (err as Error).message || 'Internal error' }, 500);
   }
 });

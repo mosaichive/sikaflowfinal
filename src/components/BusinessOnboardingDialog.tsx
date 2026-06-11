@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken } from '@/lib/referrals';
+import { getOtpErrorMessage, normalizeGhanaPhone } from '@/lib/phone-otp';
 
 type RoleKey = 'owner' | 'manager' | 'admin';
 type StepKey = 'business' | 'owner' | 'review' | 'verify';
@@ -162,18 +163,20 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
         .eq('id', user.id);
       if (profileError) throw profileError;
 
+      const normalized = normalizeGhanaPhone(phone);
       const { error: otpError } = await supabase.functions.invoke('send-signup-otp', {
-        body: { phone: phone.trim() },
+        body: { phone: normalized },
       });
       if (otpError) throw otpError;
 
-      toast({ title: 'Code sent', description: 'Check your phone for the 6-digit code.' });
+      toast({ title: 'Verification code sent', description: `Please check the SMS sent to ${normalized}.` });
       setOtpCode('');
       setOtpError('');
       setDirection(1);
       setStepIndex(STEPS.findIndex((s) => s.key === 'verify'));
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      const message = await getOtpErrorMessage(error);
+      console.error('[onboarding] send otp failed', error);
       toast({ title: 'Could not send code', description: message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -185,12 +188,13 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
     setOtpError('');
     try {
       const { error } = await supabase.functions.invoke('send-signup-otp', {
-        body: { phone: phone.trim() },
+        body: { phone: normalizeGhanaPhone(phone) },
       });
       if (error) throw error;
       toast({ title: 'New code sent' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not resend code.';
+      const message = await getOtpErrorMessage(error, 'Could not resend code.');
+      console.error('[onboarding] resend otp failed', error);
       toast({ title: 'Resend failed', description: message, variant: 'destructive' });
     } finally {
       setResending(false);
