@@ -34,12 +34,33 @@ type AtRecipient = {
   messageId?: string;
 };
 
+type AtResponseBody = {
+  SMSMessageData?: {
+    Message?: string;
+    Recipients?: AtRecipient[];
+  };
+  description?: string;
+  message?: string;
+  errorMessage?: string;
+};
+
 function readSecret(...names: string[]) {
   for (const name of names) {
     const value = Deno.env.get(name)?.trim();
     if (value) return value;
   }
   return '';
+}
+
+function isInvalidSenderId(body: AtResponseBody, recipient?: AtRecipient) {
+  const candidates = [
+    body?.SMSMessageData?.Message,
+    body?.description,
+    body?.message,
+    body?.errorMessage,
+    recipient?.status,
+  ];
+  return candidates.some((value) => String(value ?? '').toLowerCase().includes('invalidsenderid'));
 }
 
 function recipientStatusToUserMessage(status: string | undefined): string {
@@ -91,26 +112,42 @@ export async function sendAtSms(to: string, message: string) {
     ? 'https://api.sandbox.africastalking.com/version1/messaging'
     : 'https://api.africastalking.com/version1/messaging';
 
-  const params = new URLSearchParams({ username, to, message });
-  if (from) params.set('from', from);
+  const sendRequest = async (senderId: string) => {
+    const params = new URLSearchParams({ username, to, message });
+    if (senderId) params.set('from', senderId);
 
-  let res: Response;
-  try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'apiKey': apiKey,
-      },
-      body: params,
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'apiKey': apiKey,
+        },
+        body: params,
+      });
+      const body = await res.json().catch(() => ({} as AtResponseBody));
+      return { res, body: body as AtResponseBody };
+    } catch (err) {
+      console.error('[at-sms] network failure calling Africa\'s Talking:', err);
+      throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
+    }
+  };
+
+  let senderUsed = from;
+  let { res, body } = await sendRequest(senderUsed);
+  let recipients: AtRecipient[] = body?.SMSMessageData?.Recipients ?? [];
+  let recipient = recipients[0];
+
+  if (senderUsed && isInvalidSenderId(body, recipient)) {
+    console.warn('[at-sms] configured sender ID was rejected; retrying with account default sender', {
+      sender: senderUsed,
     });
-  } catch (err) {
-    console.error('[at-sms] network failure calling Africa\'s Talking:', err);
-    throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
+    senderUsed = '';
+    ({ res, body } = await sendRequest(senderUsed));
+    recipients = body?.SMSMessageData?.Recipients ?? [];
+    recipient = recipients[0];
   }
-
-  const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
     console.error('[at-sms] non-2xx from Africa\'s Talking', { status: res.status, body });
@@ -120,9 +157,6 @@ export async function sendAtSms(to: string, message: string) {
     }
     throw new SmsDeliveryError('SMS provider could not accept the message.');
   }
-
-  const recipients: AtRecipient[] = body?.SMSMessageData?.Recipients ?? [];
-  const recipient = recipients[0];
 
   // Africa's Talking returns 200 OK with Recipients=[] when nothing was queued
   // (e.g. sandbox account sending to a non-whitelisted number, blacklisted MSISDN,
@@ -150,7 +184,7 @@ export async function sendAtSms(to: string, message: string) {
     status: recipient.status,
     cost: recipient.cost,
     messageId: recipient.messageId,
-    sender: from || '(default)',
+    sender: senderUsed || '(default)',
     sandbox: isSandbox,
   });
 
