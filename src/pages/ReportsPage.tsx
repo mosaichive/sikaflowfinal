@@ -1127,9 +1127,7 @@ function TrendCard({
   const positive = invertDelta ? !up : up;
   const deltaColor = delta === 0 ? 'text-muted-foreground' : positive ? 'text-emerald-500' : 'text-rose-500';
   const Arrow = delta === 0 ? null : up ? ArrowUpRight : ArrowDownRight;
-  // Lazy-load recharts pieces
-  const Recharts = require('recharts');
-  const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } = Recharts;
+  const Tooltip = RTooltip;
 
   return (
     <Card className="rounded-2xl border-border/60 bg-card/60">
