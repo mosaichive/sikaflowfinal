@@ -6,11 +6,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { formatCurrency, PAYMENT_METHODS } from '@/lib/constants';
 import {
   calculateFinancialSnapshot,
-  calculateSalesIncome,
   getPaidAmount,
   isNegativeStockSale,
   isRecognizedSale,
-  toNumber,
 } from '@/lib/sales-inventory';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/context/BusinessContext';
@@ -28,22 +26,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowDownRight, ArrowUpRight, BarChart3, Boxes, Calculator, CalendarRange, ChevronDown, Coins,
-  Download, FileSpreadsheet, FileText, FilterX, LayoutGrid, LineChart as LineChartIcon, PackageSearch,
-  PiggyBank, Printer, Receipt, ScrollText, ShoppingCart, Sparkles, Tag, TrendingDown, TrendingUp,
-  Wallet, WalletCards, Eye,
+  Download, FileSpreadsheet, FileText, FilterX, PiggyBank, Printer, Receipt, ScrollText,
+  ShoppingCart, Tag, TrendingUp, Wallet, Eye,
 } from 'lucide-react';
 import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
 import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
-import { DynamicLineChart } from '@/components/reports/DynamicLineChart';
 import { calculateReportCumulativeFinancials, isDefaultLiveDashboardReport } from '@/lib/report-calculations';
-import {
-  buildDamagedGoodsRowsFromStockMovements,
-  calculateDamagedGoodsSummary,
-  groupDamagedGoodsByProduct,
-  getDamagedGoodsValue,
-  isMissingDamagedGoodsSchemaError,
-} from '@/lib/damaged-goods';
 
 type RawReportData = {
   sales: any[];
@@ -56,7 +45,6 @@ type RawReportData = {
   otherIncome: any[];
   products: any[];
   stockMovements: any[];
-  damagedGoods: any[];
 };
 
 function formatDateInput(date: Date) {
@@ -170,7 +158,6 @@ export default function ReportsPage() {
     otherIncome: [],
     products: [],
     stockMovements: [],
-    damagedGoods: [],
   });
 
   const { from, to } = useMemo(
@@ -182,7 +169,7 @@ export default function ReportsPage() {
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
-    const [salesRes, itemsRes, expRes, savRes, invRes, funRes, restockRes, otherIncomeRes, productsRes, stockMovementsRes, damagedGoodsRes] = await Promise.allSettled([
+    const [salesRes, itemsRes, expRes, savRes, invRes, funRes, restockRes, otherIncomeRes, productsRes, stockMovementsRes] = await Promise.allSettled([
       supabase.from('sales').select('*').order('sale_date', { ascending: false }),
       supabase.from('sale_items').select('*'),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -193,17 +180,10 @@ export default function ReportsPage() {
       supabase.from('other_income' as any).select('*').order('income_date', { ascending: false }),
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(500, businessId),
-      supabase.from('damaged_goods' as any).select('*').order('damage_date', { ascending: false }),
     ]);
 
     const productsData = productsRes.status === 'fulfilled' ? (productsRes.value ?? []) : [];
     const stockMovementsData = stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [];
-    const damagedGoodsData =
-      damagedGoodsRes.status === 'fulfilled' && !damagedGoodsRes.value.error
-        ? (damagedGoodsRes.value.data ?? [])
-        : damagedGoodsRes.status === 'fulfilled' && isMissingDamagedGoodsSchemaError(damagedGoodsRes.value.error)
-          ? buildDamagedGoodsRowsFromStockMovements(stockMovementsData, productsData)
-          : [];
 
     setRaw({
       sales: salesRes.status === 'fulfilled' && !salesRes.value.error ? (salesRes.value.data ?? []) : [],
@@ -216,7 +196,6 @@ export default function ReportsPage() {
       otherIncome: otherIncomeRes.status === 'fulfilled' && !otherIncomeRes.value.error ? (otherIncomeRes.value.data ?? []) : [],
       products: productsData,
       stockMovements: stockMovementsData,
-      damagedGoods: damagedGoodsData,
     });
     if (salesRes.status === 'rejected') logSupabaseError('reports.load.sales', salesRes.reason, { businessId });
     if (itemsRes.status === 'rejected') logSupabaseError('reports.load.saleItems', itemsRes.reason, { businessId });
@@ -228,14 +207,6 @@ export default function ReportsPage() {
     if (otherIncomeRes.status === 'rejected') logSupabaseError('reports.load.otherIncome', otherIncomeRes.reason, { businessId });
     if (productsRes.status === 'rejected') logSupabaseError('reports.load.products', productsRes.reason, { businessId });
     if (stockMovementsRes.status === 'rejected') logSupabaseError('reports.load.stockMovements', stockMovementsRes.reason, { businessId });
-    if (damagedGoodsRes.status === 'rejected') logSupabaseError('reports.load.damagedGoods', damagedGoodsRes.reason, { businessId });
-    if (
-      damagedGoodsRes.status === 'fulfilled'
-      && damagedGoodsRes.value.error
-      && !isMissingDamagedGoodsSchemaError(damagedGoodsRes.value.error)
-    ) {
-      logSupabaseError('reports.load.damagedGoods', damagedGoodsRes.value.error, { businessId });
-    }
     setLoading(false);
   }, [businessId]);
 
@@ -253,7 +224,6 @@ export default function ReportsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, () => { void fetchReport(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'damaged_goods' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'savings' }, () => { void fetchReport(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'investments' }, () => { void fetchReport(); })
       .subscribe();
@@ -274,7 +244,6 @@ export default function ReportsPage() {
         investments: [],
         funding: [],
         restocks: [],
-        damagedGoods: [],
       };
     }
 
@@ -290,7 +259,6 @@ export default function ReportsPage() {
       investments: raw.investments.filter((entry) => inDateRange(entry.investment_date, from, to)),
       funding: raw.funding.filter((entry) => inDateRange(entry.date_received, from, to)),
       restocks: raw.restocks.filter((entry) => inDateRange(entry.restock_date, from, to)),
-      damagedGoods: raw.damagedGoods.filter((entry) => inDateRange(entry.damage_date, from, to)),
     };
   }, [from, invalidRange, raw, to]);
 
@@ -322,16 +290,6 @@ export default function ReportsPage() {
       restocks: filtered.restocks,
     });
   }, [filtered, raw.products, recognizedSaleItems]);
-
-  const damagedGoodsSummary = useMemo(
-    () => calculateDamagedGoodsSummary(filtered.damagedGoods),
-    [filtered.damagedGoods],
-  );
-
-  const damagedGoodsByProduct = useMemo(
-    () => groupDamagedGoodsByProduct(filtered.damagedGoods),
-    [filtered.damagedGoods],
-  );
 
   const cumulativeReportFinancials = useMemo(
     () =>
@@ -638,11 +596,6 @@ export default function ReportsPage() {
         { label: 'Opening Stock', value: formatCurrency(openingStockValue) },
         { label: 'Restock Spending', value: formatCurrency(reportStats.totalRestockSpending) },
       ] },
-      { id: 'inventory-damaged', title: 'Damaged Goods', description: 'Stock losses in this range.', metrics: [
-        { label: 'Damaged Quantity', value: String(damagedGoodsSummary.quantity) },
-        { label: 'Estimated Loss', value: formatCurrency(damagedGoodsSummary.value), tone: 'text-amber-500' },
-        { label: 'Affected Products', value: String(damagedGoodsByProduct.length) },
-      ] },
     ],
     expense: [
       { id: 'expense-summary', title: 'Expense Summary', description: 'Total operating expenses in range.', metrics: [
@@ -676,7 +629,7 @@ export default function ReportsPage() {
         { label: 'Investor Funding', value: formatCurrency(filtered.funding.reduce((s, e) => s + Number(e.amount || 0), 0)) },
       ] },
     ],
-  }), [creditReport, damagedGoodsByProduct.length, damagedGoodsSummary, filtered, financials.stockValue, openingStockValue, paymentBreakdown, productPerformance, recognizedSales.length, reportStats, statement.closingBalance, statement.totalMoneyIn, statement.totalMoneyOut]);
+  }), [creditReport, filtered, financials.stockValue, openingStockValue, paymentBreakdown, productPerformance, recognizedSales.length, reportStats, statement.closingBalance, statement.totalMoneyIn, statement.totalMoneyOut]);
 
   const categoryDefs: { value: typeof activeCategory; label: string; icon: any }[] = [
     { value: 'sales', label: 'Sales', icon: ShoppingCart },
@@ -794,16 +747,7 @@ export default function ReportsPage() {
         </div>
 
         {/* ---------- ANALYTICS TREND CHARTS ---------- */}
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <TrendCard
-            title="Sales Trend" value={formatCurrency(reportStats.paidSalesRevenue)}
-            delta={trend(reportStats.paidSalesRevenue, priorStats.paidSalesRevenue)}
-            color="hsl(142 70% 50%)" gradId="g-sales"
-            data={buildDailySeries(from, to, (k) => {
-              const s = filtered.sales.find((x) => x.sale_date?.slice(0, 10) === k);
-              return s ? getPaidAmount(s) : 0;
-            })}
-          />
+        <div className="grid gap-4 lg:grid-cols-2">
           <TrendCard
             title="Profit Trend" value={formatCurrency(reportStats.profit)}
             delta={trend(reportStats.profit, priorStats.profit)}
@@ -867,86 +811,6 @@ export default function ReportsPage() {
               </TabsContent>
             ))}
           </Tabs>
-        </Card>
-
-        {/* ---------- DYNAMIC INTERACTIVE CHART ---------- */}
-        <DynamicLineChart
-          from={from}
-          to={to}
-          sales={filtered.sales}
-          saleItems={filtered.saleItems}
-          otherIncome={filtered.otherIncome}
-          expenses={filtered.expenses}
-          restocks={filtered.restocks}
-          products={raw.products}
-        />
-
-        {/* ---------- DAMAGED GOODS ---------- */}
-        <Card className="overflow-hidden rounded-2xl border-amber-500/20 bg-card/60">
-          <CardHeader className="border-b border-border/40 bg-gradient-to-r from-amber-500/5 to-transparent">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <PackageSearch className="h-4 w-4 text-amber-500" /> Damaged Goods Report
-                </CardTitle>
-                <p className="mt-1.5 text-sm text-muted-foreground">Inventory loss from damaged goods. Not revenue, profit, or cash movement.</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4 p-4 sm:p-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <ReportMetric label="Damaged Quantity" value={String(damagedGoodsSummary.quantity)} />
-              <ReportMetric label="Estimated Loss" value={formatCurrency(damagedGoodsSummary.value)} tone="text-amber-500" />
-              <ReportMetric label="Affected Products" value={String(damagedGoodsByProduct.length)} />
-            </div>
-
-            {damagedGoodsByProduct.length > 0 && (
-              <div className="overflow-hidden rounded-xl border border-border/60">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Total Damaged</TableHead><TableHead className="text-right">Estimated Value</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {damagedGoodsByProduct.map((entry) => (
-                      <TableRow key={entry.productId}>
-                        <TableCell className="font-medium">{entry.productName}</TableCell>
-                        <TableCell>{entry.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.value)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            {filtered.damagedGoods.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-border/60">
-                <div className="max-h-[360px] overflow-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-card">
-                      <TableRow>
-                        <TableHead>Date</TableHead><TableHead>Product</TableHead><TableHead>Qty</TableHead>
-                        <TableHead>Reason</TableHead><TableHead>Recorded By</TableHead><TableHead className="text-right">Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.damagedGoods.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell>{new Date(entry.damage_date).toLocaleDateString('en-GH')}</TableCell>
-                          <TableCell className="font-medium">{entry.product_name || 'Unknown product'}</TableCell>
-                          <TableCell>{entry.quantity}</TableCell>
-                          <TableCell>{entry.reason || '—'}</TableCell>
-                          <TableCell>{entry.recorded_by_name || '—'}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(getDamagedGoodsValue(entry))}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            ) : (
-              <EmptyState icon={<PackageSearch className="h-7 w-7 text-muted-foreground" />} title="No damaged goods in this range"
-                description="Record damaged goods from Inventory to see stock-loss reporting here." />
-            )}
-          </CardContent>
         </Card>
 
         {/* ---------- STATEMENT DATA GRID ---------- */}
@@ -1167,4 +1031,3 @@ function TrendCard({
     </Card>
   );
 }
-
