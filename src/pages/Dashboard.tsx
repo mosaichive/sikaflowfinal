@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Boxes, HandCoins, Package, Plus, Receipt, ShoppingCart, Sparkles, TrendingUp, WalletCards } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Boxes,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  HandCoins,
+  Package,
+  Plus,
+  Receipt,
+  ShoppingCart,
+  TrendingUp,
+  WalletCards,
+} from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 
@@ -14,11 +29,11 @@ import { useBusiness } from '@/context/BusinessContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCurrency, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
-import { calculateDashboardTotals, getPaidAmount, getIsoDate, sumTodaySales, toNumber } from '@/lib/sales-inventory';
-import { AVAILABLE_BUSINESS_MONEY_FORMULA, calculateBusinessFinancials } from '@/lib/business-money';
+import { formatCurrency } from '@/lib/constants';
+import { sumTodaySales, toNumber } from '@/lib/sales-inventory';
+import { calculateBusinessFinancials } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
@@ -119,238 +134,6 @@ function inRange(value: string | null | undefined, from: string, to: string) {
   return time >= new Date(`${from}T00:00:00`).getTime() && time <= new Date(`${to}T23:59:59`).getTime();
 }
 
-function buildDailyDelta(today: number, yesterday: number) {
-  const difference = today - yesterday;
-  if (Math.abs(difference) < 0.01) {
-    return { label: 'No change vs yesterday', tone: 'muted', icon: TrendingUp };
-  }
-  if (difference > 0) {
-    return { label: `${formatCurrency(difference)} more than yesterday`, tone: 'up', icon: ArrowUpRight };
-  }
-  return { label: `${formatCurrency(Math.abs(difference))} below yesterday`, tone: 'down', icon: ArrowDownRight };
-}
-
-function buildRecentActivity(data: DashboardData, from: string, to: string) {
-  const entries = [
-    ...data.sales
-      .filter((sale) => inRange(sale.sale_date, from, to))
-      .map((sale) => ({
-        id: `sale-${sale.id}`,
-        title: sale.customer_name ? `Sale to ${sale.customer_name}` : 'Walk-in sale',
-        subtitle: new Date(sale.sale_date).toLocaleDateString('en-GH'),
-        amount: getPaidAmount(sale),
-        direction: 'in' as const,
-        date: sale.sale_date,
-        icon: ShoppingCart,
-        tone: 'text-emerald-500',
-      })),
-    ...data.otherIncome
-      .filter((row) => inRange(row.income_date, from, to))
-      .map((row) => ({
-        id: `income-${row.id}`,
-        title: row.category,
-        subtitle: row.description || new Date(row.income_date).toLocaleDateString('en-GH'),
-        amount: toNumber(row.amount),
-        direction: 'in' as const,
-        date: row.income_date,
-        icon: HandCoins,
-        tone: 'text-emerald-500',
-      })),
-    ...data.expenses
-      .filter((row) => inRange(row.expense_date, from, to))
-      .map((row) => ({
-        id: `expense-${row.id}`,
-        title: row.category || 'Expense',
-        subtitle: row.description || new Date(row.expense_date).toLocaleDateString('en-GH'),
-        amount: toNumber(row.amount),
-        direction: 'out' as const,
-        date: row.expense_date,
-        icon: Receipt,
-        tone: 'text-rose-500',
-      })),
-    ...data.savings
-      .filter((row) => inRange(row.savings_date, from, to))
-      .map((row) => ({
-        id: `savings-${row.id}`,
-        title: 'Savings transfer',
-        subtitle:
-          row.note ||
-          row.reference ||
-          (row.source ? `${String(row.source).replace('_', ' ')} savings` : new Date(row.savings_date).toLocaleDateString('en-GH')),
-        amount: toNumber(row.amount),
-        direction: 'out' as const,
-        date: row.savings_date,
-        icon: WalletCards,
-        tone: 'text-amber-500',
-      })),
-    ...data.investorFunds
-      .filter((row) => inRange(row.date_received, from, to))
-      .map((row) => ({
-        id: `funding-${row.reference || row.date_received}`,
-        title: row.investor_name ? `Investor funds from ${row.investor_name}` : 'Investor funds',
-        subtitle: row.reference || new Date(row.date_received).toLocaleDateString('en-GH'),
-        amount: toNumber(row.amount),
-        direction: 'in' as const,
-        date: row.date_received,
-        icon: WalletCards,
-        tone: 'text-sky-400',
-      })),
-  ];
-
-  return entries
-    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
-    .slice(0, 6);
-}
-
-function buildSalesChart(sales: SaleRow[], year: number, month: number | null) {
-  const grouped = new Map<string, number>();
-
-  if (month === null) {
-    for (let index = 0; index < 12; index += 1) {
-      grouped.set(new Date(Date.UTC(year, index, 1)).toLocaleDateString('en-GH', { month: 'short' }), 0);
-    }
-
-    sales.forEach((sale) => {
-      const date = new Date(sale.sale_date);
-      if (date.getFullYear() !== year) return;
-      const key = new Date(Date.UTC(year, date.getMonth(), 1)).toLocaleDateString('en-GH', { month: 'short' });
-      grouped.set(key, (grouped.get(key) || 0) + getPaidAmount(sale));
-    });
-  } else {
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      grouped.set(String(day).padStart(2, '0'), 0);
-    }
-
-    sales.forEach((sale) => {
-      const date = new Date(sale.sale_date);
-      if (date.getFullYear() !== year || date.getMonth() !== month) return;
-      const key = String(date.getDate()).padStart(2, '0');
-      grouped.set(key, (grouped.get(key) || 0) + getPaidAmount(sale));
-    });
-  }
-
-  return Array.from(grouped.entries()).map(([label, value]) => ({ label, value }));
-}
-
-// Premium gradient KPI card used in the top row of the dashboard.
-function KpiCard({
-  title,
-  value,
-  icon: Icon,
-  helper,
-  gradient,
-  iconTint,
-  trend,
-  index = 0,
-  isCurrency = true,
-}: {
-  title: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  helper?: string;
-  gradient: string; // tailwind gradient classes for the soft background
-  iconTint: string; // tailwind classes for the icon chip
-  trend?: { value: number; label: string; direction: 'up' | 'down' | 'flat' } | null;
-  index?: number;
-  isCurrency?: boolean;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: index * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
-      whileHover={{ y: -3 }}
-      className="group relative"
-    >
-      {/* Glow */}
-      <div className={cn('pointer-events-none absolute -inset-px rounded-3xl opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-60', gradient)} />
-      <div className={cn(
-        'relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-5 backdrop-blur-xl shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:border-border',
-      )}>
-        {/* Soft gradient wash */}
-        <div className={cn('pointer-events-none absolute inset-0 opacity-70 bg-gradient-to-br', gradient)} />
-        {/* Decorative blob */}
-        <div className={cn('pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full blur-3xl opacity-30 bg-gradient-to-br', gradient)} />
-        <div className="relative flex items-start justify-between">
-          <div className="space-y-2 min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground tabular-nums">
-              {isCurrency
-                ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
-                : <AnimatedNumber value={value} />}
-            </p>
-            {trend ? (
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className={cn(
-                  'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold',
-                  trend.direction === 'up' && 'bg-emerald-500/15 text-emerald-500',
-                  trend.direction === 'down' && 'bg-rose-500/15 text-rose-500',
-                  trend.direction === 'flat' && 'bg-muted text-muted-foreground',
-                )}>
-                  {trend.direction === 'up' ? <ArrowUpRight className="h-3 w-3" /> : trend.direction === 'down' ? <ArrowDownRight className="h-3 w-3" /> : null}
-                  {trend.direction === 'flat' ? '0%' : `${trend.direction === 'up' ? '+' : '-'}${Math.abs(trend.value).toFixed(1)}%`}
-                </span>
-                <span className="text-muted-foreground truncate">{trend.label}</span>
-              </div>
-            ) : helper ? (
-              <p className="text-xs text-muted-foreground line-clamp-1">{helper}</p>
-            ) : null}
-          </div>
-          <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-inner ring-1 ring-inset ring-white/10', iconTint)}>
-            <Icon className="h-5 w-5" />
-          </span>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// Compact secondary metric (Stock Left, Other Income, etc).
-function MiniMetric({
-  title,
-  value,
-  icon: Icon,
-  helper,
-  valueClassName,
-  index = 0,
-  isCurrency = false,
-}: {
-  title: string;
-  value: number | string;
-  icon: React.ComponentType<{ className?: string }>;
-  helper?: string;
-  valueClassName?: string;
-  index?: number;
-  isCurrency?: boolean;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: 0.25 + index * 0.05 }}
-      className="group rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-sm transition-all hover:border-border hover:bg-card hover:-translate-y-0.5"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
-          <p className={cn('text-xl font-bold tabular-nums text-foreground', valueClassName)}>
-            {typeof value === 'number'
-              ? (isCurrency
-                  ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
-                  : <AnimatedNumber value={value} />)
-              : value}
-          </p>
-          {helper ? <p className="text-[11px] text-muted-foreground line-clamp-1">{helper}</p> : null}
-        </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-    </motion.div>
-  );
-}
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good Morning';
@@ -370,67 +153,286 @@ function getOnboardingCompletionKey(userId: string) {
   return `sikaflow_onboarding_complete_${userId}`;
 }
 
-// Tabbed analytics chart — area or bar with gradient fill + interactive tooltip.
-function AnalyticsChart({
-  data, dataKey, gradientId, stroke, stop1, stop2, emptyText, kind,
+type AnalyticsMetric = 'sales' | 'profit' | 'expenses';
+
+type AnalyticsPoint = {
+  label: string;
+  monthIndex: number;
+  sales: number;
+  profit: number;
+  expenses: number;
+};
+
+function buildYearlyAnalyticsData(data: DashboardData, year: number): AnalyticsPoint[] {
+  return Array.from({ length: 12 }, (_, monthIndex) => {
+    const from = startOfMonth(year, monthIndex);
+    const to = endOfMonth(year, monthIndex);
+    const sales = data.sales.filter((row) => inRange(row.sale_date, from, to));
+    const saleIds = new Set(sales.map((row) => row.id));
+    const financials = calculateBusinessFinancials({
+      sales: sales as any,
+      saleItems: data.saleItems.filter((item) => saleIds.has(item.sale_id)) as any,
+      products: data.products as any,
+      otherIncome: data.otherIncome.filter((row) => inRange(row.income_date, from, to)) as any,
+      expenses: data.expenses.filter((row) => inRange(row.expense_date, from, to)) as any,
+      savings: data.savings.filter((row) => inRange(row.savings_date, from, to)) as any,
+      investments: data.investments.filter((row) => inRange(row.investment_date, from, to)) as any,
+      investorFunds: data.investorFunds.filter((row) => inRange(row.date_received, from, to)) as any,
+      restocks: data.restocks.filter((row) => inRange(row.restock_date, from, to)) as any,
+      openingCashBalance: 0,
+    });
+
+    return {
+      label: new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-GH', { month: 'short' }),
+      monthIndex,
+      sales: financials.paidSalesRevenue,
+      profit: financials.profit,
+      expenses: financials.expenses,
+    };
+  });
+}
+
+function getMetricLabel(metric: AnalyticsMetric) {
+  if (metric === 'profit') return 'Profit';
+  if (metric === 'expenses') return 'Expenses';
+  return 'Sales';
+}
+
+function buildAnalyticsSummary(data: AnalyticsPoint[], metric: AnalyticsMetric, year: number) {
+  const values = data.map((row) => ({ row, value: row[metric] }));
+  const total = values.reduce((sum, entry) => sum + entry.value, 0);
+  const nonZero = values.filter((entry) => entry.value > 0);
+  const pool = nonZero.length > 0 ? nonZero : values;
+  const highest = pool.reduce((best, entry) => (entry.value > best.value ? entry : best), pool[0]);
+  const lowest = pool.reduce((best, entry) => (entry.value < best.value ? entry : best), pool[0]);
+  const label = getMetricLabel(metric);
+  const monthName = (entry: { row: AnalyticsPoint; value: number } | undefined) =>
+    entry
+      ? new Date(year, entry.row.monthIndex, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' })
+      : '—';
+
+  return {
+    total,
+    average: total / 12,
+    totalLabel: `Total ${label}`,
+    averageLabel: `Average Monthly ${label}`,
+    highest: highest ? `${monthName(highest)} (${formatCurrency(highest.value)})` : '—',
+    lowest: lowest ? `${monthName(lowest)} (${formatCurrency(lowest.value)})` : '—',
+  };
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const values = data.length > 1 ? data : [0, 0];
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = Math.max(1, max - min);
+  const points = values
+    .map((value, index) => {
+      const x = values.length === 1 ? 0 : (index / (values.length - 1)) * 100;
+      const y = 28 - ((value - min) / range) * 22 - 3;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+
+  return (
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" className="h-9 w-full overflow-visible">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function TrendLine({
+  trend,
+  positiveOnDown = false,
 }: {
-  data: { label: string; sales: number; profit: number; expenses: number }[];
-  dataKey: 'sales' | 'profit' | 'expenses';
+  trend: { value: number; label: string; direction: 'up' | 'down' | 'flat' };
+  positiveOnDown?: boolean;
+}) {
+  const direction = trend.direction;
+  const positive = direction === 'flat' ? null : positiveOnDown ? direction === 'down' : direction === 'up';
+  const Icon = direction === 'down' ? ArrowDownRight : ArrowUpRight;
+  const signedValue = direction === 'flat' ? '0.0%' : `${Math.abs(trend.value).toFixed(1)}%`;
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className={cn(
+        'inline-flex items-center gap-1 font-semibold',
+        positive === true && 'text-[#2df47e]',
+        positive === false && 'text-[#ff4f67]',
+        positive === null && 'text-slate-400',
+      )}>
+        {direction !== 'flat' ? <Icon className="h-3.5 w-3.5" /> : null}
+        {signedValue}
+      </span>
+      <span className="text-slate-400">{trend.label}</span>
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  index = 0,
+  isCurrency = true,
+  iconClassName,
+  glowClassName,
+  sparklineColor,
+  sparklineData,
+  positiveOnDown = false,
+}: {
+  title: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  trend: { value: number; label: string; direction: 'up' | 'down' | 'flat' };
+  index?: number;
+  isCurrency?: boolean;
+  iconClassName: string;
+  glowClassName: string;
+  sparklineColor: string;
+  sparklineData: number[];
+  positiveOnDown?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: index * 0.05 }}
+      whileHover={{ y: -3 }}
+      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+    >
+      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-45 transition-opacity group-hover:opacity-70', glowClassName)} />
+      <div className="relative flex h-full flex-col">
+        <div className="flex items-start gap-4">
+          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-lg ring-1 ring-white/10', iconClassName)}>
+            <Icon className="h-6 w-6" />
+          </span>
+          <div className="min-w-0 pt-1">
+            <p className="text-sm font-medium text-slate-200">{title}</p>
+            <p className="mt-3 whitespace-nowrap text-[22px] font-bold tracking-tight text-white tabular-nums sm:text-2xl">
+              {isCurrency ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} /> : <AnimatedNumber value={value} />}
+            </p>
+          </div>
+        </div>
+        <div className="mt-6">
+          <TrendLine trend={trend} positiveOnDown={positiveOnDown} />
+        </div>
+        <div className="mt-auto pt-5">
+          <Sparkline data={sparklineData} color={sparklineColor} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function MiniMetric({
+  title,
+  value,
+  icon: Icon,
+  helper,
+  iconClassName,
+  valueClassName,
+  index = 0,
+  isCurrency = false,
+}: {
+  title: string;
+  value: number | string;
+  icon: React.ComponentType<{ className?: string }>;
+  helper?: string;
+  iconClassName: string;
+  valueClassName?: string;
+  index?: number;
+  isCurrency?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
+      whileHover={{ y: -2 }}
+      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+    >
+      <div className="flex h-full items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-200">{title}</p>
+          <p className={cn('mt-3 text-2xl font-bold tracking-tight text-white tabular-nums', valueClassName)}>
+            {typeof value === 'number'
+              ? (isCurrency
+                  ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
+                  : <AnimatedNumber value={value} />)
+              : value}
+          </p>
+          {helper ? <p className="mt-3 truncate text-sm text-slate-400">{helper}</p> : null}
+        </div>
+        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-white/10', iconClassName)}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+function AnalyticsChart({
+  data,
+  dataKey,
+  gradientId,
+  stroke,
+  stop1,
+  stop2,
+  emptyText,
+  year,
+}: {
+  data: AnalyticsPoint[];
+  dataKey: AnalyticsMetric;
   gradientId: string;
   stroke: string;
   stop1: string;
   stop2: string;
   emptyText: string;
-  kind: 'area' | 'bar';
+  year: number;
 }) {
   const hasData = data.some((row) => (row[dataKey] as number) > 0);
   if (!hasData) {
     return (
-      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 text-sm text-muted-foreground">
+      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-[#223044] bg-[#090f18] text-sm text-slate-400">
         {emptyText}
       </div>
     );
   }
+
+  const metricLabel = getMetricLabel(dataKey);
+
   return (
-    <div className="h-[320px]">
+    <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
-        {kind === 'area' ? (
-          <AreaChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={stop1} stopOpacity={0.55} />
-                <stop offset="100%" stopColor={stop2} stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} stroke="hsl(var(--muted-foreground))" fontSize={11} />
-            <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={50} stroke="hsl(var(--muted-foreground))" fontSize={11} />
-            <RechartsTooltip
-              cursor={{ stroke, strokeOpacity: 0.2 }}
-              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
-              formatter={(value: number) => formatCurrency(value)}
-            />
-            <Area type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2.5} fill={`url(#${gradientId})`} animationDuration={700} />
-          </AreaChart>
-        ) : (
-          <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={stop1} stopOpacity={0.95} />
-                <stop offset="100%" stopColor={stop2} stopOpacity={0.4} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} stroke="hsl(var(--muted-foreground))" fontSize={11} />
-            <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={50} stroke="hsl(var(--muted-foreground))" fontSize={11} />
-            <RechartsTooltip
-              cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
-              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
-              formatter={(value: number) => formatCurrency(value)}
-            />
-            <Bar dataKey={dataKey} fill={`url(#${gradientId})`} radius={[8, 8, 0, 0]} animationDuration={700} />
-          </BarChart>
-        )}
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={stop1} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={stop2} stopOpacity={0.04} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="4 4" stroke="#253246" vertical={false} />
+          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#253246' }} tickMargin={12} stroke="#a7afbf" fontSize={12} />
+          <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={48} stroke="#a7afbf" fontSize={12} />
+          <RechartsTooltip
+            cursor={{ stroke, strokeOpacity: 0.35 }}
+            contentStyle={{ background: '#111827', border: '1px solid #243044', borderRadius: 10, color: '#f8fafc', fontSize: 12 }}
+            labelFormatter={(label) => `${label} ${year}`}
+            formatter={(value: number) => [formatCurrency(value), metricLabel]}
+          />
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            stroke={stroke}
+            strokeWidth={3}
+            fill={`url(#${gradientId})`}
+            dot={{ r: 4, strokeWidth: 2, stroke, fill: stroke }}
+            activeDot={{ r: 6, strokeWidth: 2, stroke: '#d8b4fe', fill: stroke }}
+            animationDuration={700}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
@@ -463,28 +465,18 @@ export default function Dashboard() {
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [analyticsMetric, setAnalyticsMetric] = useState<AnalyticsMetric>('sales');
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
-  const day = selectedDay === null ? null : Number(selectedDay);
-  const daysInSelectedMonth = month === null ? 31 : new Date(year, month + 1, 0).getDate();
   const dateRange = (() => {
     if (month === null) {
       return { from: startOfYear(year), to: endOfYear(year), label: String(year) };
     }
-    if (day === null) {
-      return {
-        from: startOfMonth(year, month),
-        to: endOfMonth(year, month),
-        label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
-      };
-    }
-    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return {
-      from: iso,
-      to: iso,
-      label: new Date(year, month, day).toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' }),
+      from: startOfMonth(year, month),
+      to: endOfMonth(year, month),
+      label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
     };
   })();
 
@@ -620,8 +612,6 @@ export default function Dashboard() {
     };
   }, [data, dateRange.from, dateRange.to]);
 
-  const metrics = useMemo(() => calculateDashboardTotals(filtered), [filtered]);
-
   // Filtered financials — respects the selected month/year filter for every
   // money card on the dashboard. Stock Left + Low Stock still use the full
   // product list (real-time inventory, not historical).
@@ -671,31 +661,19 @@ export default function Dashboard() {
 
   const todayInRange = inRange(new Date().toISOString(), dateRange.from, dateRange.to);
   const dailySales = useMemo(() => {
-    // Specific day selected → exact-day total
-    if (day !== null && month !== null) {
-      const target = new Date(year, month, day);
-      return sumTodaySales(data.sales, target);
-    }
     // Today falls within the selected month/year → live today's sales
     if (todayInRange) return sumTodaySales(data.sales);
     // Past/future period → period total
     return filteredFinancials.paidSalesRevenue;
-  }, [day, month, year, todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
+  }, [todayInRange, data.sales, filteredFinancials.paidSalesRevenue]);
+
   const yesterdaySales = useMemo(() => {
-    if (day !== null && month !== null) {
-      const target = new Date(year, month, day);
-      target.setDate(target.getDate() - 1);
-      return sumTodaySales(data.sales, target);
-    }
     if (!todayInRange) return 0;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return sumTodaySales(data.sales, yesterday);
-  }, [day, month, year, todayInRange, data.sales]);
-  const dailyDelta = useMemo(() => buildDailyDelta(dailySales, yesterdaySales), [dailySales, yesterdaySales]);
+  }, [todayInRange, data.sales]);
 
-  const salesChartData = useMemo(() => buildSalesChart(filtered.sales, year, month), [filtered.sales, month, year]);
-  const recentActivity = useMemo(() => buildRecentActivity(data, dateRange.from, dateRange.to), [data, dateRange.from, dateRange.to]);
   const lowStockProducts = useMemo(
     () =>
       data.products
@@ -736,37 +714,78 @@ export default function Dashboard() {
     });
   }, [data, dateRange.from, dateRange.to, financials.openingCash]);
 
-  // Combined series for the analytics chart tabs.
-  const analyticsChartData = useMemo(() => {
-    const buckets = new Map<string, { label: string; sales: number; expenses: number }>();
-    salesChartData.forEach((row) => {
-      buckets.set(row.label, { label: row.label, sales: row.value, expenses: 0 });
-    });
+  const periodSparklineData = useMemo(() => {
     if (month === null) {
-      data.expenses.forEach((row) => {
-        const date = new Date(row.expense_date);
-        if (date.getFullYear() !== year) return;
-        const key = new Date(Date.UTC(year, date.getMonth(), 1)).toLocaleDateString('en-GH', { month: 'short' });
-        const existing = buckets.get(key) || { label: key, sales: 0, expenses: 0 };
-        existing.expenses += toNumber(row.amount);
-        buckets.set(key, existing);
-      });
-    } else {
-      data.expenses.forEach((row) => {
-        const date = new Date(row.expense_date);
-        if (date.getFullYear() !== year || date.getMonth() !== month) return;
-        const key = String(date.getDate()).padStart(2, '0');
-        const existing = buckets.get(key) || { label: key, sales: 0, expenses: 0 };
-        existing.expenses += toNumber(row.amount);
-        buckets.set(key, existing);
+      return Array.from({ length: 12 }, (_, monthIndex) => {
+        const from = startOfMonth(year, monthIndex);
+        const to = endOfMonth(year, monthIndex);
+        const sales = data.sales.filter((row) => inRange(row.sale_date, from, to));
+        const saleIds = new Set(sales.map((row) => row.id));
+        const financials = calculateBusinessFinancials({
+          sales: sales as any,
+          saleItems: data.saleItems.filter((item) => saleIds.has(item.sale_id)) as any,
+          products: data.products as any,
+          otherIncome: data.otherIncome.filter((row) => inRange(row.income_date, from, to)) as any,
+          expenses: data.expenses.filter((row) => inRange(row.expense_date, from, to)) as any,
+          savings: data.savings.filter((row) => inRange(row.savings_date, from, to)) as any,
+          investments: data.investments.filter((row) => inRange(row.investment_date, from, to)) as any,
+          investorFunds: data.investorFunds.filter((row) => inRange(row.date_received, from, to)) as any,
+          restocks: data.restocks.filter((row) => inRange(row.restock_date, from, to)) as any,
+          openingCashBalance: 0,
+        });
+
+        return {
+          label: new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-GH', { month: 'short' }),
+          sales: financials.paidSalesRevenue,
+          expenses: financials.expenses,
+          profit: financials.profit,
+          businessMoney: financials.availableBusinessMoney,
+        };
       });
     }
-    return Array.from(buckets.values()).map((row) => ({
-      ...row,
-      profit: Math.max(0, row.sales - row.expenses),
-    }));
-  }, [salesChartData, data.expenses, year, month]);
 
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      const day = index + 1;
+      const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const sales = data.sales.filter((row) => inRange(row.sale_date, isoDate, isoDate));
+      const saleIds = new Set(sales.map((row) => row.id));
+      const financials = calculateBusinessFinancials({
+        sales: sales as any,
+        saleItems: data.saleItems.filter((item) => saleIds.has(item.sale_id)) as any,
+        products: data.products as any,
+        otherIncome: data.otherIncome.filter((row) => inRange(row.income_date, isoDate, isoDate)) as any,
+        expenses: data.expenses.filter((row) => inRange(row.expense_date, isoDate, isoDate)) as any,
+        savings: data.savings.filter((row) => inRange(row.savings_date, isoDate, isoDate)) as any,
+        investments: data.investments.filter((row) => inRange(row.investment_date, isoDate, isoDate)) as any,
+        investorFunds: data.investorFunds.filter((row) => inRange(row.date_received, isoDate, isoDate)) as any,
+        restocks: data.restocks.filter((row) => inRange(row.restock_date, isoDate, isoDate)) as any,
+        openingCashBalance: 0,
+      });
+
+      return {
+        label: String(day).padStart(2, '0'),
+        sales: financials.paidSalesRevenue,
+        expenses: financials.expenses,
+        profit: financials.profit,
+        businessMoney: financials.availableBusinessMoney,
+      };
+    });
+  }, [data, year, month]);
+
+  const yearlyAnalyticsData = useMemo(() => buildYearlyAnalyticsData(data, year), [data, year]);
+
+  const analyticsSummary = useMemo(
+    () => buildAnalyticsSummary(yearlyAnalyticsData, analyticsMetric, year),
+    [analyticsMetric, yearlyAnalyticsData, year],
+  );
+
+  const sparklineSeries = {
+    sales: periodSparklineData.map((row) => row.sales),
+    profit: periodSparklineData.map((row) => row.profit),
+    expenses: periodSparklineData.map((row) => row.expenses),
+    businessMoney: periodSparklineData.map((row) => row.businessMoney),
+  };
 
   if (loading || financialsLoading) {
     return (
@@ -780,11 +799,11 @@ export default function Dashboard() {
     );
   }
 
-  const isDefaultLiveView = month === null && day === null && year === currentYear;
+  const isDefaultLiveView = month === null && year === currentYear;
   const businessMoneyValue = isDefaultLiveView ? financials.availableBusinessMoney : cumulativeFinancials.availableBusinessMoney;
 
   const trends = {
-    dailySales: day !== null || todayInRange
+    dailySales: todayInRange
       ? computeTrend(dailySales, yesterdaySales)
       : computeTrend(filteredFinancials.paidSalesRevenue, previousFinancials.paidSalesRevenue),
     profit: computeTrend(filteredFinancials.profit, previousFinancials.profit),
@@ -797,57 +816,48 @@ export default function Dashboard() {
     : { ...trends.expenses, direction: trends.expenses.direction === 'up' ? 'down' as const : 'up' as const };
 
   const firstName = (displayName || business?.name || 'there').split(' ')[0];
-  const businessName = business?.name || 'your business';
 
   return (
     <AppLayout title="Dashboard">
-      <div className="space-y-6">
+      <div className="mx-auto max-w-[1530px] space-y-4">
         <SubscriptionBanner showAnnouncements={false} />
 
-        {/* HEADER */}
-        <motion.section
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-5 backdrop-blur-xl"
-        >
-          <div className="pointer-events-none absolute -top-24 -left-16 h-56 w-56 rounded-full bg-gradient-to-br from-violet-500/25 via-fuchsia-500/15 to-transparent blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -right-16 h-56 w-56 rounded-full bg-gradient-to-br from-cyan-400/20 via-blue-500/15 to-transparent blur-3xl" />
+        <div className="relative overflow-hidden rounded-[20px] border border-[#1f2a3a] bg-[#070b12] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
+          <div className="relative space-y-6">
+            {/* HEADER */}
+            <motion.section
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+            >
+              <div className="min-w-0 space-y-2">
+                <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white sm:text-[32px]">
+                  {getGreeting()}, {firstName} <span className="inline-block animate-[wave_1.6s_ease-in-out]">👋</span>
+                </h1>
+                <p className="text-sm text-slate-400 sm:text-base">Here&apos;s your business performance for {selectedYear}.</p>
+              </div>
 
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/90">{businessName}</p>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                {getGreeting()}, {firstName} <span className="inline-block animate-[wave_1.6s_ease-in-out]">👋</span>
-              </h1>
-              <p className="text-sm text-muted-foreground">Here&apos;s your business performance for {dateRange.label}.</p>
-            </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {hasModule('sales') ? (
+                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-violet-600 to-violet-500 px-5 text-white shadow-[0_12px_30px_rgba(124,58,237,0.25)] hover:from-violet-500 hover:to-violet-600">
+                    <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
+                  </Button>
+                ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedMonth === null ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonth(String(currentMonth))} className="rounded-full">
-                  + Month
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => { setSelectedMonth(null); setSelectedDay(null); }}>
-                  Year only
-                </Button>
-              )}
-
-              {selectedMonth !== null ? (
                 <Select
-                  value={selectedMonth}
+                  value={selectedMonth ?? 'all'}
                   onValueChange={(value) => {
-                    setSelectedMonth(value);
-                    if (selectedDay !== null) {
-                      const m = Number(value);
-                      const max = new Date(year, m + 1, 0).getDate();
-                      if (Number(selectedDay) > max) setSelectedDay(String(max));
-                    }
+                    setSelectedMonth(value === 'all' ? null : value);
                   }}
                 >
-                  <SelectTrigger className="h-9 w-[140px] rounded-full"><SelectValue placeholder="Month" /></SelectTrigger>
+                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-white ring-offset-[#070b12] focus:ring-violet-500/40">
+                    <CalendarDays className="mr-2 h-4 w-4 text-slate-300" />
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">Month</SelectItem>
                     {Array.from({ length: 12 }).map((_, index) => (
                       <SelectItem key={index} value={String(index)}>
                         {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
@@ -855,37 +865,19 @@ export default function Dashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-              ) : null}
 
-              {selectedMonth !== null ? (
-                <Select value={selectedDay ?? 'all'} onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}>
-                  <SelectTrigger className="h-9 w-[110px] rounded-full"><SelectValue placeholder="Day" /></SelectTrigger>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-white ring-offset-[#070b12] focus:ring-violet-500/40">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All days</SelectItem>
-                    {Array.from({ length: daysInSelectedMonth }).map((_, index) => (
-                      <SelectItem key={index + 1} value={String(index + 1)}>{index + 1}</SelectItem>
+                    {availableYears.map((availableYear) => (
+                      <SelectItem key={availableYear} value={String(availableYear)}>{availableYear}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : null}
-
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="h-9 w-[100px] rounded-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {availableYears.map((availableYear) => (
-                    <SelectItem key={availableYear} value={String(availableYear)}>{availableYear}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {hasModule('sales') ? (
-                <Button asChild size="sm" className="rounded-full gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 hover:opacity-95 shadow-md shadow-primary/30">
-                  <Link to="/sales?newSale=1"><Plus className="h-4 w-4" />New Sale</Link>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </motion.section>
+              </div>
+            </motion.section>
 
         {negativeStockProducts.length > 0 ? (
           <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
@@ -916,47 +908,66 @@ export default function Dashboard() {
             title="Daily Sales"
             value={dailySales}
             icon={ShoppingCart}
-            gradient="from-violet-500/15 to-fuchsia-500/5"
-            iconTint="bg-gradient-to-br from-violet-500/30 to-fuchsia-500/20 text-violet-400 dark:text-violet-300"
             trend={trends.dailySales}
-            helper={day !== null ? `Paid sales on ${dateRange.label}` : todayInRange ? dailyDelta.label : `Total in ${dateRange.label}`}
+            iconClassName="bg-violet-500/25 text-[#b46cff] shadow-[0_0_28px_rgba(139,92,246,0.35)]"
+            glowClassName="bg-violet-500"
+            sparklineColor="#9b5cff"
+            sparklineData={sparklineSeries.sales}
           />
           <KpiCard
             index={1}
             title="Total Profit"
             value={filteredFinancials.profit}
             icon={TrendingUp}
-            gradient="from-emerald-500/15 to-teal-500/5"
-            iconTint="bg-gradient-to-br from-emerald-500/30 to-teal-500/20 text-emerald-500 dark:text-emerald-300"
             trend={trends.profit}
-            helper={`Revenue − COGS − expenses`}
+            iconClassName="bg-emerald-500/25 text-[#38f085] shadow-[0_0_28px_rgba(34,197,94,0.28)]"
+            glowClassName="bg-emerald-500"
+            sparklineColor="#35df74"
+            sparklineData={sparklineSeries.profit}
           />
           <KpiCard
             index={2}
             title="Expenses"
             value={filteredFinancials.expenses}
             icon={Receipt}
-            gradient="from-rose-500/15 to-pink-500/5"
-            iconTint="bg-gradient-to-br from-rose-500/30 to-pink-500/20 text-rose-500 dark:text-rose-300"
             trend={expensesTrendDisplay}
-            helper={`Operating in ${dateRange.label}`}
+            iconClassName="bg-rose-500/25 text-[#ff5b72] shadow-[0_0_28px_rgba(244,63,94,0.28)]"
+            glowClassName="bg-rose-500"
+            sparklineColor="#fb4960"
+            sparklineData={sparklineSeries.expenses}
           />
           <KpiCard
             index={3}
             title="Available Business Money"
             value={businessMoneyValue}
             icon={WalletCards}
-            gradient="from-cyan-500/15 to-blue-500/5"
-            iconTint="bg-gradient-to-br from-cyan-500/30 to-blue-500/20 text-cyan-500 dark:text-cyan-300"
             trend={trends.businessMoney}
-            helper={isDefaultLiveView ? 'Live cash position' : `As of ${dateRange.label}`}
+            iconClassName="bg-blue-500/25 text-[#35c7ff] shadow-[0_0_28px_rgba(59,130,246,0.32)]"
+            glowClassName="bg-blue-500"
+            sparklineColor="#3f8cff"
+            sparklineData={sparklineSeries.businessMoney}
           />
         </div>
 
         {/* SECONDARY METRICS */}
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <MiniMetric index={0} title="Stock Left" value={financials.stockLeft} icon={Boxes} helper="Live inventory units" />
-          <MiniMetric index={1} title="Other Income" value={filteredFinancials.otherIncome} icon={HandCoins} isCurrency helper={`In ${dateRange.label}`} />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MiniMetric
+            index={0}
+            title="Stock Left"
+            value={financials.stockLeft}
+            icon={Boxes}
+            helper="Live inventory units"
+            iconClassName="bg-violet-500/15 text-[#a855f7]"
+          />
+          <MiniMetric
+            index={1}
+            title="Other Income"
+            value={filteredFinancials.otherIncome}
+            icon={HandCoins}
+            isCurrency
+            helper={`In ${selectedYear}`}
+            iconClassName="bg-emerald-500/15 text-[#35df74]"
+          />
           <MiniMetric
             index={2}
             title="Low Stock Alerts"
@@ -964,8 +975,17 @@ export default function Dashboard() {
             icon={AlertTriangle}
             valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((p) => p.name).join(', ') : 'No low-stock items'}
+            iconClassName="bg-amber-500/15 text-[#ff9f1c]"
           />
-          <MiniMetric index={3} title="Savings" value={filteredFinancials.savings} icon={WalletCards} isCurrency helper={`In ${dateRange.label}`} />
+          <MiniMetric
+            index={3}
+            title="Savings"
+            value={filteredFinancials.savings}
+            icon={WalletCards}
+            isCurrency
+            helper={`In ${selectedYear}`}
+            iconClassName="bg-sky-500/15 text-[#38bdf8]"
+          />
         </div>
 
         {setupRequired ? (
@@ -976,39 +996,72 @@ export default function Dashboard() {
             action={<Button onClick={() => setSetupDialogOpen(true)}>Start setup</Button>}
           />
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+          <div className="grid gap-5 xl:grid-cols-[1.85fr_1fr]">
             {/* ANALYTICS — TABBED CHART */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 backdrop-blur-xl"
+              className="relative overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
             >
-              <div className="pointer-events-none absolute -top-20 left-1/3 h-48 w-2/3 bg-gradient-to-r from-violet-500/15 via-fuchsia-500/10 to-cyan-500/10 blur-3xl" />
-              <div className="relative p-5">
-                <Tabs defaultValue="sales" className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-violet-500/14 via-fuchsia-500/10 to-cyan-500/10 blur-3xl" />
+              <div className="relative space-y-5 p-5 sm:p-6">
+                <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold tracking-tight">Business Analytics</h2>
-                      <p className="text-xs text-muted-foreground">{dateRange.label}</p>
+                      <h2 className="text-xl font-semibold tracking-tight text-white">Business Analytics</h2>
+                      <p className="mt-1 text-sm text-slate-400">{selectedYear}</p>
                     </div>
-                    <TabsList className="rounded-full bg-muted/60 p-1">
-                      <TabsTrigger value="sales" className="rounded-full text-xs">Sales</TabsTrigger>
-                      <TabsTrigger value="profit" className="rounded-full text-xs">Profit</TabsTrigger>
-                      <TabsTrigger value="expenses" className="rounded-full text-xs">Expenses</TabsTrigger>
-                    </TabsList>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <TabsList className="h-11 rounded-[9px] bg-[#0a111b] p-1">
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Expenses</TabsTrigger>
+                      </TabsList>
+                      <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-sm text-white ring-offset-[#070b12] focus:ring-violet-500/40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableYears.map((availableYear) => (
+                            <SelectItem key={availableYear} value={String(availableYear)}>
+                              {availableYear === currentYear ? 'This Year' : availableYear}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <TabsContent value="sales" className="mt-0">
-                    <AnalyticsChart data={analyticsChartData} dataKey="sales" gradientId="gradSales" stroke="hsl(280 75% 60%)" stop1="hsl(280 75% 60%)" stop2="hsl(200 90% 55%)" emptyText="No paid sales recorded for this period yet." kind="area" />
+                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#9b5cff" stop1="#8b5cf6" stop2="#111827" emptyText="No paid sales recorded for this year yet." year={year} />
                   </TabsContent>
                   <TabsContent value="profit" className="mt-0">
-                    <AnalyticsChart data={analyticsChartData} dataKey="profit" gradientId="gradProfit" stroke="hsl(160 70% 45%)" stop1="hsl(160 70% 45%)" stop2="hsl(180 80% 50%)" emptyText="No profit data for this period." kind="area" />
+                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="profit" gradientId="gradProfit" stroke="#35df74" stop1="#22c55e" stop2="#111827" emptyText="No profit data for this year." year={year} />
                   </TabsContent>
                   <TabsContent value="expenses" className="mt-0">
-                    <AnalyticsChart data={analyticsChartData} dataKey="expenses" gradientId="gradExp" stroke="hsl(350 75% 60%)" stop1="hsl(350 75% 60%)" stop2="hsl(20 90% 55%)" emptyText="No expenses recorded for this period." kind="bar" />
+                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="expenses" gradientId="gradExp" stroke="#fb4960" stop1="#f43f5e" stop2="#111827" emptyText="No expenses recorded for this year." year={year} />
                   </TabsContent>
                 </Tabs>
+
+                <div className="grid overflow-hidden rounded-[10px] border border-[#223044] bg-[#0a111b]/75 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="border-b border-[#223044] p-4 sm:border-r xl:border-b-0">
+                    <p className="text-sm text-slate-400">{analyticsSummary.totalLabel}</p>
+                    <p className="mt-2 text-base font-semibold text-white">{formatCurrency(analyticsSummary.total)}</p>
+                  </div>
+                  <div className="border-b border-[#223044] p-4 xl:border-b-0 xl:border-r">
+                    <p className="text-sm text-slate-400">{analyticsSummary.averageLabel}</p>
+                    <p className="mt-2 text-base font-semibold text-white">{formatCurrency(analyticsSummary.average)}</p>
+                  </div>
+                  <div className="border-b border-[#223044] p-4 sm:border-r sm:border-b-0">
+                    <p className="text-sm text-slate-400">Highest Month</p>
+                    <p className="mt-2 text-base font-semibold text-white">{analyticsSummary.highest}</p>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-sm text-slate-400">Lowest Month</p>
+                    <p className="mt-2 text-base font-semibold text-white">{analyticsSummary.lowest}</p>
+                  </div>
+                </div>
               </div>
             </motion.div>
 
@@ -1017,24 +1070,16 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.25 }}
-              className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/80 to-card/80 backdrop-blur-xl"
+              className="relative overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
             >
-              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/15 blur-3xl" />
-              <div className="relative p-5 space-y-4">
+              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+              <div className="relative flex h-full min-h-[470px] flex-col space-y-5 p-5 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500">
-                      <AlertTriangle className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-semibold">Low-Stock Alerts</h3>
-                      <p className="text-[11px] text-muted-foreground">{financials.lowStockCount} item(s) need attention</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-500">Live</span>
+                  <h3 className="text-xl font-semibold tracking-tight text-white">Low-Stock Alerts</h3>
+                  <span className="rounded-[7px] bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400">↯ Live</span>
                 </div>
 
-                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                <div className="flex flex-1 flex-col justify-center rounded-[12px] border border-[#223044] bg-[#090f18]/75 p-5">
                   {lowStockProducts.length > 0 ? lowStockProducts.map((product, idx) => {
                     const qty = toNumber(product.quantity);
                     const threshold = toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0);
@@ -1044,84 +1089,48 @@ export default function Dashboard() {
                         initial={{ opacity: 0, x: 12 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.35 + idx * 0.06 }}
-                        className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 px-3 py-2.5 backdrop-blur hover:border-amber-500/40 transition-colors"
+                        className="mb-3 flex items-center justify-between rounded-[10px] border border-[#223044] bg-[#0c121b] px-3 py-3 transition-colors hover:border-amber-500/40 last:mb-0"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-[11px] text-muted-foreground">Threshold: {threshold}</p>
+                          <p className="truncate text-sm font-semibold text-white">{product.name}</p>
+                          <p className="text-xs text-slate-400">Threshold: {threshold}</p>
                         </div>
                         <span className={cn(
                           'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
-                          qty <= 0 ? 'bg-rose-500/20 text-rose-500' : qty <= threshold / 2 ? 'bg-amber-500/20 text-amber-500' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
+                          qty <= 0 ? 'bg-rose-500/20 text-rose-400' : qty <= threshold / 2 ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/10 text-amber-300',
                         )}>
                           {qty} left
                         </span>
                       </motion.div>
                     );
                   }) : (
-                    <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
-                      All products are well stocked 🎉
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-800/80">
+                        <Package className="h-12 w-12 text-slate-400" />
+                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white shadow-[0_0_30px_rgba(124,58,237,0.35)]">
+                          <CheckCircle2 className="h-6 w-6" />
+                        </span>
+                      </div>
+                      <p className="text-base font-medium text-violet-100">All products are well stocked</p>
+                      <p className="mt-3 text-sm text-slate-400">Great job! No low-stock items at the moment.</p>
                     </div>
                   )}
                 </div>
 
                 {hasModule('inventory') ? (
-                  <Button asChild variant="outline" size="sm" className="w-full rounded-xl border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50">
-                    <Link to="/inventory">View Inventory</Link>
+                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-violet-500/40 bg-transparent text-violet-300 hover:border-violet-400 hover:bg-violet-500/10 hover:text-violet-100">
+                    <Link to="/inventory" className="flex items-center justify-center gap-2">
+                      View Inventory
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
                   </Button>
                 ) : null}
               </div>
             </motion.div>
           </div>
         )}
-
-        {/* RECENT ACTIVITY */}
-        {!setupRequired ? (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.35 }}
-            className="rounded-3xl border border-border/60 bg-card/80 backdrop-blur-xl p-5"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-base font-semibold tracking-tight">Recent Activity</h3>
-                <p className="text-xs text-muted-foreground">Sales, income, and expenses within {dateRange.label}</p>
-              </div>
-              <Sparkles className="h-4 w-4 text-muted-foreground" />
-            </div>
-
-            {recentActivity.length > 0 ? (
-              <div className="grid gap-2 md:grid-cols-2">
-                {recentActivity.map((entry, idx) => (
-                  <motion.div
-                    key={entry.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 + idx * 0.04 }}
-                    className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/40 p-3 hover:border-border transition-colors"
-                  >
-                    <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10', entry.tone)}>
-                      <entry.icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{entry.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{entry.subtitle}</p>
-                    </div>
-                    <p className={cn('text-sm font-semibold tabular-nums', entry.tone)}>
-                      {entry.direction === 'in' ? '+' : '-'}
-                      {formatCurrency(entry.amount)}
-                    </p>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-border/60 text-sm text-muted-foreground">
-                No activity for this period yet.
-              </div>
-            )}
-          </motion.div>
-        ) : null}
+          </div>
+        </div>
 
         <FirstTimeSetupDialog
           open={setupDialogOpen}
