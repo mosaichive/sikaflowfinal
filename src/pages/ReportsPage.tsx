@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
 import { formatCurrency, PAYMENT_METHODS } from '@/lib/constants';
@@ -20,8 +21,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, CalendarRange, Download, FileText, FilterX, PackageSearch, Receipt, TrendingUp, WalletCards } from 'lucide-react';
+import {
+  ArrowDownRight, ArrowUpRight, BarChart3, Boxes, Calculator, CalendarRange, ChevronDown, Coins,
+  Download, FileSpreadsheet, FileText, FilterX, LayoutGrid, LineChart as LineChartIcon, PackageSearch,
+  PiggyBank, Printer, Receipt, ScrollText, ShoppingCart, Sparkles, Tag, TrendingDown, TrendingUp,
+  Wallet, WalletCards, Eye,
+} from 'lucide-react';
 import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
 import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
