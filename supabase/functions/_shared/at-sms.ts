@@ -34,6 +34,14 @@ type AtRecipient = {
   messageId?: string;
 };
 
+function readSecret(...names: string[]) {
+  for (const name of names) {
+    const value = Deno.env.get(name)?.trim();
+    if (value) return value;
+  }
+  return '';
+}
+
 function recipientStatusToUserMessage(status: string | undefined): string {
   switch ((status || '').trim()) {
     case 'Success':
@@ -61,10 +69,10 @@ function recipientStatusToUserMessage(status: string | undefined): string {
 }
 
 export async function sendAtSms(to: string, message: string) {
-  const username = Deno.env.get('AT_USERNAME');
-  const apiKey = Deno.env.get('AT_API_KEY');
-  const from = Deno.env.get('AT_SENDER_ID') || '';
-  const allowSandbox = (Deno.env.get('AT_ALLOW_SANDBOX') || '').toLowerCase() === 'true';
+  const username = readSecret('AT_USERNAME', 'AFRICASTALKING_USERNAME', 'AFRICAS_TALKING_USERNAME');
+  const apiKey = readSecret('AT_API_KEY', 'AFRICASTALKING_API_KEY', 'AFRICAS_TALKING_API_KEY');
+  const from = readSecret('AT_SENDER_ID', 'AFRICASTALKING_SENDER_ID', 'AFRICAS_TALKING_SENDER_ID');
+  const allowSandbox = readSecret('AT_ALLOW_SANDBOX', 'AFRICASTALKING_ALLOW_SANDBOX', 'AFRICAS_TALKING_ALLOW_SANDBOX').toLowerCase() === 'true';
 
   if (!username || !apiKey) {
     console.error('[at-sms] missing AT_USERNAME or AT_API_KEY');
