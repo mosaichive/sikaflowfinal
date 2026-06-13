@@ -257,14 +257,14 @@ function TrendLine({
     <div className="flex items-center gap-2 text-sm">
       <span className={cn(
         'inline-flex items-center gap-1 font-semibold',
-        positive === true && 'text-[#2df47e]',
-        positive === false && 'text-[#ff4f67]',
-        positive === null && 'text-slate-400',
+        positive === true && 'text-emerald-600 dark:text-[#2df47e]',
+        positive === false && 'text-rose-600 dark:text-[#ff4f67]',
+        positive === null && 'text-slate-500 dark:text-slate-400',
       )}>
         {direction !== 'flat' ? <Icon className="h-3.5 w-3.5" /> : null}
         {signedValue}
       </span>
-      <span className="text-slate-400">{trend.label}</span>
+      <span className="text-slate-500 dark:text-slate-400">{trend.label}</span>
     </div>
   );
 }
@@ -294,23 +294,28 @@ function KpiCard({
   sparklineData: number[];
   positiveOnDown?: boolean;
 }) {
+  const formattedValue = isCurrency ? formatCurrency(value) : String(value);
+  const valueSizeClass = isCurrency && formattedValue.length >= 13
+    ? 'text-[clamp(1rem,1.12vw,1.15rem)]'
+    : 'text-[clamp(1.25rem,1.6vw,1.5rem)]';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       whileHover={{ y: -3 }}
-      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
     >
-      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-45 transition-opacity group-hover:opacity-70', glowClassName)} />
+      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-0 transition-opacity dark:opacity-45 dark:group-hover:opacity-70', glowClassName)} />
       <div className="relative flex h-full flex-col">
         <div className="flex items-start gap-4">
-          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-lg ring-1 ring-white/10', iconClassName)}>
+          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-black/5 dark:shadow-lg dark:ring-white/10', iconClassName)}>
             <Icon className="h-6 w-6" />
           </span>
-          <div className="min-w-0 pt-1">
-            <p className="text-sm font-medium text-slate-200">{title}</p>
-            <p className="mt-3 whitespace-nowrap text-[22px] font-bold tracking-tight text-white tabular-nums sm:text-2xl">
+          <div className="min-w-0 flex-1 pt-1">
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{title}</p>
+            <p className={cn('mt-3 whitespace-nowrap font-bold tracking-tight text-slate-950 tabular-nums dark:text-white', valueSizeClass)}>
               {isCurrency ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} /> : <AnimatedNumber value={value} />}
             </p>
           </div>
@@ -351,21 +356,21 @@ function MiniMetric({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
       whileHover={{ y: -2 }}
-      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
     >
       <div className="flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-200">{title}</p>
-          <p className={cn('mt-3 text-2xl font-bold tracking-tight text-white tabular-nums', valueClassName)}>
+          <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{title}</p>
+          <p className={cn('mt-3 whitespace-nowrap text-[clamp(1.35rem,1.7vw,1.5rem)] font-bold tracking-tight text-slate-950 tabular-nums dark:text-white', valueClassName)}>
             {typeof value === 'number'
               ? (isCurrency
                   ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
                   : <AnimatedNumber value={value} />)
               : value}
           </p>
-          {helper ? <p className="mt-3 truncate text-sm text-slate-400">{helper}</p> : null}
+          {helper ? <p className="mt-3 truncate text-sm text-slate-500 dark:text-slate-400">{helper}</p> : null}
         </div>
-        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-white/10', iconClassName)}>
+        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5 dark:ring-white/10', iconClassName)}>
           <Icon className="h-5 w-5" />
         </span>
       </div>
@@ -395,7 +400,7 @@ function AnalyticsChart({
   const hasData = data.some((row) => (row[dataKey] as number) > 0);
   if (!hasData) {
     return (
-      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-[#223044] bg-[#090f18] text-sm text-slate-400">
+      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 dark:border-[#223044] dark:bg-[#090f18] dark:text-slate-400">
         {emptyText}
       </div>
     );
@@ -413,12 +418,12 @@ function AnalyticsChart({
               <stop offset="100%" stopColor={stop2} stopOpacity={0.04} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="4 4" stroke="#253246" vertical={false} />
-          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#253246' }} tickMargin={12} stroke="#a7afbf" fontSize={12} />
-          <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={48} stroke="#a7afbf" fontSize={12} />
+          <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" vertical={false} />
+          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: 'hsl(var(--border))' }} tickMargin={12} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+          <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} width={48} stroke="hsl(var(--muted-foreground))" fontSize={12} />
           <RechartsTooltip
             cursor={{ stroke, strokeOpacity: 0.35 }}
-            contentStyle={{ background: '#111827', border: '1px solid #243044', borderRadius: 10, color: '#f8fafc', fontSize: 12 }}
+            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, color: 'hsl(var(--card-foreground))', fontSize: 12, boxShadow: '0 14px 34px rgba(15,23,42,0.12)' }}
             labelFormatter={(label) => `${label} ${year}`}
             formatter={(value: number) => [formatCurrency(value), metricLabel]}
           />
@@ -822,8 +827,8 @@ export default function Dashboard() {
       <div className="mx-auto max-w-[1530px] space-y-4">
         <SubscriptionBanner showAnnouncements={false} />
 
-        <div className="relative overflow-hidden rounded-[20px] border border-[#1f2a3a] bg-[#070b12] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
+        <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-[#f8fafc] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:border-[#1f2a3a] dark:bg-[#070b12] dark:shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.06),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
           <div className="relative space-y-6">
             {/* HEADER */}
             <motion.section
@@ -833,15 +838,15 @@ export default function Dashboard() {
               className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
             >
               <div className="min-w-0 space-y-2">
-                <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white sm:text-[32px]">
+                <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-[32px]">
                   {getGreeting()}, {firstName} <span className="inline-block animate-[wave_1.6s_ease-in-out]">👋</span>
                 </h1>
-                <p className="text-sm text-slate-400 sm:text-base">Here&apos;s your business performance for {selectedYear}.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 sm:text-base">Here&apos;s your business performance for {selectedYear}.</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 {hasModule('sales') ? (
-                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-violet-600 to-violet-500 px-5 text-white shadow-[0_12px_30px_rgba(124,58,237,0.25)] hover:from-violet-500 hover:to-violet-600">
+                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-violet-600 to-violet-500 px-5 text-white shadow-[0_12px_26px_rgba(124,58,237,0.22)] hover:from-violet-500 hover:to-violet-600 dark:shadow-[0_12px_30px_rgba(124,58,237,0.25)]">
                     <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
                   </Button>
                 ) : null}
@@ -852,8 +857,8 @@ export default function Dashboard() {
                     setSelectedMonth(value === 'all' ? null : value);
                   }}
                 >
-                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-white ring-offset-[#070b12] focus:ring-violet-500/40">
-                    <CalendarDays className="mr-2 h-4 w-4 text-slate-300" />
+                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
+                    <CalendarDays className="mr-2 h-4 w-4 text-slate-500 dark:text-slate-300" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -867,7 +872,7 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-white ring-offset-[#070b12] focus:ring-violet-500/40">
+                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -909,7 +914,7 @@ export default function Dashboard() {
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-violet-500/25 text-[#b46cff] shadow-[0_0_28px_rgba(139,92,246,0.35)]"
+            iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-500/25 dark:text-[#b46cff] dark:shadow-[0_0_28px_rgba(139,92,246,0.35)]"
             glowClassName="bg-violet-500"
             sparklineColor="#9b5cff"
             sparklineData={sparklineSeries.sales}
@@ -920,7 +925,7 @@ export default function Dashboard() {
             value={filteredFinancials.profit}
             icon={TrendingUp}
             trend={trends.profit}
-            iconClassName="bg-emerald-500/25 text-[#38f085] shadow-[0_0_28px_rgba(34,197,94,0.28)]"
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085] dark:shadow-[0_0_28px_rgba(34,197,94,0.28)]"
             glowClassName="bg-emerald-500"
             sparklineColor="#35df74"
             sparklineData={sparklineSeries.profit}
@@ -931,7 +936,7 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
-            iconClassName="bg-rose-500/25 text-[#ff5b72] shadow-[0_0_28px_rgba(244,63,94,0.28)]"
+            iconClassName="bg-rose-100 text-rose-600 dark:bg-rose-500/25 dark:text-[#ff5b72] dark:shadow-[0_0_28px_rgba(244,63,94,0.28)]"
             glowClassName="bg-rose-500"
             sparklineColor="#fb4960"
             sparklineData={sparklineSeries.expenses}
@@ -942,7 +947,7 @@ export default function Dashboard() {
             value={businessMoneyValue}
             icon={WalletCards}
             trend={trends.businessMoney}
-            iconClassName="bg-blue-500/25 text-[#35c7ff] shadow-[0_0_28px_rgba(59,130,246,0.32)]"
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff] dark:shadow-[0_0_28px_rgba(59,130,246,0.32)]"
             glowClassName="bg-blue-500"
             sparklineColor="#3f8cff"
             sparklineData={sparklineSeries.businessMoney}
@@ -957,7 +962,7 @@ export default function Dashboard() {
             value={financials.stockLeft}
             icon={Boxes}
             helper="Live inventory units"
-            iconClassName="bg-violet-500/15 text-[#a855f7]"
+            iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-[#a855f7]"
           />
           <MiniMetric
             index={1}
@@ -966,7 +971,7 @@ export default function Dashboard() {
             icon={HandCoins}
             isCurrency
             helper={`In ${selectedYear}`}
-            iconClassName="bg-emerald-500/15 text-[#35df74]"
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-[#35df74]"
           />
           <MiniMetric
             index={2}
@@ -975,7 +980,7 @@ export default function Dashboard() {
             icon={AlertTriangle}
             valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
             helper={lowStockProducts.length > 0 ? lowStockProducts.map((p) => p.name).join(', ') : 'No low-stock items'}
-            iconClassName="bg-amber-500/15 text-[#ff9f1c]"
+            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-[#ff9f1c]"
           />
           <MiniMetric
             index={3}
@@ -984,7 +989,7 @@ export default function Dashboard() {
             icon={WalletCards}
             isCurrency
             helper={`In ${selectedYear}`}
-            iconClassName="bg-sky-500/15 text-[#38bdf8]"
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-[#38bdf8]"
           />
         </div>
 
@@ -1002,24 +1007,24 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="relative overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
             >
-              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-violet-500/14 via-fuchsia-500/10 to-cyan-500/10 blur-3xl" />
+              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-violet-500/5 via-fuchsia-500/4 to-cyan-500/4 blur-3xl dark:from-violet-500/14 dark:via-fuchsia-500/10 dark:to-cyan-500/10" />
               <div className="relative space-y-5 p-5 sm:p-6">
                 <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold tracking-tight text-white">Business Analytics</h2>
-                      <p className="mt-1 text-sm text-slate-400">{selectedYear}</p>
+                      <h2 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Business Analytics</h2>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedYear}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
-                      <TabsList className="h-11 rounded-[9px] bg-[#0a111b] p-1">
-                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Sales</TabsTrigger>
-                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Profit</TabsTrigger>
-                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-300 data-[state=active]:bg-violet-600 data-[state=active]:text-white">Expenses</TabsTrigger>
+                      <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Expenses</TabsTrigger>
                       </TabsList>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-[#263247] bg-[#0a111b] px-4 text-sm text-white ring-offset-[#070b12] focus:ring-violet-500/40">
+                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1044,22 +1049,22 @@ export default function Dashboard() {
                   </TabsContent>
                 </Tabs>
 
-                <div className="grid overflow-hidden rounded-[10px] border border-[#223044] bg-[#0a111b]/75 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="border-b border-[#223044] p-4 sm:border-r xl:border-b-0">
-                    <p className="text-sm text-slate-400">{analyticsSummary.totalLabel}</p>
-                    <p className="mt-2 text-base font-semibold text-white">{formatCurrency(analyticsSummary.total)}</p>
+                <div className="grid overflow-hidden rounded-[10px] border border-slate-200 bg-white/80 shadow-sm dark:border-[#223044] dark:bg-[#0a111b]/75 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="border-b border-slate-200 p-4 dark:border-[#223044] sm:border-r xl:border-b-0">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{analyticsSummary.totalLabel}</p>
+                    <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{formatCurrency(analyticsSummary.total)}</p>
                   </div>
-                  <div className="border-b border-[#223044] p-4 xl:border-b-0 xl:border-r">
-                    <p className="text-sm text-slate-400">{analyticsSummary.averageLabel}</p>
-                    <p className="mt-2 text-base font-semibold text-white">{formatCurrency(analyticsSummary.average)}</p>
+                  <div className="border-b border-slate-200 p-4 dark:border-[#223044] xl:border-b-0 xl:border-r">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{analyticsSummary.averageLabel}</p>
+                    <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{formatCurrency(analyticsSummary.average)}</p>
                   </div>
-                  <div className="border-b border-[#223044] p-4 sm:border-r sm:border-b-0">
-                    <p className="text-sm text-slate-400">Highest Month</p>
-                    <p className="mt-2 text-base font-semibold text-white">{analyticsSummary.highest}</p>
+                  <div className="border-b border-slate-200 p-4 dark:border-[#223044] sm:border-r sm:border-b-0">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Highest Month</p>
+                    <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{analyticsSummary.highest}</p>
                   </div>
                   <div className="p-4">
-                    <p className="text-sm text-slate-400">Lowest Month</p>
-                    <p className="mt-2 text-base font-semibold text-white">{analyticsSummary.lowest}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Lowest Month</p>
+                    <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{analyticsSummary.lowest}</p>
                   </div>
                 </div>
               </div>
@@ -1070,16 +1075,16 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.25 }}
-              className="relative overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
             >
-              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/5 blur-3xl dark:bg-amber-500/10" />
               <div className="relative flex h-full min-h-[470px] flex-col space-y-5 p-5 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold tracking-tight text-white">Low-Stock Alerts</h3>
-                  <span className="rounded-[7px] bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400">↯ Live</span>
+                  <h3 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Low-Stock Alerts</h3>
+                  <span className="rounded-[7px] bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">↯ Live</span>
                 </div>
 
-                <div className="flex flex-1 flex-col justify-center rounded-[12px] border border-[#223044] bg-[#090f18]/75 p-5">
+                <div className="flex flex-1 flex-col justify-center rounded-[12px] border border-slate-200 bg-white p-5 shadow-sm dark:border-[#223044] dark:bg-[#090f18]/75">
                   {lowStockProducts.length > 0 ? lowStockProducts.map((product, idx) => {
                     const qty = toNumber(product.quantity);
                     const threshold = toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0);
@@ -1089,11 +1094,11 @@ export default function Dashboard() {
                         initial={{ opacity: 0, x: 12 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.35 + idx * 0.06 }}
-                        className="mb-3 flex items-center justify-between rounded-[10px] border border-[#223044] bg-[#0c121b] px-3 py-3 transition-colors hover:border-amber-500/40 last:mb-0"
+                        className="mb-3 flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:border-amber-400/60 dark:border-[#223044] dark:bg-[#0c121b] dark:hover:border-amber-500/40 last:mb-0"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-white">{product.name}</p>
-                          <p className="text-xs text-slate-400">Threshold: {threshold}</p>
+                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Threshold: {threshold}</p>
                         </div>
                         <span className={cn(
                           'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
@@ -1105,20 +1110,20 @@ export default function Dashboard() {
                     );
                   }) : (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-800/80">
-                        <Package className="h-12 w-12 text-slate-400" />
-                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white shadow-[0_0_30px_rgba(124,58,237,0.35)]">
+                      <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80">
+                        <Package className="h-12 w-12 text-slate-400 dark:text-slate-400" />
+                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white shadow-[0_14px_28px_rgba(124,58,237,0.22)] dark:shadow-[0_0_30px_rgba(124,58,237,0.35)]">
                           <CheckCircle2 className="h-6 w-6" />
                         </span>
                       </div>
-                      <p className="text-base font-medium text-violet-100">All products are well stocked</p>
-                      <p className="mt-3 text-sm text-slate-400">Great job! No low-stock items at the moment.</p>
+                      <p className="text-base font-medium text-slate-900 dark:text-violet-100">All products are well stocked</p>
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Great job! No low-stock items at the moment.</p>
                     </div>
                   )}
                 </div>
 
                 {hasModule('inventory') ? (
-                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-violet-500/40 bg-transparent text-violet-300 hover:border-violet-400 hover:bg-violet-500/10 hover:text-violet-100">
+                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-violet-500/50 bg-white text-violet-700 hover:border-violet-500 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/40 dark:bg-transparent dark:text-violet-300 dark:hover:border-violet-400 dark:hover:bg-violet-500/10 dark:hover:text-violet-100">
                     <Link to="/inventory" className="flex items-center justify-center gap-2">
                       View Inventory
                       <ChevronRight className="h-4 w-4" />
