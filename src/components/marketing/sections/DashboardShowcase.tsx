@@ -50,7 +50,7 @@ export function DashboardShowcase() {
         />
 
         <div className="relative mt-16">
-          <div className="absolute inset-x-10 top-10 h-72 bg-gradient-to-r from-violet-500/30 via-fuchsia-500/30 to-cyan-400/30 blur-3xl opacity-60 pointer-events-none" />
+          <div className="absolute inset-x-10 top-10 h-72 bg-gradient-to-r from-[#C7254E]/24 via-[#D6335B]/20 to-cyan-400/24 blur-3xl opacity-60 pointer-events-none" />
 
           <div className="relative z-10 mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="inline-flex w-full rounded-2xl border border-white/10 bg-white/[0.05] p-1 backdrop-blur sm:w-auto">
@@ -96,7 +96,7 @@ export function DashboardShowcase() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-5 shadow-[0_40px_120px_-30px_rgba(139,92,246,0.5)] sm:p-8"
+            className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-5 shadow-[0_8px_24px_rgba(199,37,78,0.12)] sm:p-8"
           >
             <div className="flex items-center justify-between border-b border-white/10 pb-5">
               <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ function DashboardPreview() {
       transition={{ duration: 0.35 }}
     >
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard icon={TrendingUp} label="Daily Sales" value={12480} prefix="GHS " accent="from-violet-500/20 to-fuchsia-500/5" />
+        <KpiCard icon={TrendingUp} label="Daily Sales" value={12480} prefix="GHS " accent="from-[#C7254E]/18 to-[#D6335B]/6" />
         <KpiCard icon={BarChart3} label="Profit" value={3920} prefix="GHS " accent="from-emerald-500/20 to-teal-500/5" />
         <KpiCard icon={Receipt} label="Expenses" value={1640} prefix="GHS " accent="from-rose-500/20 to-pink-500/5" />
         <KpiCard icon={Wallet} label="Business Money" value={24300} prefix="GHS " accent="from-cyan-500/20 to-blue-500/5" />
@@ -176,7 +176,7 @@ function DashboardPreview() {
                 whileInView={{ height: `${h}%` }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06, duration: 0.6 }}
-                className="flex-1 rounded-md bg-gradient-to-t from-violet-500 to-cyan-400 opacity-90"
+                className="flex-1 rounded-md bg-gradient-to-t from-[#C7254E] to-[#D6335B] opacity-90"
               />
             ))}
           </div>
@@ -215,7 +215,7 @@ function VideoPreview() {
       className="mt-6"
     >
       <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b0f15]/90 shadow-[0_30px_90px_-40px_rgba(34,211,238,0.55)]">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-cyan-400/10" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#C7254E]/10 via-transparent to-cyan-400/10" />
         <video
           className="relative aspect-video w-full bg-[#0b0f15] object-contain"
           src="/kuditrack-ads.mp4"
@@ -229,7 +229,7 @@ function VideoPreview() {
 
       <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-black">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C7254E] to-[#D6335B] text-white">
             <PlayCircle className="h-5 w-5" />
           </span>
           <div>
@@ -253,7 +253,7 @@ function MobileMockup() {
       transition={{ duration: 0.8, delay: 0.3 }}
       className="hidden xl:block absolute -right-6 -bottom-10 w-56 rounded-[2rem] border border-white/15 bg-[#0b0f15]/90 p-3 shadow-2xl backdrop-blur"
     >
-      <div className="h-72 rounded-[1.4rem] bg-gradient-to-br from-violet-900/40 to-cyan-900/40 p-4">
+      <div className="h-72 rounded-[1.4rem] bg-gradient-to-br from-[#C7254E]/28 to-cyan-900/36 p-4">
         <p className="text-[10px] uppercase tracking-widest text-white/50">Mobile</p>
         <p className="mt-1 text-xl font-bold">GHS 1,820</p>
         <p className="text-[10px] text-emerald-300">Today's profit</p>
@@ -265,7 +265,7 @@ function MobileMockup() {
                 whileInView={{ width: `${w}%` }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.5 + i * 0.1, duration: 0.8 }}
-                className="h-full bg-gradient-to-r from-violet-400 to-cyan-300"
+                className="h-full bg-gradient-to-r from-[#C7254E] to-[#D6335B]"
               />
             </div>
           ))}

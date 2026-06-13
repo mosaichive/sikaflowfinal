@@ -75,15 +75,15 @@ export function AdvertiseSection() {
                 transition={{ delay: i * 0.08 }}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur"
               >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-cyan-400/20 border border-white/10 flex items-center justify-center mb-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#C7254E]/24 to-cyan-400/16 border border-white/10 flex items-center justify-center mb-3">
                   <b.icon className="h-4 w-4 text-white" />
                 </div>
                 <p className="text-sm font-semibold">{b.title}</p>
                 <p className="text-xs text-white/60 mt-1.5 leading-relaxed">{b.desc}</p>
               </motion.div>
             ))}
-            <div className="sm:col-span-2 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 to-cyan-400/5 p-5">
-              <p className="text-xs uppercase tracking-widest text-violet-200">Estimated reach</p>
+            <div className="sm:col-span-2 rounded-2xl border border-[rgba(199,37,78,0.25)] bg-gradient-to-br from-[#C7254E]/10 to-cyan-400/5 p-5">
+              <p className="text-xs uppercase tracking-widest text-[#ff9aad]">Estimated reach</p>
               <p className="text-3xl font-bold mt-1">14,000+ <span className="text-sm font-normal text-white/60">monthly impressions</span></p>
             </div>
           </div>
@@ -93,7 +93,7 @@ export function AdvertiseSection() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-6 sm:p-8 shadow-[0_20px_60px_-20px_rgba(139,92,246,0.4)]"
+            className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
           >
             {success ? (
               <SuccessState onReset={() => setSuccess(false)} />
@@ -116,13 +116,13 @@ export function AdvertiseSection() {
                     onChange={onChange('message')}
                     rows={4}
                     placeholder="Tell us about your campaign..."
-                    className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus-visible:ring-violet-500"
+                    className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus-visible:ring-[#C7254E]"
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="w-full h-11 rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 text-black font-semibold hover:opacity-90"
+                  className="w-full h-11 rounded-full bg-gradient-to-r from-[#C7254E] to-[#D6335B] text-white font-semibold hover:opacity-90"
                 >
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Application'}
                 </Button>
@@ -153,7 +153,7 @@ export function Field({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus-visible:ring-violet-500"
+        className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus-visible:ring-[#C7254E]"
       />
     </div>
   );

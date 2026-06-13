@@ -31,9 +31,9 @@ const CATEGORIES: Category[] = [
     highlight: 'sales',
     subtitle: 'Sales, expenses & profit in one view',
     image: salesImage,
-    gradient: 'from-violet-500/40 via-fuchsia-500/20 to-transparent',
-    glow: 'from-violet-500/60 to-fuchsia-500/30',
-    accent: 'bg-violet-500',
+    gradient: 'from-[#C7254E]/35 via-[#D6335B]/18 to-transparent',
+    glow: 'from-[#C7254E]/45 to-[#D6335B]/24',
+    accent: 'bg-[#C7254E]',
     mockup: 'sales',
     features: [
       { icon: TrendingUp, label: 'Sales Tracking' },
@@ -134,7 +134,7 @@ export function FeaturesSection() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">{cat.eyebrow}</p>
                 <h3 className="text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-slate-950">
                   {cat.title}{' '}
-                  <span className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent italic">
+                  <span className="bg-gradient-to-r from-[#C7254E] via-[#D6335B] to-[#ff8aa2] bg-clip-text text-transparent italic">
                     {cat.highlight}
                   </span>
                 </h3>
@@ -165,7 +165,7 @@ export function FeaturesSection() {
         >
           <Button
             onClick={() => navigate('/sign-up')}
-            className="bg-gradient-to-r from-violet-500 to-cyan-400 text-black hover:opacity-90 rounded-full px-8 h-12 font-semibold text-base shadow-[0_0_40px_-5px_rgba(139,92,246,0.7)]"
+            className="bg-gradient-to-r from-[#C7254E] to-[#D6335B] text-white hover:opacity-90 rounded-full px-8 h-12 font-semibold text-base shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
           >
             Start Tracking Today <ArrowRight className="ml-1.5 h-4 w-4" />
           </Button>
@@ -197,7 +197,7 @@ function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }
           <div className="text-lg font-bold text-slate-900">GH₵ 12,480</div>
           <div className="mt-2 flex items-end gap-1 h-8">
             {[40, 65, 35, 80, 55, 90, 70].map((h, idx) => (
-              <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-violet-400 to-fuchsia-400" style={{ height: `${h}%` }} />
+              <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-[#C7254E] to-[#D6335B]" style={{ height: `${h}%` }} />
             ))}
           </div>
         </>
@@ -229,7 +229,7 @@ function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }
             <span className="text-pink-600 font-semibold">5 active</span>
           </div>
           {[
-            { name: 'Ama K.', role: 'Manager', color: 'bg-violet-500' },
+            { name: 'Ama K.', role: 'Manager', color: 'bg-[#C7254E]' },
             { name: 'Kwame O.', role: 'Sales', color: 'bg-cyan-500' },
             { name: 'Zola M.', role: 'Sales', color: 'bg-pink-500' },
           ].map((m) => (
@@ -265,7 +265,7 @@ export function SectionHeader({
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className={`text-xs font-semibold uppercase tracking-[0.2em] mb-3 ${isLight ? 'text-emerald-700' : 'text-violet-300'}`}
+          className={`text-xs font-semibold uppercase tracking-[0.2em] mb-3 ${isLight ? 'text-emerald-700' : 'text-[#ff9aad]'}`}
         >
           {eyebrow}
         </motion.p>

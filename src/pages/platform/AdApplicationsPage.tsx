@@ -101,7 +101,7 @@ export default function PlatformAdApplicationsPage() {
                   <Detail label="Budget" value={r.budget || '—'} />
                 </div>
                 {r.message && (
-                  <div className="text-sm whitespace-pre-wrap border-l-2 border-violet-500/40 pl-3 text-foreground/80">
+                  <div className="text-sm whitespace-pre-wrap border-l-2 border-primary/40 pl-3 text-foreground/80">
                     {r.message}
                   </div>
                 )}

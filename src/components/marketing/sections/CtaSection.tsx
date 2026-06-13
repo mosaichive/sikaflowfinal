@@ -12,13 +12,13 @@ export function CtaSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7 }}
-          className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-violet-700/30 via-fuchsia-600/20 to-cyan-500/30 p-10 sm:p-16 text-center"
+          className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-[#C7254E]/28 via-[#D6335B]/18 to-cyan-500/24 p-10 sm:p-16 text-center"
         >
           {/* Animated bg shapes */}
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-            className="absolute -top-40 -left-20 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-violet-500/40 to-transparent blur-3xl"
+            className="absolute -top-40 -left-20 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-[#C7254E]/32 to-transparent blur-3xl"
           />
           <motion.div
             animate={{ rotate: -360 }}

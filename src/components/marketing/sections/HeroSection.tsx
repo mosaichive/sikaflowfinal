@@ -21,7 +21,7 @@ const SLIDES = [
     key: "sales",
     label: "Sales Tracking",
     icon: TrendingUp,
-    accent: "from-violet-500 to-fuchsia-500",
+    accent: "from-[#C7254E] to-[#D6335B]",
     title: "Today's Sales",
     metric: 12480,
     sub: "+18% vs yesterday",
@@ -115,7 +115,7 @@ export function HeroSection() {
               className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight leading-[1.05]"
             >
               Track Sales.{" "}
-              <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#C7254E] via-[#D6335B] to-[#ff8aa2] bg-clip-text text-transparent">
                 Control Stock.
               </span>
               <br />
@@ -141,7 +141,7 @@ export function HeroSection() {
             >
               <Button
                 asChild
-                className="h-12 px-7 rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 text-black font-semibold hover:opacity-90 shadow-[0_0_40px_-5px_rgba(139,92,246,0.7)]"
+                className="h-12 px-7 rounded-full bg-gradient-to-r from-[#C7254E] to-[#D6335B] text-white font-semibold hover:opacity-90 shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
               >
                 <Link to="/sign-up">
                   Start Free <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -210,7 +210,7 @@ export function HeroSection() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative h-full rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl p-6 sm:p-8 shadow-[0_30px_120px_-30px_rgba(139,92,246,0.4)] overflow-hidden"
+              className="relative h-full rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl p-6 sm:p-8 shadow-[0_30px_120px_-30px_rgba(199,37,78,0.28)] overflow-hidden"
             >
               {/* glow ring */}
               <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/5 pointer-events-none" />
@@ -351,7 +351,7 @@ function FlyerSlider() {
       transition={{ duration: 0.7, delay: 0.45 }}
       className="relative mt-10 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 shadow-[0_30px_110px_-50px_rgba(34,211,238,0.55)] backdrop-blur-xl sm:mt-16 sm:rounded-[2rem] sm:p-5"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(139,92,246,0.22),transparent_34%),radial-gradient(circle_at_82%_26%,rgba(34,211,238,0.18),transparent_32%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(199,37,78,0.16),transparent_34%),radial-gradient(circle_at_82%_26%,rgba(34,211,238,0.18),transparent_32%)]" />
       <div className="relative flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-center">
         <div className="flex flex-col gap-5">
           <div>
@@ -400,7 +400,7 @@ function FlyerSlider() {
         </div>
 
         <div className="relative mx-auto w-full max-w-[320px] sm:max-w-[430px] lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <div className="absolute -inset-5 rounded-[2.4rem] bg-gradient-to-br from-violet-500/25 via-cyan-400/10 to-emerald-400/20 blur-2xl" />
+          <div className="absolute -inset-5 rounded-[2.4rem] bg-gradient-to-br from-[#C7254E]/20 via-cyan-400/10 to-emerald-400/20 blur-2xl" />
           <div className="relative overflow-hidden rounded-[1.7rem] border border-white/15 bg-black/20 p-2 shadow-2xl">
             <AnimatePresence mode="wait">
               <motion.img

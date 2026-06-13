@@ -29,7 +29,7 @@ export default function PlatformDashboard() {
       { label: 'Active Trials', value: profiles.filter((p: any) => p.subscription_status === 'trial').length, icon: Sparkles, tone: 'text-amber-500' },
       { label: 'Active Monthly', value: activeMonthly, icon: CheckCircle2, tone: 'text-emerald-500' },
       { label: 'Active Annual', value: activeAnnual, icon: CheckCircle2, tone: 'text-emerald-600' },
-      { label: 'Lifetime', value: profiles.filter((p: any) => p.subscription_plan === 'lifetime').length, icon: CheckCircle2, tone: 'text-purple-500' },
+      { label: 'Lifetime', value: profiles.filter((p: any) => p.subscription_plan === 'lifetime').length, icon: CheckCircle2, tone: 'text-primary' },
       { label: 'Expired', value: profiles.filter((p: any) => p.subscription_status === 'expired').length, icon: AlertCircle, tone: 'text-orange-500' },
       { label: 'Suspended', value: profiles.filter((p: any) => p.suspended).length, icon: XCircle, tone: 'text-red-500' },
       { label: 'Signups (30d)', value: profiles.filter((p: any) => new Date(p.created_at) > new Date(Date.now() - 30 * 86400000)).length, icon: Clock, tone: 'text-yellow-500' },

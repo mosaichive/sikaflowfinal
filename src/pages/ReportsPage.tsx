@@ -652,7 +652,7 @@ export default function ReportsPage() {
       value: formatCurrency(reportStats.operatingExpenses), delta: trend(reportStats.operatingExpenses, priorStats.operatingExpenses), invertDeltaColor: true },
     { label: 'COGS', icon: Calculator, accent: 'from-amber-500/25 to-amber-500/0', iconClass: 'text-amber-400 bg-amber-500/10',
       value: formatCurrency(reportStats.cogs), delta: trend(reportStats.cogs, priorStats.cogs), invertDeltaColor: true },
-    { label: 'Inventory Value', icon: Boxes, accent: 'from-violet-500/25 to-violet-500/0', iconClass: 'text-violet-400 bg-violet-500/10',
+    { label: 'Inventory Value', icon: Boxes, accent: 'from-[#C7254E]/18 to-[#C7254E]/0', iconClass: 'text-[#C7254E] bg-[rgba(199,37,78,0.12)]',
       value: financialsLoading ? '—' : formatCurrency(financials.stockValue), delta: 0 },
   ];
 

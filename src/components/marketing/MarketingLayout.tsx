@@ -182,7 +182,7 @@ export function MarketingLayout() {
 function Footer() {
   return (
     <footer className="relative border-t border-white/10 mt-20">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-violet-950/20 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#C7254E]/14 pointer-events-none" />
       <div className="relative max-w-7xl mx-auto px-5 sm:px-8 py-14">
         <div className="grid md:grid-cols-4 gap-10">
           <div>

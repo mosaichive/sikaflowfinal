@@ -385,6 +385,9 @@ function AnalyticsChart({
   stroke,
   stop1,
   stop2,
+  stop1Opacity = 0.55,
+  stop2Opacity = 0.04,
+  activeDotStroke,
   emptyText,
   year,
 }: {
@@ -394,6 +397,9 @@ function AnalyticsChart({
   stroke: string;
   stop1: string;
   stop2: string;
+  stop1Opacity?: number;
+  stop2Opacity?: number;
+  activeDotStroke?: string;
   emptyText: string;
   year: number;
 }) {
@@ -414,8 +420,8 @@ function AnalyticsChart({
         <AreaChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={stop1} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={stop2} stopOpacity={0.04} />
+              <stop offset="0%" stopColor={stop1} stopOpacity={stop1Opacity} />
+              <stop offset="100%" stopColor={stop2} stopOpacity={stop2Opacity} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" vertical={false} />
@@ -434,7 +440,7 @@ function AnalyticsChart({
             strokeWidth={3}
             fill={`url(#${gradientId})`}
             dot={{ r: 4, strokeWidth: 2, stroke, fill: stroke }}
-            activeDot={{ r: 6, strokeWidth: 2, stroke: '#d8b4fe', fill: stroke }}
+            activeDot={{ r: 6, strokeWidth: 2, stroke: activeDotStroke ?? stroke, fill: stroke }}
             animationDuration={700}
           />
         </AreaChart>
@@ -828,7 +834,7 @@ export default function Dashboard() {
         <SubscriptionBanner showAnnouncements={false} />
 
         <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-[#f8fafc] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:border-[#1f2a3a] dark:bg-[#070b12] dark:shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.06),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.06),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.14),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
           <div className="relative space-y-6">
             {/* HEADER */}
             <motion.section
@@ -846,7 +852,7 @@ export default function Dashboard() {
 
               <div className="flex flex-wrap items-center gap-3">
                 {hasModule('sales') ? (
-                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-violet-600 to-violet-500 px-5 text-white shadow-[0_12px_26px_rgba(124,58,237,0.22)] hover:from-violet-500 hover:to-violet-600 dark:shadow-[0_12px_30px_rgba(124,58,237,0.25)]">
+                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-[#C7254E] to-[#D6335B] px-5 text-white shadow-[0_8px_24px_rgba(199,37,78,0.12)] hover:from-[#D6335B] hover:to-[#C7254E] focus-visible:ring-[#C7254E]/40 dark:shadow-[0_8px_24px_rgba(199,37,78,0.16)]">
                     <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
                   </Button>
                 ) : null}
@@ -857,7 +863,7 @@ export default function Dashboard() {
                     setSelectedMonth(value === 'all' ? null : value);
                   }}
                 >
-                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
+                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
                     <CalendarDays className="mr-2 h-4 w-4 text-slate-500 dark:text-slate-300" />
                     <SelectValue />
                   </SelectTrigger>
@@ -872,7 +878,7 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
+                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -914,9 +920,9 @@ export default function Dashboard() {
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-500/25 dark:text-[#b46cff] dark:shadow-[0_0_28px_rgba(139,92,246,0.35)]"
-            glowClassName="bg-violet-500"
-            sparklineColor="#9b5cff"
+            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.18)] dark:text-[#ff7b96] dark:shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
+            glowClassName="bg-[#C7254E]"
+            sparklineColor="#C7254E"
             sparklineData={sparklineSeries.sales}
           />
           <KpiCard
@@ -962,7 +968,7 @@ export default function Dashboard() {
             value={financials.stockLeft}
             icon={Boxes}
             helper="Live inventory units"
-            iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-[#a855f7]"
+            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.15)] dark:text-[#ff7b96]"
           />
           <MiniMetric
             index={1}
@@ -1009,7 +1015,7 @@ export default function Dashboard() {
               transition={{ duration: 0.5, delay: 0.15 }}
               className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
             >
-              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-violet-500/5 via-fuchsia-500/4 to-cyan-500/4 blur-3xl dark:from-violet-500/14 dark:via-fuchsia-500/10 dark:to-cyan-500/10" />
+              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-[#C7254E]/5 via-[#D6335B]/4 to-cyan-500/4 blur-3xl dark:from-[#C7254E]/12 dark:via-[#D6335B]/8 dark:to-cyan-500/10" />
               <div className="relative space-y-5 p-5 sm:p-6">
                 <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1019,12 +1025,12 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
-                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Sales</TabsTrigger>
-                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Profit</TabsTrigger>
-                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white dark:text-slate-300">Expenses</TabsTrigger>
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
                       </TabsList>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-violet-500/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-violet-500/40">
+                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1039,7 +1045,7 @@ export default function Dashboard() {
                   </div>
 
                   <TabsContent value="sales" className="mt-0">
-                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#9b5cff" stop1="#8b5cf6" stop2="#111827" emptyText="No paid sales recorded for this year yet." year={year} />
+                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#C7254E" stop1="#C7254E" stop2="#C7254E" stop1Opacity={0.18} stop2Opacity={0.02} activeDotStroke="#D6335B" emptyText="No paid sales recorded for this year yet." year={year} />
                   </TabsContent>
                   <TabsContent value="profit" className="mt-0">
                     <AnalyticsChart data={yearlyAnalyticsData} dataKey="profit" gradientId="gradProfit" stroke="#35df74" stop1="#22c55e" stop2="#111827" emptyText="No profit data for this year." year={year} />
@@ -1112,18 +1118,18 @@ export default function Dashboard() {
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80">
                         <Package className="h-12 w-12 text-slate-400 dark:text-slate-400" />
-                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white shadow-[0_14px_28px_rgba(124,58,237,0.22)] dark:shadow-[0_0_30px_rgba(124,58,237,0.35)]">
+                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(199,37,78,0.25)] bg-[rgba(199,37,78,0.15)] text-[#C7254E] shadow-[0_8px_24px_rgba(199,37,78,0.12)] dark:text-[#ff7b96]">
                           <CheckCircle2 className="h-6 w-6" />
                         </span>
                       </div>
-                      <p className="text-base font-medium text-slate-900 dark:text-violet-100">All products are well stocked</p>
+                      <p className="text-base font-medium text-slate-900 dark:text-white">All products are well stocked</p>
                       <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Great job! No low-stock items at the moment.</p>
                     </div>
                   )}
                 </div>
 
                 {hasModule('inventory') ? (
-                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-violet-500/50 bg-white text-violet-700 hover:border-violet-500 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/40 dark:bg-transparent dark:text-violet-300 dark:hover:border-violet-400 dark:hover:bg-violet-500/10 dark:hover:text-violet-100">
+                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-[rgba(199,37,78,0.35)] bg-white text-[#C7254E] hover:border-[#C7254E] hover:bg-[rgba(199,37,78,0.08)] hover:text-[#C7254E] dark:border-[rgba(199,37,78,0.32)] dark:bg-transparent dark:text-[#ff7b96] dark:hover:border-[#D6335B] dark:hover:bg-[rgba(199,37,78,0.12)] dark:hover:text-white">
                     <Link to="/inventory" className="flex items-center justify-center gap-2">
                       View Inventory
                       <ChevronRight className="h-4 w-4" />

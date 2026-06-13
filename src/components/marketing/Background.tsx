@@ -7,7 +7,7 @@ export function GradientBlobs({ className = '' }: { className?: string }) {
       <motion.div
         animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0] }}
         transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full bg-violet-600/30 blur-[120px]"
+        className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full bg-[#C7254E]/24 blur-[120px]"
       />
       <motion.div
         animate={{ x: [0, -50, 30, 0], y: [0, 40, -20, 0] }}
