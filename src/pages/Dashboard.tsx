@@ -254,17 +254,17 @@ function TrendLine({
   const signedValue = direction === 'flat' ? '0.0%' : `${Math.abs(trend.value).toFixed(1)}%`;
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-[13px]">
       <span className={cn(
-        'inline-flex items-center gap-1 font-semibold',
+        'inline-flex shrink-0 items-center gap-1 font-semibold leading-none',
         positive === true && 'text-[#2df47e]',
         positive === false && 'text-[#ff4f67]',
         positive === null && 'text-slate-400',
       )}>
-        {direction !== 'flat' ? <Icon className="h-3.5 w-3.5" /> : null}
+        {direction !== 'flat' ? <Icon className="h-3 w-3" /> : null}
         {signedValue}
       </span>
-      <span className="text-slate-400">{trend.label}</span>
+      <span className="min-w-0 text-slate-400">{trend.label}</span>
     </div>
   );
 }
@@ -300,22 +300,23 @@ function KpiCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       whileHover={{ y: -3 }}
-      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="group relative flex min-h-[196px] overflow-hidden rounded-[14px] border border-[#243044] bg-[radial-gradient(circle_at_16%_0%,rgba(255,255,255,0.045),transparent_36%),linear-gradient(145deg,#0d1420_0%,#0a1018_70%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-5"
     >
-      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-45 transition-opacity group-hover:opacity-70', glowClassName)} />
-      <div className="relative flex h-full flex-col">
-        <div className="flex items-start gap-4">
-          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-lg ring-1 ring-white/10', iconClassName)}>
-            <Icon className="h-6 w-6" />
+      <div className={cn('pointer-events-none absolute -left-10 -top-12 h-32 w-32 rounded-full blur-3xl opacity-20 transition-opacity group-hover:opacity-30', glowClassName)} />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.018] via-transparent to-black/10" />
+      <div className="relative flex min-h-full w-full flex-col">
+        <div className="flex min-h-11 items-center gap-3">
+          <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-white/10', iconClassName)}>
+            <Icon className="h-5 w-5" />
           </span>
-          <div className="min-w-0 pt-1">
-            <p className="text-sm font-medium text-slate-200">{title}</p>
-            <p className="mt-3 whitespace-nowrap text-[22px] font-bold tracking-tight text-white tabular-nums sm:text-2xl">
-              {isCurrency ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} /> : <AnimatedNumber value={value} />}
-            </p>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold leading-snug text-slate-200 sm:text-[13px]">{title}</p>
           </div>
         </div>
-        <div className="mt-6">
+        <p className="mt-4 w-full whitespace-nowrap text-[clamp(1.22rem,1.65vw,1.72rem)] font-bold leading-tight tracking-tight text-white tabular-nums">
+          {isCurrency ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} /> : <AnimatedNumber value={value} />}
+        </p>
+        <div className="mt-4">
           <TrendLine trend={trend} positiveOnDown={positiveOnDown} />
         </div>
         <div className="mt-auto pt-5">
@@ -351,22 +352,22 @@ function MiniMetric({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
       whileHover={{ y: -2 }}
-      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="relative min-h-[138px] overflow-hidden rounded-[14px] border border-[#223044] bg-[#0c121b] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-6"
     >
-      <div className="flex h-full items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-200">{title}</p>
-          <p className={cn('mt-3 text-2xl font-bold tracking-tight text-white tabular-nums', valueClassName)}>
+      <div className="flex h-full items-center justify-between gap-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-tight text-slate-200 sm:text-base">{title}</p>
+          <p className={cn('mt-4 whitespace-nowrap text-[clamp(1.55rem,1.75vw,2rem)] font-bold leading-tight tracking-tight text-white tabular-nums', valueClassName)}>
             {typeof value === 'number'
               ? (isCurrency
                   ? <AnimatedNumber value={value} formatter={(n) => formatCurrency(n)} />
                   : <AnimatedNumber value={value} />)
               : value}
           </p>
-          {helper ? <p className="mt-3 truncate text-sm text-slate-400">{helper}</p> : null}
+          {helper ? <p className="mt-4 text-sm leading-snug text-slate-400 sm:text-base">{helper}</p> : null}
         </div>
-        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-white/10', iconClassName)}>
-          <Icon className="h-5 w-5" />
+        <span className={cn('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 ring-white/10', iconClassName)}>
+          <Icon className="h-6 w-6" />
         </span>
       </div>
     </motion.div>
@@ -902,14 +903,14 @@ export default function Dashboard() {
         ) : null}
 
         {/* TOP 4 KPI CARDS */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <KpiCard
             index={0}
             title="Daily Sales"
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-violet-500/25 text-[#b46cff] shadow-[0_0_28px_rgba(139,92,246,0.35)]"
+            iconClassName="bg-violet-500/18 text-[#b46cff] shadow-[0_0_14px_rgba(139,92,246,0.16)]"
             glowClassName="bg-violet-500"
             sparklineColor="#9b5cff"
             sparklineData={sparklineSeries.sales}
@@ -920,7 +921,7 @@ export default function Dashboard() {
             value={filteredFinancials.profit}
             icon={TrendingUp}
             trend={trends.profit}
-            iconClassName="bg-emerald-500/25 text-[#38f085] shadow-[0_0_28px_rgba(34,197,94,0.28)]"
+            iconClassName="bg-emerald-500/18 text-[#38f085] shadow-[0_0_14px_rgba(34,197,94,0.14)]"
             glowClassName="bg-emerald-500"
             sparklineColor="#35df74"
             sparklineData={sparklineSeries.profit}
@@ -931,7 +932,7 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
-            iconClassName="bg-rose-500/25 text-[#ff5b72] shadow-[0_0_28px_rgba(244,63,94,0.28)]"
+            iconClassName="bg-rose-500/18 text-[#ff5b72] shadow-[0_0_14px_rgba(244,63,94,0.14)]"
             glowClassName="bg-rose-500"
             sparklineColor="#fb4960"
             sparklineData={sparklineSeries.expenses}
@@ -942,7 +943,7 @@ export default function Dashboard() {
             value={businessMoneyValue}
             icon={WalletCards}
             trend={trends.businessMoney}
-            iconClassName="bg-blue-500/25 text-[#35c7ff] shadow-[0_0_28px_rgba(59,130,246,0.32)]"
+            iconClassName="bg-blue-500/18 text-[#35c7ff] shadow-[0_0_14px_rgba(59,130,246,0.16)]"
             glowClassName="bg-blue-500"
             sparklineColor="#3f8cff"
             sparklineData={sparklineSeries.businessMoney}
@@ -950,7 +951,7 @@ export default function Dashboard() {
         </div>
 
         {/* SECONDARY METRICS */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <MiniMetric
             index={0}
             title="Stock Left"
