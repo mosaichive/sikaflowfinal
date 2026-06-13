@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, FileClock
+  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, CreditCard, FileClock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -31,10 +31,11 @@ const allItems: { title: string; url: string; icon: any; module: ModuleKey }[] =
   { title: 'Support', url: '/support', icon: LifeBuoy, module: 'dashboard' },
   { title: 'Settings', url: '/settings', icon: Settings, module: 'settings' },
 ];
-const settingsSubItems: { title: string; section: string; icon: any }[] = [
+const settingsSubItems: { title: string; section: string; icon: any; url?: string }[] = [
   { title: 'Profile', section: 'profile', icon: User },
   { title: 'Sales Settings', section: 'sales', icon: DollarSign },
   { title: 'Bank', section: 'bank', icon: Landmark },
+  { title: 'Billing', section: 'billing', icon: CreditCard, url: '/billing' },
   { title: 'Audit Log', section: 'audit', icon: FileClock },
 ];
 
@@ -48,7 +49,7 @@ export function AppSidebar() {
   const { isDark, toggle } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const onSettings = location.pathname.startsWith('/settings');
+  const onSettings = location.pathname.startsWith('/settings') || location.pathname.startsWith('/billing');
   const currentSection = new URLSearchParams(location.search).get('s') || '';
   const [settingsOpen, setSettingsOpen] = useState(onSettings);
 
@@ -106,11 +107,11 @@ export function AppSidebar() {
                       {!collapsed && settingsOpen && (
                         <div className="mt-1 ml-7 flex flex-col gap-0.5 border-l border-border/60 pl-2 animate-fade-in">
                           {visibleSettingsSubItems.map((sub) => {
-                            const isActive = onSettings && currentSection === sub.section;
+                            const isActive = sub.url ? location.pathname.startsWith(sub.url) : location.pathname.startsWith('/settings') && currentSection === sub.section;
                             return (
                               <button
                                 key={sub.section}
-                                onClick={() => navigate(`/settings?s=${sub.section}`)}
+                                onClick={() => navigate(sub.url ?? `/settings?s=${sub.section}`)}
                                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
                               >
                                 <sub.icon className="h-3.5 w-3.5 shrink-0" />

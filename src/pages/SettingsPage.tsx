@@ -17,9 +17,8 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2, User, DollarSign, FileClock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2, User, DollarSign, CreditCard, FileClock } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
-import { ReferralProgramCard } from '@/components/settings/ReferralProgramCard';
 import { EmailVerificationCard } from '@/components/settings/EmailVerificationCard';
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
@@ -91,6 +90,7 @@ export default function SettingsPage() {
         { title: 'Profile', section: 'profile' as const, icon: User, description: 'Manage your photo, name, business display and account details.' },
         { title: 'Sales Settings', section: 'sales' as const, icon: DollarSign, description: 'Control inventory rules, opening cash and sales preferences.' },
         { title: 'Bank', section: 'bank' as const, icon: Landmark, description: 'Add and manage bank or mobile money accounts.' },
+        { title: 'Billing', section: 'billing' as const, icon: CreditCard, description: 'Manage your plan, renewals and payment history.', to: '/billing' },
         { title: 'Audit Log', section: 'audit' as const, icon: FileClock, description: 'Review recent system and team activity.' },
       ];
 
@@ -605,7 +605,7 @@ export default function SettingsPage() {
                     <button
                       key={category.section}
                       type="button"
-                      onClick={() => navigate(`/settings?s=${category.section}`)}
+                      onClick={() => navigate('to' in category ? category.to : `/settings?s=${category.section}`)}
                       className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/70 p-4 text-left shadow-sm backdrop-blur transition-colors hover:border-primary/40 hover:bg-secondary/70"
                     >
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -715,8 +715,6 @@ export default function SettingsPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Role</span><Badge variant={roleBadgeVariant(role || '')} className="capitalize">{role || 'No role'}</Badge></div>
           </CardContent>
         </Card>
-
-        <ReferralProgramCard />
 
         <EmailVerificationCard />
         <PhoneVerificationCard />
