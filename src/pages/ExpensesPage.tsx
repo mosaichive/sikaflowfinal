@@ -67,9 +67,8 @@ export default function ExpensesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [attachmentKey, setAttachmentKey] = useState(0);
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [form, setForm] = useState(defaultForm);
+  const [drafts, setDrafts] = useState<ExpenseRowDraft[]>(() => [makeDraft()]);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
 
   const canManage = isAdmin || isManager;
 
@@ -99,18 +98,25 @@ export default function ExpensesPage() {
   const total = filteredExpenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
   const hasDateFilter = !!dateFrom || !!dateTo;
 
-  const resetForm = () => {
-    setForm(defaultForm);
-    setReceiptFile(null);
-    setAttachmentKey((value) => value + 1);
+  const draftTotal = drafts.reduce((sum, row) => {
+    const n = Number(row.amount || 0);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+
+  const resetDrafts = () => {
+    setDrafts([makeDraft()]);
+    setRowErrors({});
   };
 
-  const handleReceiptChange = (file: File | null) => {
+  const updateDraft = (id: string, patch: Partial<ExpenseRowDraft>) => {
+    setDrafts((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const handleReceiptChange = (id: string, file: File | null) => {
     if (!file) {
-      setReceiptFile(null);
+      updateDraft(id, { receipt: null });
       return;
     }
-
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
       toast({
@@ -120,7 +126,6 @@ export default function ExpensesPage() {
       });
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: 'Receipt too large',
@@ -129,73 +134,94 @@ export default function ExpensesPage() {
       });
       return;
     }
-
-    setReceiptFile(file);
+    updateDraft(id, { receipt: file });
   };
 
-  const uploadReceipt = async () => {
-    if (!receiptFile || !businessId || !user) return null;
-    const safeName = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    // First path segment must equal auth.uid() to satisfy storage RLS.
-    const path = `${user.id}/${businessId}/${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from('expense-receipts').upload(path, receiptFile, { upsert: true });
+  const uploadReceipt = async (file: File) => {
+    if (!businessId || !user) return null;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const path = `${user.id}/${businessId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    const { error } = await supabase.storage.from('expense-receipts').upload(path, file, { upsert: true });
     if (error) throw error;
-    return { path, name: receiptFile.name };
+    return { path, name: file.name };
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || !businessId) return;
-    const amount = Number(form.amount || 0);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast({
-        title: 'Enter a valid amount',
-        description: 'Expense amount must be greater than zero.',
-        variant: 'destructive',
-      });
+
+    // Pre-validate
+    const errors: Record<string, string> = {};
+    drafts.forEach((row, index) => {
+      const amount = Number(row.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        errors[row.id] = `Row ${index + 1}: enter a valid amount.`;
+      }
+    });
+    if (Object.keys(errors).length > 0) {
+      setRowErrors(errors);
+      toast({ title: 'Check the highlighted rows', description: Object.values(errors)[0], variant: 'destructive' });
       return;
     }
 
     setLoading(true);
-    try {
-      let receipt: { path: string; name: string } | null = null;
-      let uploadFailed = false;
+    setRowErrors({});
+    const failures: { index: number; message: string }[] = [];
+    let successCount = 0;
+
+    for (let i = 0; i < drafts.length; i += 1) {
+      const row = drafts[i];
       try {
-        receipt = await uploadReceipt();
-      } catch (uploadError) {
-        uploadFailed = true;
-        logSupabaseError('expenses.receipt_upload', uploadError, { businessId, userId: user.id });
+        let receipt: { path: string; name: string } | null = null;
+        if (row.receipt) {
+          try {
+            receipt = await uploadReceipt(row.receipt);
+          } catch (uploadError) {
+            logSupabaseError('expenses.receipt_upload', uploadError, { businessId, userId: user.id });
+          }
+        }
+        await insertExpenseRecord({
+          user_id: effectiveBusinessOwnerId ?? user.id,
+          business_id: businessId,
+          category: row.category,
+          description: row.description.trim(),
+          amount: Number(row.amount || 0),
+          expense_date: row.expense_date,
+          payment_method: row.payment_method,
+          attachment_path: receipt?.path ?? null,
+          attachment_name: receipt?.name ?? null,
+          recorded_by: user.id,
+          recorded_by_name: displayName || user.email || 'Team member',
+        });
+        successCount += 1;
+      } catch (error) {
+        logSupabaseError('expenses.record', error, { businessId, userId: user.id, rowIndex: i });
+        const message = getErrorMessage(error);
+        failures.push({ index: i, message });
+        setRowErrors((prev) => ({ ...prev, [row.id]: `Row ${i + 1}: ${message}` }));
       }
-      await insertExpenseRecord({
-        user_id: effectiveBusinessOwnerId ?? user.id,
-        business_id: businessId,
-        category: form.category,
-        description: form.description.trim(),
-        amount,
-        expense_date: form.expense_date,
-        payment_method: form.payment_method,
-        attachment_path: receipt?.path ?? null,
-        attachment_name: receipt?.name ?? null,
-        recorded_by: user.id,
-        recorded_by_name: displayName || user.email || 'Team member',
-      });
+    }
+
+    setLoading(false);
+
+    if (failures.length === 0) {
       toast({
-        title: 'Expense recorded',
-        description: uploadFailed
-          ? 'Saved, but the receipt could not be uploaded. You can attach it again from the expense.'
-          : 'This expense now reduces available business money and profit.',
+        title: successCount > 1 ? `${successCount} expenses recorded` : 'Expense recorded',
+        description: 'Each entry now reduces available business money and profit.',
       });
-      resetForm();
+      resetDrafts();
       setOpen(false);
-    } catch (error) {
-      logSupabaseError('expenses.record', error, {
-        businessId,
-        userId: user.id,
-        hasReceipt: !!receiptFile,
+      void fetchExpenses();
+    } else {
+      toast({
+        title: `${failures.length} row${failures.length > 1 ? 's' : ''} failed`,
+        description: `${successCount} saved. Fix the highlighted row${failures.length > 1 ? 's' : ''} and try again.`,
+        variant: 'destructive',
       });
-      toast({ title: 'Could not record expense', description: getErrorMessage(error), variant: 'destructive' });
-    } finally {
-      setLoading(false);
+      // Keep only the failed drafts so user can retry
+      const failedIds = new Set(failures.map((f) => drafts[f.index].id));
+      setDrafts((current) => current.filter((row) => failedIds.has(row.id)));
+      void fetchExpenses();
     }
   };
 
