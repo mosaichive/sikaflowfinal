@@ -1117,9 +1117,9 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.25 }}
-              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-border bg-card"
             >
-              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/5 blur-3xl dark:bg-amber-500/10" />
+
               <div className="relative flex h-full min-h-[470px] flex-col space-y-5 p-5 sm:p-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Low-Stock Alerts</h3>
