@@ -305,9 +305,9 @@ function KpiCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       whileHover={{ y: -3 }}
-      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
     >
-      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-0 transition-opacity dark:opacity-45 dark:group-hover:opacity-70', glowClassName)} />
+
       <div className="relative flex h-full flex-col">
         <div className="flex items-start gap-4">
           <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-black/5 dark:shadow-lg dark:ring-white/10', iconClassName)}>
