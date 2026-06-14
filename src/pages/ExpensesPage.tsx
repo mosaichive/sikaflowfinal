@@ -287,78 +287,123 @@ export default function ExpensesPage() {
                 <X className="mr-1 h-4 w-4" /> Clear
               </Button>
             ) : null}
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) resetDrafts(); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="mr-2 h-4 w-4" /> Add Expense</Button>
               </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Record Expense</DialogTitle>
+                  <DialogTitle>Record Expenses</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {EXPENSE_CATEGORIES.map((category) => (
-                            <SelectItem key={category} value={category}>{category}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Payment Method</Label>
-                      <Select value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as typeof current.payment_method }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {PAYMENT_METHODS.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Amount (GH₵)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.amount}
-                        onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date</Label>
-                      <Input
-                        type="date"
-                        value={form.expense_date}
-                        onChange={(event) => setForm((current) => ({ ...current, expense_date: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Description</Label>
-                      <Textarea
-                        value={form.description}
-                        onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                        placeholder="What was this expense for?"
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Receipt (optional)</Label>
-                      <Input
-                        key={attachmentKey}
-                        type="file"
-                        accept=".jpg,.jpeg,.png,.webp,.pdf"
-                        onChange={(event) => handleReceiptChange(event.target.files?.[0] ?? null)}
-                      />
-                      <p className="text-xs text-muted-foreground">Upload a JPG, PNG, WEBP, or PDF receipt up to 5MB.</p>
-                    </div>
+                  <div className="space-y-4">
+                    {drafts.map((row, index) => {
+                      const error = rowErrors[row.id];
+                      return (
+                        <div key={row.id} className={`rounded-lg border p-4 space-y-3 ${error ? 'border-destructive/60 bg-destructive/5' : 'border-border bg-card'}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold">Expense #{index + 1}</p>
+                            {drafts.length > 1 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-destructive"
+                                onClick={() => setDrafts((current) => current.filter((r) => r.id !== row.id))}
+                                disabled={loading}
+                              >
+                                <Trash2 className="mr-1 h-4 w-4" /> Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <Label>Category</Label>
+                              <Select value={row.category} onValueChange={(value) => updateDraft(row.id, { category: value })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {EXPENSE_CATEGORIES.map((category) => (
+                                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Payment Method</Label>
+                              <Select value={row.payment_method} onValueChange={(value) => updateDraft(row.id, { payment_method: value })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {PAYMENT_METHODS.map((method) => (
+                                    <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Amount (GH₵)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={row.amount}
+                                onChange={(event) => updateDraft(row.id, { amount: event.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Date</Label>
+                              <Input
+                                type="date"
+                                value={row.expense_date}
+                                onChange={(event) => updateDraft(row.id, { expense_date: event.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5 md:col-span-2">
+                              <Label>Description</Label>
+                              <Textarea
+                                value={row.description}
+                                onChange={(event) => updateDraft(row.id, { description: event.target.value })}
+                                placeholder="What was this expense for?"
+                                rows={2}
+                              />
+                            </div>
+                            <div className="space-y-1.5 md:col-span-2">
+                              <Label>Receipt (optional)</Label>
+                              <Input
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                onChange={(event) => handleReceiptChange(row.id, event.target.files?.[0] ?? null)}
+                              />
+                              {row.receipt ? (
+                                <p className="text-xs text-muted-foreground">Attached: {row.receipt.name}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                          {error ? (
+                            <p className="text-xs font-medium text-destructive">{error}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Saving...' : 'Record Expense'}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setDrafts((current) => [...current, makeDraft()])}
+                    disabled={loading}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Add another expense
+                  </Button>
+
+                  <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-4 py-3">
+                    <span className="text-sm text-muted-foreground">Total ({drafts.length} {drafts.length === 1 ? 'entry' : 'entries'})</span>
+                    <span className="text-base font-semibold">{formatCurrency(draftTotal)}</span>
+                  </div>
+
+                  <Button type="submit" className="w-full bg-[#C7254E] hover:bg-[#A91D40] text-white" disabled={loading}>
+                    {loading ? 'Saving...' : drafts.length > 1 ? `Save ${drafts.length} Expenses` : 'Record Expense'}
                   </Button>
                 </form>
               </DialogContent>
