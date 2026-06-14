@@ -356,7 +356,7 @@ function MiniMetric({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
       whileHover={{ y: -2 }}
-      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
     >
       <div className="flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
