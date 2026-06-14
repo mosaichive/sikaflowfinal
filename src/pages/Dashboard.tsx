@@ -854,8 +854,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-[1530px] space-y-4">
         <SubscriptionBanner showAnnouncements={false} />
 
-        <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-[#f8fafc] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:border-[#1f2a3a] dark:bg-[#070b12] dark:shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.06),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.14),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
+        <div className="relative overflow-hidden rounded-[14px] border border-border bg-card p-4 sm:p-6">
           <div className="relative space-y-6">
             {/* HEADER */}
             <motion.section
@@ -868,15 +867,31 @@ export default function Dashboard() {
                 <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-[32px]">
                   {getGreeting()}, {firstName} <span className="inline-block animate-[wave_1.6s_ease-in-out]">👋</span>
                 </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 sm:text-base">Here&apos;s your business performance for {selectedYear}.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 sm:text-base">Here&apos;s your business performance for {dateRange.label}.</p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
                 {hasModule('sales') ? (
-                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-[#C7254E] to-[#D6335B] px-5 text-white shadow-[0_8px_24px_rgba(199,37,78,0.12)] hover:from-[#D6335B] hover:to-[#C7254E] focus-visible:ring-[#C7254E]/40 dark:shadow-[0_8px_24px_rgba(199,37,78,0.16)]">
+                  <Button asChild className="h-12 rounded-[8px] bg-[#C7254E] px-5 text-white hover:bg-[#A91D40]">
                     <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
                   </Button>
                 ) : null}
+
+                <Select
+                  value={selectedDay ?? 'all'}
+                  onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}
+                  disabled={month === null}
+                >
+                  <SelectTrigger className="h-12 w-[110px] rounded-[8px] border-border bg-card px-3 text-foreground">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Days</SelectItem>
+                    {Array.from({ length: daysInSelectedMonth }).map((_, index) => (
+                      <SelectItem key={index + 1} value={String(index + 1)}>{index + 1}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <Select
                   value={selectedMonth ?? 'all'}
@@ -884,12 +899,12 @@ export default function Dashboard() {
                     setSelectedMonth(value === 'all' ? null : value);
                   }}
                 >
-                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
-                    <CalendarDays className="mr-2 h-4 w-4 text-slate-500 dark:text-slate-300" />
+                  <SelectTrigger className="h-12 w-[140px] rounded-[8px] border-border bg-card px-3 text-foreground">
+                    <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Month</SelectItem>
+                    <SelectItem value="all">All Months</SelectItem>
                     {Array.from({ length: 12 }).map((_, index) => (
                       <SelectItem key={index} value={String(index)}>
                         {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
@@ -899,7 +914,7 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
+                  <SelectTrigger className="h-12 w-[120px] rounded-[8px] border-border bg-card px-3 text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
