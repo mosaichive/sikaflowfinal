@@ -1049,9 +1049,9 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-border bg-card"
             >
-              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-[#C7254E]/5 via-[#D6335B]/4 to-cyan-500/4 blur-3xl dark:from-[#C7254E]/12 dark:via-[#D6335B]/8 dark:to-cyan-500/10" />
+
               <div className="relative space-y-5 p-5 sm:p-6">
                 <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
