@@ -305,12 +305,12 @@ function KpiCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       whileHover={{ y: -3 }}
-      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
     >
-      <div className={cn('pointer-events-none absolute -left-12 -top-14 h-36 w-36 rounded-full blur-3xl opacity-0 transition-opacity dark:opacity-45 dark:group-hover:opacity-70', glowClassName)} />
+
       <div className="relative flex h-full flex-col">
         <div className="flex items-start gap-4">
-          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-black/5 dark:shadow-lg dark:ring-white/10', iconClassName)}>
+          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full ring-1 ring-black/5 dark:ring-white/10', iconClassName)}>
             <Icon className="h-6 w-6" />
           </span>
           <div className="min-w-0 flex-1 pt-1">
@@ -356,7 +356,7 @@ function MiniMetric({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
       whileHover={{ y: -2 }}
-      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
     >
       <div className="flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
@@ -476,13 +476,24 @@ export default function Dashboard() {
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [analyticsMetric, setAnalyticsMetric] = useState<AnalyticsMetric>('sales');
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
+  const day = selectedDay === null ? null : Number(selectedDay);
+  const daysInSelectedMonth = month === null ? 31 : new Date(year, month + 1, 0).getDate();
   const dateRange = (() => {
     if (month === null) {
       return { from: startOfYear(year), to: endOfYear(year), label: String(year) };
+    }
+    if (day !== null) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return {
+        from: iso,
+        to: iso,
+        label: new Date(year, month, day).toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' }),
+      };
     }
     return {
       from: startOfMonth(year, month),
@@ -490,6 +501,16 @@ export default function Dashboard() {
       label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
     };
   })();
+
+  // Reset day when month/year changes if it falls outside the new month
+  useEffect(() => {
+    if (selectedDay !== null && Number(selectedDay) > daysInSelectedMonth) {
+      setSelectedDay(null);
+    }
+    if (month === null && selectedDay !== null) {
+      setSelectedDay(null);
+    }
+  }, [month, year, selectedDay, daysInSelectedMonth]);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -833,8 +854,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-[1530px] space-y-4">
         <SubscriptionBanner showAnnouncements={false} />
 
-        <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-[#f8fafc] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:border-[#1f2a3a] dark:bg-[#070b12] dark:shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.06),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(199,37,78,0.14),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(14,165,233,0.12),transparent_28%)]" />
+        <div className="relative overflow-hidden rounded-[14px] border border-border bg-card p-4 sm:p-6">
           <div className="relative space-y-6">
             {/* HEADER */}
             <motion.section
@@ -847,15 +867,31 @@ export default function Dashboard() {
                 <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-[32px]">
                   {getGreeting()}, {firstName} <span className="inline-block animate-[wave_1.6s_ease-in-out]">👋</span>
                 </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 sm:text-base">Here&apos;s your business performance for {selectedYear}.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 sm:text-base">Here&apos;s your business performance for {dateRange.label}.</p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
                 {hasModule('sales') ? (
-                  <Button asChild className="h-12 rounded-[8px] bg-gradient-to-br from-[#C7254E] to-[#D6335B] px-5 text-white shadow-[0_8px_24px_rgba(199,37,78,0.12)] hover:from-[#D6335B] hover:to-[#C7254E] focus-visible:ring-[#C7254E]/40 dark:shadow-[0_8px_24px_rgba(199,37,78,0.16)]">
+                  <Button asChild className="h-12 rounded-[8px] bg-[#C7254E] px-5 text-white hover:bg-[#A91D40]">
                     <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
                   </Button>
                 ) : null}
+
+                <Select
+                  value={selectedDay ?? 'all'}
+                  onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}
+                  disabled={month === null}
+                >
+                  <SelectTrigger className="h-12 w-[110px] rounded-[8px] border-border bg-card px-3 text-foreground">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Days</SelectItem>
+                    {Array.from({ length: daysInSelectedMonth }).map((_, index) => (
+                      <SelectItem key={index + 1} value={String(index + 1)}>{index + 1}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <Select
                   value={selectedMonth ?? 'all'}
@@ -863,12 +899,12 @@ export default function Dashboard() {
                     setSelectedMonth(value === 'all' ? null : value);
                   }}
                 >
-                  <SelectTrigger className="h-12 w-[156px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
-                    <CalendarDays className="mr-2 h-4 w-4 text-slate-500 dark:text-slate-300" />
+                  <SelectTrigger className="h-12 w-[140px] rounded-[8px] border-border bg-card px-3 text-foreground">
+                    <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Month</SelectItem>
+                    <SelectItem value="all">All Months</SelectItem>
                     {Array.from({ length: 12 }).map((_, index) => (
                       <SelectItem key={index} value={String(index)}>
                         {new Date(2000, index, 1).toLocaleDateString('en-GH', { month: 'long' })}
@@ -878,7 +914,7 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-12 w-[136px] rounded-[8px] border-slate-200 bg-white px-4 text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
+                  <SelectTrigger className="h-12 w-[120px] rounded-[8px] border-border bg-card px-3 text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -920,7 +956,7 @@ export default function Dashboard() {
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.18)] dark:text-[#ff7b96] dark:shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
+            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.18)] dark:text-[#ff7b96]"
             glowClassName="bg-[#C7254E]"
             sparklineColor="#C7254E"
             sparklineData={sparklineSeries.sales}
@@ -931,7 +967,7 @@ export default function Dashboard() {
             value={filteredFinancials.profit}
             icon={TrendingUp}
             trend={trends.profit}
-            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085] dark:shadow-[0_0_28px_rgba(34,197,94,0.28)]"
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085]"
             glowClassName="bg-emerald-500"
             sparklineColor="#35df74"
             sparklineData={sparklineSeries.profit}
@@ -942,7 +978,7 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
-            iconClassName="bg-rose-100 text-rose-600 dark:bg-rose-500/25 dark:text-[#ff5b72] dark:shadow-[0_0_28px_rgba(244,63,94,0.28)]"
+            iconClassName="bg-rose-100 text-rose-600 dark:bg-rose-500/25 dark:text-[#ff5b72]"
             glowClassName="bg-rose-500"
             sparklineColor="#fb4960"
             sparklineData={sparklineSeries.expenses}
@@ -953,7 +989,7 @@ export default function Dashboard() {
             value={businessMoneyValue}
             icon={WalletCards}
             trend={trends.businessMoney}
-            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff] dark:shadow-[0_0_28px_rgba(59,130,246,0.32)]"
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff]"
             glowClassName="bg-blue-500"
             sparklineColor="#3f8cff"
             sparklineData={sparklineSeries.businessMoney}
@@ -1013,9 +1049,9 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-border bg-card"
             >
-              <div className="pointer-events-none absolute -top-24 left-1/4 h-56 w-2/3 bg-gradient-to-r from-[#C7254E]/5 via-[#D6335B]/4 to-cyan-500/4 blur-3xl dark:from-[#C7254E]/12 dark:via-[#D6335B]/8 dark:to-cyan-500/10" />
+
               <div className="relative space-y-5 p-5 sm:p-6">
                 <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1025,9 +1061,9 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
-                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
-                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
-                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
                       </TabsList>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
@@ -1081,9 +1117,9 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.25 }}
-              className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-[#223044] dark:bg-[#0c121b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+              className="relative overflow-hidden rounded-[14px] border border-border bg-card"
             >
-              <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/5 blur-3xl dark:bg-amber-500/10" />
+
               <div className="relative flex h-full min-h-[470px] flex-col space-y-5 p-5 sm:p-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Low-Stock Alerts</h3>
