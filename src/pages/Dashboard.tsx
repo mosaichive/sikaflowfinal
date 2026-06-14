@@ -476,13 +476,24 @@ export default function Dashboard() {
   const [localOnboardingCompleted, setLocalOnboardingCompleted] = useState(false);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [analyticsMetric, setAnalyticsMetric] = useState<AnalyticsMetric>('sales');
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
+  const day = selectedDay === null ? null : Number(selectedDay);
+  const daysInSelectedMonth = month === null ? 31 : new Date(year, month + 1, 0).getDate();
   const dateRange = (() => {
     if (month === null) {
       return { from: startOfYear(year), to: endOfYear(year), label: String(year) };
+    }
+    if (day !== null) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return {
+        from: iso,
+        to: iso,
+        label: new Date(year, month, day).toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' }),
+      };
     }
     return {
       from: startOfMonth(year, month),
@@ -490,6 +501,16 @@ export default function Dashboard() {
       label: new Date(year, month, 1).toLocaleDateString('en-GH', { month: 'long', year: 'numeric' }),
     };
   })();
+
+  // Reset day when month/year changes if it falls outside the new month
+  useEffect(() => {
+    if (selectedDay !== null && Number(selectedDay) > daysInSelectedMonth) {
+      setSelectedDay(null);
+    }
+    if (month === null && selectedDay !== null) {
+      setSelectedDay(null);
+    }
+  }, [month, year, selectedDay, daysInSelectedMonth]);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
