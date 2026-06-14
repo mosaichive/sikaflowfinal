@@ -310,7 +310,7 @@ function KpiCard({
 
       <div className="relative flex h-full flex-col">
         <div className="flex items-start gap-4">
-          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-black/5 dark:shadow-lg dark:ring-white/10', iconClassName)}>
+          <span className={cn('flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full ring-1 ring-black/5 dark:ring-white/10', iconClassName)}>
             <Icon className="h-6 w-6" />
           </span>
           <div className="min-w-0 flex-1 pt-1">
