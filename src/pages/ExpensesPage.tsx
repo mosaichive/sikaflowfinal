@@ -29,13 +29,25 @@ type ExpenseRow = {
   recorded_by_name: string | null;
 };
 
-const defaultForm = {
+type ExpenseRowDraft = {
+  id: string;
+  category: string;
+  description: string;
+  amount: string;
+  expense_date: string;
+  payment_method: string;
+  receipt: File | null;
+};
+
+const makeDraft = (): ExpenseRowDraft => ({
+  id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : String(Math.random()),
   category: EXPENSE_CATEGORIES[0] ?? 'Miscellaneous',
   description: '',
   amount: '',
   expense_date: new Date().toISOString().slice(0, 10),
   payment_method: PAYMENT_METHODS[0].value,
-};
+  receipt: null,
+});
 
 function matchesDateRange(dateValue: string, from: string, to: string) {
   const time = new Date(dateValue).getTime();
