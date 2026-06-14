@@ -956,7 +956,7 @@ export default function Dashboard() {
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.18)] dark:text-[#ff7b96] dark:shadow-[0_8px_24px_rgba(199,37,78,0.12)]"
+            iconClassName="bg-[rgba(199,37,78,0.12)] text-[#C7254E] dark:bg-[rgba(199,37,78,0.18)] dark:text-[#ff7b96]"
             glowClassName="bg-[#C7254E]"
             sparklineColor="#C7254E"
             sparklineData={sparklineSeries.sales}
@@ -967,7 +967,7 @@ export default function Dashboard() {
             value={filteredFinancials.profit}
             icon={TrendingUp}
             trend={trends.profit}
-            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085] dark:shadow-[0_0_28px_rgba(34,197,94,0.28)]"
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085]"
             glowClassName="bg-emerald-500"
             sparklineColor="#35df74"
             sparklineData={sparklineSeries.profit}
@@ -978,7 +978,7 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
-            iconClassName="bg-rose-100 text-rose-600 dark:bg-rose-500/25 dark:text-[#ff5b72] dark:shadow-[0_0_28px_rgba(244,63,94,0.28)]"
+            iconClassName="bg-rose-100 text-rose-600 dark:bg-rose-500/25 dark:text-[#ff5b72]"
             glowClassName="bg-rose-500"
             sparklineColor="#fb4960"
             sparklineData={sparklineSeries.expenses}
@@ -989,7 +989,7 @@ export default function Dashboard() {
             value={businessMoneyValue}
             icon={WalletCards}
             trend={trends.businessMoney}
-            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff] dark:shadow-[0_0_28px_rgba(59,130,246,0.32)]"
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff]"
             glowClassName="bg-blue-500"
             sparklineColor="#3f8cff"
             sparklineData={sparklineSeries.businessMoney}
@@ -1061,9 +1061,9 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
-                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
-                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
-                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#C7254E] data-[state=active]:to-[#D6335B] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#C7254E] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
                       </TabsList>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-[#C7254E]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#C7254E]/40">
