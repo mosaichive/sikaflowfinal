@@ -244,6 +244,18 @@ export default function StaffUsersPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label>Phone (optional, for SMS invite)</Label>
+                    <Input
+                      type="tel"
+                      placeholder="e.g. 0244123456 or +233244123456"
+                      value={form.phone}
+                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      If provided, we'll text the invite link to this number too.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Role</Label>
                     <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v, modules: modulesForRole(v) }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
