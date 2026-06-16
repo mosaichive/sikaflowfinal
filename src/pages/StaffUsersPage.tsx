@@ -17,6 +17,8 @@ import { Shield, Trash2, UserPlus, Users, Copy, Power, Settings2, Mail, RefreshC
 import { PermissionsEditor } from '@/components/PermissionsEditor';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 import { TEAM_ROLES, modulesForRole, type ModuleKey } from '@/lib/permissions';
+import { notifyTeamInvite, isPhoneSendable } from '@/lib/sms-notifications';
+import { normalizeGhanaPhone } from '@/lib/phone-otp';
 
 type MemberRow = {
   id: string;
@@ -49,8 +51,8 @@ export default function StaffUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const defaultRole = 'salesperson';
-  const [form, setForm] = useState<{ email: string; full_name: string; role: string; modules: ModuleKey[]; mode: 'link' | 'password'; password: string }>(
-    { email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' },
+  const [form, setForm] = useState<{ email: string; full_name: string; phone: string; role: string; modules: ModuleKey[]; mode: 'link' | 'password'; password: string }>(
+    { email: '', full_name: '', phone: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' },
   );
 
   const load = useCallback(async () => {
@@ -131,14 +133,27 @@ export default function StaffUsersPage() {
             display_name: form.full_name.trim() || null,
             permissions: { role: form.role, modules: form.modules },
           })
-          .select('token')
+          .select('id, token')
           .single();
         if (error) throw error;
         await copyLink(data.token);
         toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
+
+        const phone = form.phone.trim();
+        if (phone) {
+          if (!isPhoneSendable(phone)) {
+            toast({
+              title: 'Invitation created, but SMS could not be sent.',
+              description: 'The phone number does not look valid.',
+              variant: 'destructive',
+            });
+          } else {
+            void notifyTeamInvite(data.id, normalizeGhanaPhone(phone), inviteLink(data.token), toast);
+          }
+        }
       }
 
-      setForm({ email: '', full_name: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
+      setForm({ email: '', full_name: '', phone: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
       setInviteOpen(false);
       void load();
     } catch (err) {
