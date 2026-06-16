@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { notifySaleThanks, notifyLowStock } from '@/lib/sms-notifications';
 import { Plus, ShoppingCart, Trash2, Eye, Pencil, FileText, ReceiptText, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -392,6 +393,11 @@ export default function SalesPage() {
         .map((r) => `${r.product!.name} × ${r.qty}`)
         .join(', ');
       toast({ title: 'Sale recorded!', description: `${summary} — ${formatCurrency(total)}` });
+      // Fire-and-forget SMS notifications. Helpers never throw and surface
+      // only true delivery failures via the toast.
+      void notifySaleThanks(sale.id, toast);
+      const affectedProductIds = validLines.map((r) => r.product!.id).filter(Boolean) as string[];
+      void notifyLowStock(affectedProductIds);
       setPendingStockOverrideAction(null);
       resetForm();
       setOpen(false);

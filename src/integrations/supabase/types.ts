@@ -822,6 +822,9 @@ export type Database = {
           phone_verified_at: string | null
           referred_by_user_id: string | null
           role: string | null
+          sms_notify_low_stock: boolean
+          sms_notify_sale_thanks: boolean
+          sms_notify_team_invite: boolean
           subscription_end_date: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date: string | null
@@ -854,6 +857,9 @@ export type Database = {
           phone_verified_at?: string | null
           referred_by_user_id?: string | null
           role?: string | null
+          sms_notify_low_stock?: boolean
+          sms_notify_sale_thanks?: boolean
+          sms_notify_team_invite?: boolean
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date?: string | null
@@ -886,6 +892,9 @@ export type Database = {
           phone_verified_at?: string | null
           referred_by_user_id?: string | null
           role?: string | null
+          sms_notify_low_stock?: boolean
+          sms_notify_sale_thanks?: boolean
+          sms_notify_team_invite?: boolean
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date?: string | null
@@ -1312,6 +1321,45 @@ export type Database = {
           phone?: string
           purpose?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      sms_logs: {
+        Row: {
+          business_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          message_preview: string | null
+          notification_type: string
+          provider_response: Json | null
+          recipient_phone: string
+          reference_id: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_preview?: string | null
+          notification_type: string
+          provider_response?: Json | null
+          recipient_phone: string
+          reference_id?: string | null
+          status: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_preview?: string | null
+          notification_type?: string
+          provider_response?: Json | null
+          recipient_phone?: string
+          reference_id?: string | null
+          status?: string
         }
         Relationships: []
       }

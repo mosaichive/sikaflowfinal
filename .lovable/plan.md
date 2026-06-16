@@ -1,73 +1,52 @@
-# KudiTrack Marketing Site
+# SMS Notifications via Africa's Talking
 
-A new public marketing site, fully isolated from the existing app/dashboard. No changes to existing auth, business data, or financial logic.
+Build customer thank-you SMS, low-stock alerts, and team invitation SMS on top of the existing `_shared/at-sms.ts` helper (already supports optional `AT_SENDER_ID`, E.164 normalization, server-side credentials, and friendly error mapping). No frontend keys, no changes to RLS, auth, sales math, or inventory math.
 
-## 1. Routing
+> Note: Africa's Talking is currently returning **401 Unauthorized** for the configured `AT_USERNAME=Portfolio` + `AT_API_KEY`. The feature will be wired end-to-end, but SMS will only actually deliver once a working legacy AT key is in place. All call sites are designed to fail soft so the app keeps working in the meantime.
 
-- `/` → `MarketingLayout` + `HomePage` (single long-scroll page with all sections, anchor links for `#features`, `#pricing`, `#reviews`, `#advertise`, `#contact`, `#faq`).
-- Authenticated users hitting `/` still go to `/dashboard` (preserve current behavior via a small guard inside `HomePage`, redirecting if `user` exists).
-- Dedicated routes also exist and reuse the same layout, each rendering a focused section + the rest below:
-  - `/features`, `/pricing`, `/reviews`, `/advertise`, `/contact`, `/feedback`
-- All marketing routes wrapped in `<MarketingLayout>` (sticky transparent navbar + footer). The existing AuthProvider/Subscription stack still wraps everything so navbar can show "Dashboard" when logged in.
+## What gets built
 
-## 2. Design system (scoped, no impact on dashboard)
+### 1. Shared helper reuse
+- Reuse `supabase/functions/_shared/at-sms.ts` (already handles optional sender, normalization, sandbox guard, friendly errors).
+- Add a small `sms_logs` table + helper to record every send attempt.
 
-- Dark fintech aesthetic: deep navy/black backgrounds with violet→cyan→emerald gradient accents.
-- Glassmorphism cards, animated gradient blobs, soft glows, subtle grid backdrop.
-- Framer Motion (already installed) for scroll reveals, parallax, counters, hero carousel.
-- Mobile-first responsive.
-- Add a scoped CSS class layer (`.marketing-*`) so the dashboard's tokens stay untouched.
+### 2. New table: `sms_logs`
+Columns: `business_id`, `recipient_phone`, `notification_type` (`sale_thanks` | `low_stock` | `team_invite`), `message_preview` (first 160 chars), `provider_response` (jsonb), `status` (`sent` | `failed`), `error_message`, `created_at`. RLS: owner reads own logs, service_role full access, no anon. Indexed on `(business_id, notification_type, created_at)` for cooldown lookups.
 
-## 3. Sections (all on `/`)
+### 3. Notification preferences
+Add three boolean columns to `profiles` (default `true`):
+- `sms_notify_sale_thanks`
+- `sms_notify_low_stock`
+- `sms_notify_team_invite`
 
-1. **Sticky transparent Navbar** — Logo · Features · Pricing · Reviews · Advertise · Contact · Login · Get Started.
-2. **Hero** — Headline, sub, two CTAs, auto-rotating 3-slide showcase (Sales / Inventory / Analytics), floating glassy stat cards (Daily Sales, Profit, Low Stock), animated gradient blobs, animated counters.
-3. **Features** — 9 cards w/ icons, hover lift, gradient borders, scroll-reveal stagger.
-4. **Problem → Solution** — Split screen, "messy notebooks" vs organized dashboard, animated transition.
-5. **Dashboard Showcase** — Big floating mock dashboard panel, glowing floating KPI cards.
-6. **Reviews** — Auto-scrolling testimonial carousel, glass cards, star ratings.
-7. **Advertise** — Benefits grid + application form.
-8. **Pricing** — Free / Basic / Pro, monthly/yearly toggle, glowing recommended plan.
-9. **FAQ** — Animated accordion (reuse shadcn Accordion).
-10. **CTA** — Cinematic gradient band, big buttons.
-11. **Feedback / Contact** — Form (name, email, subject, message).
-12. **Footer** — Logo, links, socials, legal.
+Surface toggles in **Settings → Notifications** (new card on existing SettingsPage).
 
-## 4. Backend (new, isolated)
+### 4. Edge functions
 
-Two new tables, both with RLS:
+**`send-sale-thanks-sms`** — called from client after a sale row is successfully inserted. Inputs: `sale_id`. Server loads sale + business name, checks preference + customer phone validity, sends, logs. Returns `{ ok, reason? }` — never throws to caller.
 
-- `public.feedback_messages` — `id, name, email, subject, message, status (new|in_progress|resolved), created_at, resolved_at`.
-  - Anyone (anon + authenticated) can `INSERT`.
-  - Only `super_admin` can `SELECT/UPDATE/DELETE`.
-- `public.ad_applications` — `id, business_name, contact_name, email, phone, business_type, ad_goal, budget, message, status (pending|approved|rejected|contacted), created_at, reviewed_at, reviewed_by`.
-  - Anyone (anon + authenticated) can `INSERT`.
-  - Only `super_admin` can read/update/delete.
+**`send-low-stock-alert`** — called from client after a stock-changing mutation (sale, restock cancellation). Inputs: `product_id`. Server checks: threshold set, current stock ≤ threshold, preference on, no `sent` log for this product in last 24h. Recipients: owner phone + active staff with inventory permission and a phone on file. Logs each recipient.
 
-Both submitted from the public landing page without auth.
+**`send-team-invite-sms`** — called from `StaffUsersPage` invite flow after `staff_invites` row is created. Inputs: `invite_id`, `phone`, `invite_url`. Validates phone, sends, logs. Failure does not roll back invite.
 
-## 5. Super Admin additions
+All three use `verify_jwt = false` default + in-code JWT validation against `SUPABASE_JWKS` (matching existing pattern in other functions), and use `supabaseAdmin` for reads.
 
-Two new pages under `/super-admin`:
+### 5. Client wiring (presentation only)
+- **SalesPage / record-sale flow**: after successful insert, fire-and-forget `supabase.functions.invoke('send-sale-thanks-sms', { body: { sale_id } })`. On `{ ok: false }` show toast "Sale saved, but SMS could not be sent." Do not block UI.
+- **Inventory mutations** (sale insert, manual stock edit): same fire-and-forget to `send-low-stock-alert` per affected product.
+- **StaffUsersPage invite dialog**: add optional phone field; after invite is created, invoke `send-team-invite-sms`. On failure toast: "Invitation created, but SMS could not be sent."
+- **SettingsPage**: new "SMS Notifications" card with three switches bound to the new profile columns.
 
-- `/super-admin/feedback` — list, filter by status, mark resolved, delete. Realtime via Supabase channel, unread badge in `PlatformLayout` sidebar.
-- `/super-admin/ad-applications` — list, filter, approve/reject/mark contacted, copy contact info.
+### 6. Phone normalization
+Reuse `normalizePhone` from `_shared/at-sms.ts` server-side and `normalizeGhanaPhone` from `src/lib/phone-otp.ts` client-side for input validation feedback (rejecting invalid numbers before invoking).
 
-Sidebar links added to `PlatformLayout` with unread-count badges.
+### 7. Templates
+- Sale: `Thank you for buying from {business}. Your purchase of GHS {amount} has been recorded. We appreciate your business.`
+- Low stock: `Low stock alert: {product} has only {qty} left in {business}. Please restock soon.`
+- Invite: `You have been invited to join {business} on KudiTrack. Accept here: {url}`
 
-## 6. What I will NOT touch
+### 8. Out of scope (won't touch)
+- RLS on existing tables, auth flows, sales/inventory calculations, permissions model, existing OTP functions, AT credentials themselves.
 
-- `src/pages/Dashboard.tsx` and all tenant pages.
-- Auth flows, business/subscription contexts.
-- Existing tables, RLS policies, edge functions, financial calcs.
-- The Supabase client/types files.
-
-## Technical notes
-
-- New components live under `src/components/marketing/` and `src/pages/marketing/`.
-- Hero carousel uses existing embla carousel + autoplay via simple interval.
-- Counters use the existing `AnimatedNumber` component.
-- Form submissions use the existing Supabase client (`supabase.from('feedback_messages').insert(...)`) — works for anon thanks to the INSERT-only policy.
-- No new npm dependencies needed (framer-motion, embla, lucide, shadcn ui all present).
-
-If this matches what you want, I'll run the migration first (you'll approve it), then build the page and super-admin views.
+## Open question
+The 401 from AT is unresolved (legacy key needed). Should I proceed building the full feature now so it's ready to flip on the moment the key works, or wait until SMS delivery is confirmed end-to-end first?
