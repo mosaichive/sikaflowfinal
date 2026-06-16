@@ -22,6 +22,7 @@ import { ImageCropper } from '@/components/ImageCropper';
 import { EmailVerificationCard } from '@/components/settings/EmailVerificationCard';
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
+import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard';
 import { useToast } from '@/hooks/use-toast';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 
