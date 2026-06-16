@@ -393,6 +393,11 @@ export default function SalesPage() {
         .map((r) => `${r.product!.name} × ${r.qty}`)
         .join(', ');
       toast({ title: 'Sale recorded!', description: `${summary} — ${formatCurrency(total)}` });
+      // Fire-and-forget SMS notifications. Helpers never throw and surface
+      // only true delivery failures via the toast.
+      void notifySaleThanks(sale.id, toast);
+      const affectedProductIds = validLines.map((r) => r.product!.id).filter(Boolean) as string[];
+      void notifyLowStock(affectedProductIds);
       setPendingStockOverrideAction(null);
       resetForm();
       setOpen(false);
