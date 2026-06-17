@@ -90,6 +90,7 @@ export async function notifyTeamInvite(
   if (!res.ok && toast && !SILENT_REASONS.has(res.reason ?? '')) {
     toast({
       title: 'Invitation created, but SMS could not be sent.',
+      description: res.error || res.reason || undefined,
       variant: 'destructive',
     });
   }
