@@ -283,6 +283,13 @@ async function sendAfricasTalkingSms(to: string, message: string) {
 
 export async function sendAtSms(to: string, message: string) {
   const arkeselKey = readSecret('ARKESEL_API_KEY');
+  const atKey = readSecret('AT_API_KEY', 'AFRICASTALKING_API_KEY', 'AFRICAS_TALKING_API_KEY');
+  console.log('[sms] dispatch', {
+    to,
+    arkeselKeyDetected: Boolean(arkeselKey),
+    atKeyDetected: Boolean(atKey),
+    provider: arkeselKey ? 'arkesel' : (atKey ? 'africastalking' : 'none'),
+  });
   if (arkeselKey) {
     return await sendArkeselSms(arkeselKey, to, message);
   }
