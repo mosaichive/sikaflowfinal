@@ -47,6 +47,7 @@ export async function notifySaleThanks(saleId: string, toast?: ToastFn) {
   if (!res.ok && toast && !SILENT_REASONS.has(res.reason ?? '')) {
     toast({
       title: 'Sale saved, but SMS could not be sent.',
+      description: res.error || res.reason || undefined,
       variant: 'destructive',
     });
   }
