@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
         error_message: errMsg,
         reference_id: sale.id,
       });
-      return json({ ok: false, reason: 'send_failed' });
+      return json({ ok: false, reason: 'send_failed', error: errMsg });
     }
   } catch (err) {
     console.error('[send-sale-thanks-sms] unexpected', err);

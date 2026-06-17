@@ -10,16 +10,23 @@ import { normalizeGhanaPhone, isValidE164 } from '@/lib/phone-otp';
 
 type ToastFn = (opts: { title: string; description?: string; variant?: 'default' | 'destructive' }) => void;
 
-type SmsResult = { ok: boolean; reason?: string };
+type SmsResult = { ok: boolean; reason?: string; error?: string };
 
 async function invoke(fn: string, body: Record<string, unknown>): Promise<SmsResult> {
   try {
     const { data, error } = await supabase.functions.invoke(fn, { body });
-    if (error) return { ok: false, reason: 'invoke_error' };
+    if (error) {
+      console.error(`[sms] ${fn} invoke error`, error);
+      return { ok: false, reason: 'invoke_error', error: error.message };
+    }
     const result = (data ?? {}) as SmsResult;
-    return { ok: Boolean(result.ok), reason: result.reason };
-  } catch {
-    return { ok: false, reason: 'network_error' };
+    if (!result.ok) {
+      console.error(`[sms] ${fn} returned failure`, result);
+    }
+    return { ok: Boolean(result.ok), reason: result.reason, error: result.error };
+  } catch (err) {
+    console.error(`[sms] ${fn} threw`, err);
+    return { ok: false, reason: 'network_error', error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -40,6 +47,7 @@ export async function notifySaleThanks(saleId: string, toast?: ToastFn) {
   if (!res.ok && toast && !SILENT_REASONS.has(res.reason ?? '')) {
     toast({
       title: 'Sale saved, but SMS could not be sent.',
+      description: res.error || res.reason || undefined,
       variant: 'destructive',
     });
   }
@@ -82,6 +90,7 @@ export async function notifyTeamInvite(
   if (!res.ok && toast && !SILENT_REASONS.has(res.reason ?? '')) {
     toast({
       title: 'Invitation created, but SMS could not be sent.',
+      description: res.error || res.reason || undefined,
       variant: 'destructive',
     });
   }

@@ -69,8 +69,20 @@ async function sendArkeselSms(apiKey: string, to: string, message: string) {
   // missing/unapproved sender ID never blocks delivery.
   const sender = (configuredSender || ARKESEL_DEFAULT_SENDER).slice(0, 11);
 
+  console.log('[arkesel-sms] preparing send', {
+    apiKeyDetected: true,
+    apiKeyLength: apiKey.length,
+    apiKeyPrefix: apiKey.slice(0, 4) + '…',
+    senderIdConfigured: Boolean(configuredSender),
+    senderUsed: sender,
+    senderIsDefault: !configuredSender,
+    to,
+    messageLength: message.length,
+  });
+
   let res: Response;
-  let body: ArkeselResponse;
+  let rawBodyText = '';
+  let body: ArkeselResponse = {};
   try {
     res = await fetch('https://sms.arkesel.com/api/v2/sms/send', {
       method: 'POST',
@@ -85,31 +97,52 @@ async function sendArkeselSms(apiKey: string, to: string, message: string) {
         recipients: [to],
       }),
     });
-    body = (await res.json().catch(() => ({}))) as ArkeselResponse;
+    rawBodyText = await res.text();
+    try {
+      body = rawBodyText ? (JSON.parse(rawBodyText) as ArkeselResponse) : {};
+    } catch {
+      body = {};
+    }
   } catch (err) {
-    console.error('[arkesel-sms] network failure', err);
+    console.error('[arkesel-sms] network failure', {
+      to,
+      sender,
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
   }
 
   const status = String(body?.status ?? '').toLowerCase();
+  const providerMessage = String(body?.message ?? '').trim();
 
   if (!res.ok || (status && status !== 'success')) {
     console.error('[arkesel-sms] non-success response', {
       httpStatus: res.status,
-      body,
+      httpStatusText: res.statusText,
+      providerStatus: body?.status ?? null,
+      providerMessage: providerMessage || null,
+      providerCode: body?.code ?? null,
+      providerData: body?.data ?? null,
+      rawBody: rawBodyText.slice(0, 500),
       sender,
       to,
     });
+    const detail = providerMessage || rawBodyText.slice(0, 200) || `HTTP ${res.status}`;
     if (res.status === 401 || res.status === 403 || status === 'unauthorised' || status === 'unauthorized') {
-      throw new SmsConfigError('SMS provider rejected our credentials. Please contact support.');
+      throw new SmsConfigError(`Arkesel rejected our credentials (HTTP ${res.status}: ${detail}).`);
     }
-    throw new SmsDeliveryError(arkeselStatusToUserMessage(body?.status, body?.message), body);
+    throw new SmsDeliveryError(
+      `Arkesel ${arkeselStatusToUserMessage(body?.status, body?.message)} [HTTP ${res.status}: ${detail}]`,
+      { httpStatus: res.status, body, rawBody: rawBodyText.slice(0, 500) },
+    );
   }
 
   console.log('[arkesel-sms] queued', {
+    httpStatus: res.status,
     to,
     sender,
-    status: body?.status,
+    providerStatus: body?.status,
+    providerMessage: providerMessage || null,
   });
   return body;
 }
@@ -250,6 +283,13 @@ async function sendAfricasTalkingSms(to: string, message: string) {
 
 export async function sendAtSms(to: string, message: string) {
   const arkeselKey = readSecret('ARKESEL_API_KEY');
+  const atKey = readSecret('AT_API_KEY', 'AFRICASTALKING_API_KEY', 'AFRICAS_TALKING_API_KEY');
+  console.log('[sms] dispatch', {
+    to,
+    arkeselKeyDetected: Boolean(arkeselKey),
+    atKeyDetected: Boolean(atKey),
+    provider: arkeselKey ? 'arkesel' : (atKey ? 'africastalking' : 'none'),
+  });
   if (arkeselKey) {
     return await sendArkeselSms(arkeselKey, to, message);
   }
