@@ -6,10 +6,9 @@
 //
 // Environment variables:
 //   ARKESEL_API_KEY    - Arkesel API key (preferred provider)
-//   ARKESEL_SENDER_ID  - Optional. Approved alphanumeric sender (<= 11 chars).
-//                        If absent we use the Arkesel platform default sender
-//                        "Arkesel" so delivery is not blocked while waiting
-//                        for sender ID approval.
+//   ARKESEL_SENDER_ID  - Optional approved alphanumeric sender ID.
+//                        If absent, no sender field is sent so Arkesel can
+//                        use the account default sender.
 //
 //   Legacy fallback only:
 //     AT_USERNAME, AT_API_KEY, AT_SENDER_ID, AT_ALLOW_SANDBOX
@@ -45,11 +44,24 @@ function readSecret(...names: string[]) {
 type ArkeselResponse = {
   status?: string;
   message?: string;
+  description?: string;
+  error?: string;
   data?: unknown;
-  code?: string;
+  code?: string | number;
 };
 
-const ARKESEL_DEFAULT_SENDER = 'Arkesel';
+function parseArkeselResponse(text: string): ArkeselResponse {
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text) as ArkeselResponse;
+  } catch {
+    return {};
+  }
+}
+
+function arkeselResponseForLog(body: ArkeselResponse, rawBodyText: string) {
+  return Object.keys(body).length > 0 ? body : rawBodyText.slice(0, 500);
+}
 
 function arkeselStatusToUserMessage(status: string | undefined, message: string | undefined) {
   const s = (status || '').toLowerCase();
@@ -64,25 +76,28 @@ function arkeselStatusToUserMessage(status: string | undefined, message: string 
 }
 
 async function sendArkeselSms(apiKey: string, to: string, message: string) {
-  const configuredSender = readSecret('ARKESEL_SENDER_ID');
-  // Sender ID is required by Arkesel; fall back to the platform default so a
-  // missing/unapproved sender ID never blocks delivery.
-  const sender = (configuredSender || ARKESEL_DEFAULT_SENDER).slice(0, 11);
+  const sender = readSecret('ARKESEL_SENDER_ID');
+  const senderForLog = sender || '(default)';
+  const payload: { message: string; recipients: string[]; sender?: string } = {
+    message,
+    recipients: [to],
+  };
+
+  if (sender) {
+    payload.sender = sender;
+  }
 
   console.log('[arkesel-sms] preparing send', {
-    apiKeyDetected: true,
-    apiKeyLength: apiKey.length,
-    apiKeyPrefix: apiKey.slice(0, 4) + '…',
-    senderIdConfigured: Boolean(configuredSender),
-    senderUsed: sender,
-    senderIsDefault: !configuredSender,
     to,
+    sender: senderForLog,
+    hasSenderField: Boolean(sender),
     messageLength: message.length,
   });
 
-  let res: Response;
+  let res: Response | null = null;
   let rawBodyText = '';
   let body: ArkeselResponse = {};
+
   try {
     res = await fetch('https://sms.arkesel.com/api/v2/sms/send', {
       method: 'POST',
@@ -91,29 +106,32 @@ async function sendArkeselSms(apiKey: string, to: string, message: string) {
         'Content-Type': 'application/json',
         'api-key': apiKey,
       },
-      body: JSON.stringify({
-        sender,
-        message,
-        recipients: [to],
-      }),
+      body: JSON.stringify(payload),
     });
     rawBodyText = await res.text();
-    try {
-      body = rawBodyText ? (JSON.parse(rawBodyText) as ArkeselResponse) : {};
-    } catch {
-      body = {};
-    }
+    body = parseArkeselResponse(rawBodyText);
   } catch (err) {
     console.error('[arkesel-sms] network failure', {
       to,
-      sender,
+      sender: senderForLog,
       error: err instanceof Error ? err.message : String(err),
     });
     throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
   }
 
+  if (!res) {
+    throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
+  }
+
   const status = String(body?.status ?? '').toLowerCase();
-  const providerMessage = String(body?.message ?? '').trim();
+  const providerMessage = String(body?.message ?? body?.description ?? body?.error ?? '').trim();
+
+  console.log('[arkesel-sms] response received', {
+    httpStatus: res.status,
+    to,
+    sender: senderForLog,
+    providerStatus: body?.status ?? null,
+  });
 
   if (!res.ok || (status && status !== 'success')) {
     console.error('[arkesel-sms] non-success response', {
@@ -123,16 +141,17 @@ async function sendArkeselSms(apiKey: string, to: string, message: string) {
       providerMessage: providerMessage || null,
       providerCode: body?.code ?? null,
       providerData: body?.data ?? null,
-      rawBody: rawBodyText.slice(0, 500),
-      sender,
+      body: arkeselResponseForLog(body, rawBodyText),
+      sender: senderForLog,
       to,
     });
+
     const detail = providerMessage || rawBodyText.slice(0, 200) || `HTTP ${res.status}`;
     if (res.status === 401 || res.status === 403 || status === 'unauthorised' || status === 'unauthorized') {
       throw new SmsConfigError(`Arkesel rejected our credentials (HTTP ${res.status}: ${detail}).`);
     }
     throw new SmsDeliveryError(
-      `Arkesel ${arkeselStatusToUserMessage(body?.status, body?.message)} [HTTP ${res.status}: ${detail}]`,
+      `Arkesel ${arkeselStatusToUserMessage(body?.status, providerMessage)} [HTTP ${res.status}: ${detail}]`,
       { httpStatus: res.status, body, rawBody: rawBodyText.slice(0, 500) },
     );
   }
@@ -140,7 +159,7 @@ async function sendArkeselSms(apiKey: string, to: string, message: string) {
   console.log('[arkesel-sms] queued', {
     httpStatus: res.status,
     to,
-    sender,
+    sender: senderForLog,
     providerStatus: body?.status,
     providerMessage: providerMessage || null,
   });
