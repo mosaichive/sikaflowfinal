@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         error_message: errMsg,
         reference_id: invite.id,
       });
-      return json({ ok: false, reason: 'send_failed' });
+      return json({ ok: false, reason: 'send_failed', error: errMsg });
     }
   } catch (err) {
     console.error('[send-team-invite-sms] unexpected', err);
