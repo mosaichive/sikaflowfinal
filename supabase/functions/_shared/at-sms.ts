@@ -1,17 +1,29 @@
-// SMS helper for KudiTrack.
+// Centralized SMS service for KudiTrack.
 //
-// Default provider: Arkesel (https://arkesel.com) using the v2 REST API.
-// Falls back to Africa's Talking only if ARKESEL_API_KEY is not set but
-// legacy AT_USERNAME / AT_API_KEY are.
+// Provider: Africa's Talking (https://africastalking.com).
 //
 // Environment variables:
-//   ARKESEL_API_KEY    - Arkesel API key (preferred provider)
-//   ARKESEL_SENDER_ID  - Optional approved alphanumeric sender ID.
-//                        If absent, no sender field is sent so Arkesel can
-//                        use the account default sender.
+//   AT_USERNAME    - Africa's Talking username ("sandbox" for the sandbox env)
+//   AT_API_KEY     - Africa's Talking API key
+//   AT_SENDER_ID   - Optional approved alphanumeric/short-code sender ID.
+//                    If empty, Africa's Talking uses the account default
+//                    sender (no `from` field is sent). We only log a warning.
+//   SMS_ENABLED    - "false" to disable outbound delivery globally. When
+//                    disabled, sendSms() logs the intended payload and
+//                    resolves successfully (dry-run); no provider call is made.
+//   AT_ALLOW_SANDBOX - "true" to permit the sandbox username to attempt
+//                      real sends (otherwise sandbox is treated as config error).
 //
-//   Legacy fallback only:
-//     AT_USERNAME, AT_API_KEY, AT_SENDER_ID, AT_ALLOW_SANDBOX
+// Public API:
+//   sendSms({ to, message, senderId? }) -> Promise<SmsSendResult>
+//   sendAtSms(to, message)              -> Promise<SmsSendResult>  (legacy alias)
+//   normalizePhone(raw)                 -> string
+//   hashCode(code, salt?)               -> Promise<string>
+//
+// Errors:
+//   SmsConfigError   - missing credentials / unrecoverable config issue
+//   SmsDeliveryError - provider accepted the call but rejected the message,
+//                      or the network call failed after retries.
 
 export class SmsConfigError extends Error {
   readonly kind = 'config' as const;
@@ -29,6 +41,25 @@ export class SmsDeliveryError extends Error {
   }
 }
 
+export type SmsSendArgs = {
+  to: string;
+  message: string;
+  senderId?: string;
+};
+
+export type SmsSendResult = {
+  ok: true;
+  provider: 'africastalking';
+  delivered: boolean;        // true when actually dispatched; false in dry-run
+  dryRun: boolean;
+  recipient?: AtRecipient;
+  raw?: unknown;
+};
+
+// ---------------------------------------------------------------------------
+// Env helpers
+// ---------------------------------------------------------------------------
+
 function readSecret(...names: string[]) {
   for (const name of names) {
     const value = Deno.env.get(name)?.trim();
@@ -37,137 +68,15 @@ function readSecret(...names: string[]) {
   return '';
 }
 
-// ---------------------------------------------------------------------------
-// Arkesel v2 SMS
-// ---------------------------------------------------------------------------
-
-type ArkeselResponse = {
-  status?: string;
-  message?: string;
-  description?: string;
-  error?: string;
-  data?: unknown;
-  code?: string | number;
-};
-
-function parseArkeselResponse(text: string): ArkeselResponse {
-  if (!text.trim()) return {};
-  try {
-    return JSON.parse(text) as ArkeselResponse;
-  } catch {
-    return {};
-  }
-}
-
-function arkeselResponseForLog(body: ArkeselResponse, rawBodyText: string) {
-  return Object.keys(body).length > 0 ? body : rawBodyText.slice(0, 500);
-}
-
-function arkeselStatusToUserMessage(status: string | undefined, message: string | undefined) {
-  const s = (status || '').toLowerCase();
-  if (s === 'success') return 'Message accepted by carrier.';
-  if (s === 'invalid_phone_number') return 'That phone number is not valid for SMS delivery.';
-  if (s === 'insufficient_balance') return 'SMS provider has insufficient balance. Contact support.';
-  if (s === 'invalid_sender') return 'SMS sender ID is not approved.';
-  if (s === 'unauthorised' || s === 'unauthorized') {
-    return 'SMS provider rejected our credentials. Please contact support.';
-  }
-  return message?.trim() || 'SMS gateway did not confirm delivery.';
-}
-
-async function sendArkeselSms(apiKey: string, to: string, message: string) {
-  const sender = readSecret('ARKESEL_SENDER_ID');
-  const senderForLog = sender || '(default)';
-  const payload: { message: string; recipients: string[]; sender?: string } = {
-    message,
-    recipients: [to],
-  };
-
-  if (sender) {
-    payload.sender = sender;
-  }
-
-  console.log('[arkesel-sms] preparing send', {
-    to,
-    sender: senderForLog,
-    hasSenderField: Boolean(sender),
-    messageLength: message.length,
-  });
-
-  let res: Response | null = null;
-  let rawBodyText = '';
-  let body: ArkeselResponse = {};
-
-  try {
-    res = await fetch('https://sms.arkesel.com/api/v2/sms/send', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'api-key': apiKey,
-      },
-      body: JSON.stringify(payload),
-    });
-    rawBodyText = await res.text();
-    body = parseArkeselResponse(rawBodyText);
-  } catch (err) {
-    console.error('[arkesel-sms] network failure', {
-      to,
-      sender: senderForLog,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
-  }
-
-  if (!res) {
-    throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
-  }
-
-  const status = String(body?.status ?? '').toLowerCase();
-  const providerMessage = String(body?.message ?? body?.description ?? body?.error ?? '').trim();
-
-  console.log('[arkesel-sms] response received', {
-    httpStatus: res.status,
-    to,
-    sender: senderForLog,
-    providerStatus: body?.status ?? null,
-  });
-
-  if (!res.ok || (status && status !== 'success')) {
-    console.error('[arkesel-sms] non-success response', {
-      httpStatus: res.status,
-      httpStatusText: res.statusText,
-      providerStatus: body?.status ?? null,
-      providerMessage: providerMessage || null,
-      providerCode: body?.code ?? null,
-      providerData: body?.data ?? null,
-      body: arkeselResponseForLog(body, rawBodyText),
-      sender: senderForLog,
-      to,
-    });
-
-    const detail = providerMessage || rawBodyText.slice(0, 200) || `HTTP ${res.status}`;
-    if (res.status === 401 || res.status === 403 || status === 'unauthorised' || status === 'unauthorized') {
-      throw new SmsConfigError(`Arkesel rejected our credentials (HTTP ${res.status}: ${detail}).`);
-    }
-    throw new SmsDeliveryError(
-      `Arkesel ${arkeselStatusToUserMessage(body?.status, providerMessage)} [HTTP ${res.status}: ${detail}]`,
-      { httpStatus: res.status, body, rawBody: rawBodyText.slice(0, 500) },
-    );
-  }
-
-  console.log('[arkesel-sms] queued', {
-    httpStatus: res.status,
-    to,
-    sender: senderForLog,
-    providerStatus: body?.status,
-    providerMessage: providerMessage || null,
-  });
-  return body;
+function smsEnabled() {
+  const raw = (Deno.env.get('SMS_ENABLED') ?? '').trim().toLowerCase();
+  // Default ON when unset, so behaviour is unchanged once credentials exist.
+  if (!raw) return true;
+  return !(raw === 'false' || raw === '0' || raw === 'no' || raw === 'off');
 }
 
 // ---------------------------------------------------------------------------
-// Africa's Talking (legacy fallback)
+// Africa's Talking response types & helpers
 // ---------------------------------------------------------------------------
 
 type AtRecipient = {
@@ -196,7 +105,7 @@ function isInvalidSenderId(body: AtResponseBody, recipient?: AtRecipient) {
     body?.errorMessage,
     recipient?.status,
   ];
-  return candidates.some((value) => String(value ?? '').toLowerCase().includes('invalidsenderid'));
+  return candidates.some((v) => String(v ?? '').toLowerCase().includes('invalidsenderid'));
 }
 
 function atRecipientStatusToUserMessage(status: string | undefined): string {
@@ -225,14 +134,97 @@ function atRecipientStatusToUserMessage(status: string | undefined): string {
   }
 }
 
-async function sendAfricasTalkingSms(to: string, message: string) {
-  const username = readSecret('AT_USERNAME', 'AFRICASTALKING_USERNAME', 'AFRICAS_TALKING_USERNAME');
-  const apiKey = readSecret('AT_API_KEY', 'AFRICASTALKING_API_KEY', 'AFRICAS_TALKING_API_KEY');
-  const from = readSecret('AT_SENDER_ID', 'AFRICASTALKING_SENDER_ID', 'AFRICAS_TALKING_SENDER_ID');
-  const allowSandbox = readSecret('AT_ALLOW_SANDBOX', 'AFRICASTALKING_ALLOW_SANDBOX', 'AFRICAS_TALKING_ALLOW_SANDBOX').toLowerCase() === 'true';
+// ---------------------------------------------------------------------------
+// Core dispatch (with one retry on transient/network errors)
+// ---------------------------------------------------------------------------
+
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 400;
+
+async function postOnce(endpoint: string, username: string, apiKey: string, to: string, message: string, senderId: string) {
+  const params = new URLSearchParams({ username, to, message });
+  if (senderId) params.set('from', senderId);
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      apiKey,
+    },
+    body: params,
+  });
+  const body = (await res.json().catch(() => ({}))) as AtResponseBody;
+  return { res, body };
+}
+
+async function postWithRetry(endpoint: string, username: string, apiKey: string, to: string, message: string, senderId: string) {
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await postOnce(endpoint, username, apiKey, to, message, senderId);
+      // Retry only on 5xx
+      if (result.res.status >= 500 && attempt < MAX_ATTEMPTS) {
+        console.warn('[sms] transient provider 5xx, will retry', {
+          attempt, httpStatus: result.res.status,
+        });
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      }
+      return result;
+    } catch (err) {
+      lastErr = err;
+      console.warn('[sms] network error, may retry', {
+        attempt, error: err instanceof Error ? err.message : String(err),
+      });
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      }
+    }
+  }
+  throw new SmsDeliveryError(
+    'Could not reach SMS provider. Please try again.',
+    lastErr instanceof Error ? lastErr.message : String(lastErr),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export async function sendSms(args: SmsSendArgs): Promise<SmsSendResult> {
+  const to = String(args.to ?? '').trim();
+  const message = String(args.message ?? '');
+  if (!to) throw new SmsConfigError('Missing recipient phone number.');
+  if (!message) throw new SmsConfigError('Missing SMS message body.');
+
+  const username = readSecret('AT_USERNAME');
+  const apiKey = readSecret('AT_API_KEY');
+  const envSender = readSecret('AT_SENDER_ID');
+  const senderId = (args.senderId ?? envSender ?? '').trim();
+  const allowSandbox = readSecret('AT_ALLOW_SANDBOX').toLowerCase() === 'true';
+  const enabled = smsEnabled();
+
+  if (!senderId) {
+    console.warn('[sms] AT_SENDER_ID is not configured — using Africa\'s Talking default sender');
+  }
+
+  console.log('[sms] dispatch', {
+    provider: 'africastalking',
+    to,
+    senderId: senderId || '(default)',
+    messageLength: message.length,
+    smsEnabled: enabled,
+    atUsernameDetected: Boolean(username),
+    atApiKeyDetected: Boolean(apiKey),
+  });
+
+  if (!enabled) {
+    console.log('[sms] SMS_ENABLED=false — dry run, not dispatching', { to });
+    return { ok: true, provider: 'africastalking', delivered: false, dryRun: true };
+  }
 
   if (!username || !apiKey) {
-    console.error('[at-sms] missing AT_USERNAME or AT_API_KEY');
     throw new SmsConfigError('SMS provider is not configured. Please contact support.');
   }
 
@@ -247,35 +239,15 @@ async function sendAfricasTalkingSms(to: string, message: string) {
     ? 'https://api.sandbox.africastalking.com/version1/messaging'
     : 'https://api.africastalking.com/version1/messaging';
 
-  const sendRequest = async (senderId: string) => {
-    const params = new URLSearchParams({ username, to, message });
-    if (senderId) params.set('from', senderId);
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'apiKey': apiKey,
-        },
-        body: params,
-      });
-      const body = await res.json().catch(() => ({} as AtResponseBody));
-      return { res, body: body as AtResponseBody };
-    } catch (err) {
-      console.error('[at-sms] network failure', err);
-      throw new SmsDeliveryError('Could not reach SMS provider. Please try again.');
-    }
-  };
-
-  let senderUsed = from;
-  let { res, body } = await sendRequest(senderUsed);
-  let recipients: AtRecipient[] = body?.SMSMessageData?.Recipients ?? [];
+  // First attempt with configured sender (if any).
+  let { res, body } = await postWithRetry(endpoint, username, apiKey, to, message, senderId);
+  let recipients = body?.SMSMessageData?.Recipients ?? [];
   let recipient = recipients[0];
 
-  if (senderUsed && isInvalidSenderId(body, recipient)) {
-    senderUsed = '';
-    ({ res, body } = await sendRequest(senderUsed));
+  // If the sender ID was rejected, retry once without it (use AT default).
+  if (senderId && isInvalidSenderId(body, recipient)) {
+    console.warn('[sms] sender id rejected — retrying with default sender', { senderId });
+    ({ res, body } = await postWithRetry(endpoint, username, apiKey, to, message, ''));
     recipients = body?.SMSMessageData?.Recipients ?? [];
     recipient = recipients[0];
   }
@@ -284,39 +256,41 @@ async function sendAfricasTalkingSms(to: string, message: string) {
     if (res.status === 401 || res.status === 403) {
       throw new SmsConfigError('SMS provider rejected our credentials. Please contact support.');
     }
-    throw new SmsDeliveryError('SMS provider could not accept the message.');
+    console.error('[sms] non-2xx from provider', { httpStatus: res.status, body });
+    throw new SmsDeliveryError('SMS provider could not accept the message.', body);
   }
   if (!recipient) {
+    console.error('[sms] no recipient in provider response', body);
     throw new SmsDeliveryError('SMS provider did not queue the message.', body);
   }
   if (recipient.status && recipient.status !== 'Success') {
     throw new SmsDeliveryError(atRecipientStatusToUserMessage(recipient.status), recipient);
   }
-  console.log('[at-sms] queued', { to: recipient.number, status: recipient.status });
-  return body;
-}
 
-// ---------------------------------------------------------------------------
-// Public entry point (name kept for backwards compatibility with callers)
-// ---------------------------------------------------------------------------
-
-export async function sendAtSms(to: string, message: string) {
-  const arkeselKey = readSecret('ARKESEL_API_KEY');
-  const atKey = readSecret('AT_API_KEY', 'AFRICASTALKING_API_KEY', 'AFRICAS_TALKING_API_KEY');
-  console.log('[sms] dispatch', {
-    to,
-    arkeselKeyDetected: Boolean(arkeselKey),
-    atKeyDetected: Boolean(atKey),
-    provider: arkeselKey ? 'arkesel' : (atKey ? 'africastalking' : 'none'),
+  console.log('[sms] queued', {
+    to: recipient.number,
+    status: recipient.status,
+    messageId: recipient.messageId,
+    cost: recipient.cost,
   });
-  if (arkeselKey) {
-    return await sendArkeselSms(arkeselKey, to, message);
-  }
-  // Fallback: legacy Africa's Talking credentials.
-  return await sendAfricasTalkingSms(to, message);
+  return {
+    ok: true,
+    provider: 'africastalking',
+    delivered: true,
+    dryRun: false,
+    recipient,
+    raw: body,
+  };
 }
 
-export const sendSms = sendAtSms;
+// Legacy alias kept so existing edge functions don't need touching.
+export async function sendAtSms(to: string, message: string) {
+  return await sendSms({ to, message });
+}
+
+// ---------------------------------------------------------------------------
+// Phone & misc utilities (unchanged — used by auth/OTP flows too)
+// ---------------------------------------------------------------------------
 
 export function normalizePhone(raw: string): string {
   const p = String(raw || '').trim().replace(/[\s\-()]/g, '');
