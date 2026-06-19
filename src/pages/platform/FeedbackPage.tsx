@@ -59,7 +59,7 @@ export default function PlatformFeedbackPage() {
           <p className="text-sm text-muted-foreground">Messages from the public landing page.</p>
         </div>
         <div className="flex items-center gap-3">
-          {unread > 0 && <Badge className="bg-rose-500/15 text-rose-300 border border-rose-500/30">{unread} unread</Badge>}
+          {unread > 0 && <Badge className="border border-[rgba(81,193,31,0.25)] bg-[rgba(81,193,31,0.12)] text-[#51C11F]">{unread} unread</Badge>}
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -120,7 +120,7 @@ export default function PlatformFeedbackPage() {
 
 function StatusBadge({ status }: { status: FeedbackRow['status'] }) {
   const map = {
-    new: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+    new: 'bg-[rgba(81,193,31,0.12)] text-[#51C11F] border-[rgba(81,193,31,0.25)]',
     in_progress: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     resolved: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   } as const;

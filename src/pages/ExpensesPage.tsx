@@ -402,7 +402,7 @@ export default function ExpensesPage() {
                     <span className="text-base font-semibold">{formatCurrency(draftTotal)}</span>
                   </div>
 
-                  <Button type="submit" className="w-full bg-[#C7254E] hover:bg-[#A91D40] text-white" disabled={loading}>
+                  <Button type="submit" className="w-full bg-[#51C11F] hover:bg-[#45A91A] text-white" disabled={loading}>
                     {loading ? 'Saving...' : drafts.length > 1 ? `Save ${drafts.length} Expenses` : 'Record Expense'}
                   </Button>
                 </form>

@@ -648,11 +648,11 @@ export default function ReportsPage() {
       value: formatCurrency(reportStats.paidSalesRevenue), delta: trend(reportStats.paidSalesRevenue, priorStats.paidSalesRevenue) },
     { label: 'Profit', icon: TrendingUp, accent: 'from-emerald-500/25 to-emerald-500/0', iconClass: 'text-emerald-400 bg-emerald-500/10',
       value: formatCurrency(reportStats.profit), delta: trend(reportStats.profit, priorStats.profit) },
-    { label: 'Expenses', icon: Receipt, accent: 'from-rose-500/25 to-rose-500/0', iconClass: 'text-rose-400 bg-rose-500/10',
+    { label: 'Expenses', icon: Receipt, accent: 'from-[#51C11F]/18 to-[#51C11F]/0', iconClass: 'text-[#51C11F] bg-[rgba(81,193,31,0.12)]',
       value: formatCurrency(reportStats.operatingExpenses), delta: trend(reportStats.operatingExpenses, priorStats.operatingExpenses), invertDeltaColor: true },
     { label: 'COGS', icon: Calculator, accent: 'from-amber-500/25 to-amber-500/0', iconClass: 'text-amber-400 bg-amber-500/10',
       value: formatCurrency(reportStats.cogs), delta: trend(reportStats.cogs, priorStats.cogs), invertDeltaColor: true },
-    { label: 'Inventory Value', icon: Boxes, accent: 'from-[#C7254E]/18 to-[#C7254E]/0', iconClass: 'text-[#C7254E] bg-[rgba(199,37,78,0.12)]',
+    { label: 'Inventory Value', icon: Boxes, accent: 'from-[#51C11F]/18 to-[#51C11F]/0', iconClass: 'text-[#51C11F] bg-[rgba(81,193,31,0.12)]',
       value: financialsLoading ? '—' : formatCurrency(financials.stockValue), delta: 0 },
   ];
 

@@ -20,9 +20,9 @@ export function ProblemSection() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7 }}
-            className="relative overflow-hidden rounded-3xl border border-rose-100 bg-white p-7 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)]"
+            className="relative overflow-hidden rounded-3xl border border-amber-100 bg-white p-7 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)]"
           >
-            <p className="text-xs font-semibold uppercase tracking-widest text-rose-600">Before KudiTrack</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Before KudiTrack</p>
             <h3 className="mt-2 text-2xl font-bold text-slate-950">The old way</h3>
             <div className="mt-6 space-y-3">
               <ProblemRow icon={NotebookPen} text="Messy notebooks you can't find when you need them" />
@@ -31,7 +31,7 @@ export function ProblemSection() {
               <ProblemRow icon={Calculator} text='"How much did I really make?" — no clear answer' />
             </div>
             {/* Decorative scribble */}
-            <div className="mt-8 rounded-xl border border-rose-100 bg-rose-50 p-4 font-mono text-xs text-rose-700 leading-loose">
+            <div className="mt-8 rounded-xl border border-amber-100 bg-amber-50 p-4 font-mono text-xs text-amber-800 leading-loose">
               <div className="line-through opacity-70">Rice — 480</div>
               <div className="line-through opacity-70">Sugar — 18 ?? 28 ??</div>
               <div>Coke — ??</div>
@@ -87,8 +87,8 @@ export function ProblemSection() {
 function ProblemRow({ icon: Icon, text }: { icon: any; text: string }) {
   return (
     <div className="flex items-start gap-3 text-sm text-slate-700">
-      <div className="mt-0.5 h-7 w-7 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
-        <Icon className="h-3.5 w-3.5 text-rose-500" />
+      <div className="mt-0.5 h-7 w-7 rounded-lg border border-amber-100 bg-amber-50 flex items-center justify-center shrink-0">
+        <Icon className="h-3.5 w-3.5 text-amber-600" />
       </div>
       <span>{text}</span>
     </div>
