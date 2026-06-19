@@ -276,6 +276,7 @@ function KpiCard({
   value,
   icon: Icon,
   trend,
+  to,
   index = 0,
   isCurrency = true,
   iconClassName,
@@ -288,6 +289,7 @@ function KpiCard({
   value: number;
   icon: React.ComponentType<{ className?: string }>;
   trend: { value: number; label: string; direction: 'up' | 'down' | 'flat' };
+  to?: string;
   index?: number;
   isCurrency?: boolean;
   iconClassName: string;
@@ -300,6 +302,7 @@ function KpiCard({
   const valueSizeClass = isCurrency && formattedValue.length >= 13
     ? 'text-[clamp(1rem,1.12vw,1.15rem)]'
     : 'text-[clamp(1.25rem,1.6vw,1.5rem)]';
+  const isClickable = Boolean(to);
 
   return (
     <motion.div
@@ -307,8 +310,20 @@ function KpiCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       whileHover={{ y: -3 }}
-      className="group relative min-h-[196px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
+      className={cn(
+        'group relative min-h-[196px] overflow-hidden rounded-[14px] border border-border bg-card p-5',
+        isClickable && 'cursor-pointer transition-colors hover:border-[rgba(44,134,3,0.45)]',
+      )}
     >
+      {to ? (
+        <Link
+          to={to}
+          aria-label={`Open ${title}`}
+          className="absolute inset-0 z-10 rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2C8603] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <span className="sr-only">Open {title}</span>
+        </Link>
+      ) : null}
 
       <div className="relative flex h-full flex-col">
         <div className="flex items-start gap-4">
@@ -338,6 +353,7 @@ function MiniMetric({
   value,
   icon: Icon,
   helper,
+  to,
   iconClassName,
   valueClassName,
   index = 0,
@@ -347,19 +363,34 @@ function MiniMetric({
   value: number | string;
   icon: React.ComponentType<{ className?: string }>;
   helper?: string;
+  to?: string;
   iconClassName: string;
   valueClassName?: string;
   index?: number;
   isCurrency?: boolean;
 }) {
+  const isClickable = Boolean(to);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.18 + index * 0.04 }}
       whileHover={{ y: -2 }}
-      className="relative min-h-[116px] overflow-hidden rounded-[14px] border border-border bg-card p-5"
+      className={cn(
+        'relative min-h-[116px] overflow-hidden rounded-[14px] border border-border bg-card p-5',
+        isClickable && 'cursor-pointer transition-colors hover:border-[rgba(44,134,3,0.45)]',
+      )}
     >
+      {to ? (
+        <Link
+          to={to}
+          aria-label={`Open ${title}`}
+          className="absolute inset-0 z-10 rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2C8603] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <span className="sr-only">Open {title}</span>
+        </Link>
+      ) : null}
       <div className="flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{title}</p>
@@ -977,6 +1008,7 @@ export default function Dashboard() {
             value={filteredFinancials.profit}
             icon={TrendingUp}
             trend={trends.profit}
+            to={hasModule('reports') ? '/reports' : undefined}
             iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085]"
             glowClassName="bg-emerald-500"
             sparklineColor="#35df74"
@@ -988,6 +1020,7 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
+            to={hasModule('expenses') ? '/expenses' : undefined}
             iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)] dark:text-[#2C8603]"
             glowClassName="bg-[#2C8603]"
             sparklineColor="#2C8603"
@@ -999,6 +1032,7 @@ export default function Dashboard() {
             value={businessMoneyValue}
             icon={WalletCards}
             trend={trends.businessMoney}
+            to={hasModule('reports') ? '/reports' : undefined}
             iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff]"
             glowClassName="bg-blue-500"
             sparklineColor="#3f8cff"
@@ -1023,6 +1057,7 @@ export default function Dashboard() {
             icon={HandCoins}
             isCurrency
             helper={`In ${selectedYear}`}
+            to={hasModule('other_income') ? '/other-income' : undefined}
             iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-[#35df74]"
           />
           <MiniMetric
@@ -1041,6 +1076,7 @@ export default function Dashboard() {
             icon={WalletCards}
             isCurrency
             helper={`In ${selectedYear}`}
+            to={hasModule('savings') ? '/savings' : undefined}
             iconClassName="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-[#38bdf8]"
           />
         </div>
