@@ -726,7 +726,7 @@ export default function SalesPage() {
                           <p className="mt-1 text-[10px] text-muted-foreground">Default price: {formatCurrency(row.defaultPrice)} · {stockLabel}</p>
                         )}
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-xs">Quantity</Label>
                           <Input
@@ -737,18 +737,6 @@ export default function SalesPage() {
                             placeholder="0"
                             value={row.line.quantity}
                             onChange={(e) => updateLine(row.line.key, { quantity: e.target.value, amount: '' })}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">Discount</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={row.line.discount}
-                            onChange={(e) => updateLine(row.line.key, { discount: e.target.value, amount: '' })}
                           />
                         </div>
                         <div>
