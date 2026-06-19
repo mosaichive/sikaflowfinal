@@ -466,7 +466,7 @@ export default function SalesPage() {
         customer_name: customerName || 'Walk-in',
         customer_phone: customerPhone,
         subtotal, discount, total,
-        amount_paid: amountPaid, balance,
+        amount_paid: paidNumber, balance,
         payment_method: paymentMethod,
         payment_status: paymentStatus,
         due_date: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
