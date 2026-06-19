@@ -20,7 +20,7 @@ type EnsureWorkspaceInput = {
   allowCreate?: boolean;
 };
 
-type CachedProductRow = {
+export type CachedProductRow = {
   id: string;
   business_id?: string;
   name: string;
@@ -35,12 +35,20 @@ type CachedProductRow = {
   is_archived?: boolean | null;
 };
 
+// Rich product reads use the current schema when available; the stable select
+// keeps older single-tenant schemas working when optional catalog columns are
+// missing from the API schema cache.
+const PRODUCT_SELECT =
+  'id,name,sku,category,image_url,is_archived,stock,cost,price,low_stock_threshold,created_at,updated_at';
+
 // Use only columns that actually exist in the single-tenant products schema.
 // `quantity`/`cost_price`/`selling_price`/`reorder_level`/`business_id` are
 // remapped from `stock`/`cost`/`price`/`low_stock_threshold`/none in
 // normalizeProductRow().
 const STABLE_PRODUCT_SELECT =
   'id,name,sku,stock,cost,price,low_stock_threshold,created_at,updated_at';
+
+const OPTIONAL_PRODUCT_READ_COLUMNS = ['category', 'image_url', 'is_archived'] as const;
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
@@ -104,12 +112,16 @@ function writeCachedProducts(businessId: string, rows: CachedProductRow[]) {
 }
 
 function normalizeProductRow(row: Record<string, unknown>): CachedProductRow {
+  const hasCategory = Object.prototype.hasOwnProperty.call(row, 'category');
+  const hasImageUrl = Object.prototype.hasOwnProperty.call(row, 'image_url');
+  const hasArchived = Object.prototype.hasOwnProperty.call(row, 'is_archived');
+
   return {
     id: String(row.id ?? ''),
     business_id: typeof row.business_id === 'string' ? row.business_id : undefined,
     name: String(row.name ?? ''),
     sku: typeof row.sku === 'string' ? row.sku : '',
-    category: typeof row.category === 'string' ? row.category : '',
+    category: hasCategory ? (typeof row.category === 'string' ? row.category : '') : undefined,
     quantity:
       typeof row.quantity === 'number'
         ? row.quantity
@@ -134,8 +146,8 @@ function normalizeProductRow(row: Record<string, unknown>): CachedProductRow {
         : typeof row.reorder_level === 'number' || typeof row.reorder_level === 'string'
           ? Number(row.reorder_level ?? 0)
           : 0,
-    image_url: typeof row.image_url === 'string' ? row.image_url : null,
-    is_archived: typeof row.is_archived === 'boolean' ? row.is_archived : false,
+    image_url: hasImageUrl ? (typeof row.image_url === 'string' ? row.image_url : null) : undefined,
+    is_archived: hasArchived ? (typeof row.is_archived === 'boolean' ? row.is_archived : false) : undefined,
   };
 }
 
@@ -154,7 +166,11 @@ export function removeCachedProduct(businessId: string, productId: string) {
   writeCachedProducts(businessId, nextRows);
 }
 
-function mergeProductRows(
+function hasValue(value: unknown) {
+  return typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null;
+}
+
+export function mergeProductRows(
   liveRows: CachedProductRow[],
   cachedRows: CachedProductRow[],
   showArchived: boolean,
@@ -166,10 +182,25 @@ function mergeProductRows(
   }
 
   for (const row of liveRows) {
-    merged.set(row.id, {
-      ...merged.get(row.id),
+    const cached = merged.get(row.id);
+    const nextRow = {
+      ...cached,
       ...row,
-    });
+    };
+
+    if (cached) {
+      if (row.category === undefined && hasValue(cached.category)) {
+        nextRow.category = cached.category;
+      }
+      if (row.image_url === undefined && hasValue(cached.image_url)) {
+        nextRow.image_url = cached.image_url;
+      }
+      if (row.is_archived === undefined && cached.is_archived !== undefined) {
+        nextRow.is_archived = cached.is_archived;
+      }
+    }
+
+    merged.set(row.id, nextRow);
   }
 
   return Array.from(merged.values())
@@ -686,6 +717,7 @@ export async function updateProductRecord(
       'business_id',
       'low_stock_threshold',
       'reorder_level',
+      'category',
       'is_archived',
       'cost_price',
       'selling_price',
@@ -750,16 +782,15 @@ export async function updateExpenseRecord(
 export async function loadProductsCompat(showArchived: boolean, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const allCachedRows = readAllCachedProducts();
-  // The live single-tenant schema has no `is_archived` or `category` columns.
-  // Always use the stable select to avoid schema-cache errors that wipe the
-  // product list (which then zeroes out Stock Left / Stock Value / Profit).
   const scopedBaseQuery = () => {
-    return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
+    return supabase.from('products').select(PRODUCT_SELECT).order('name');
   };
-  const visibleBaseQuery = () => supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
+  const visibleBaseQuery = () => supabase.from('products').select(PRODUCT_SELECT).order('name');
   const stableBaseQuery = () => {
     return supabase.from('products').select(STABLE_PRODUCT_SELECT).order('name');
   };
+  const isMissingOptionalProductReadColumn = (error: unknown) =>
+    OPTIONAL_PRODUCT_READ_COLUMNS.some((column) => isMissingColumnError(error, column, 'products'));
   const filterVisibleRows = (rows: CachedProductRow[]) =>
     effectiveBusinessId
       ? rows.filter((row) => row.business_id === effectiveBusinessId)
@@ -863,6 +894,29 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
 
     return getCachedRowsFallback();
   }
+  if (isMissingOptionalProductReadColumn(error)) {
+    logSupabaseError('workspace.loadProductsCompat', error, {
+      table: 'products',
+      fallbackMode: 'loadWithoutOptionalCatalogColumns',
+      businessId: effectiveBusinessId,
+      showArchived,
+    });
+    try {
+      const stableRows = await loadStableRows();
+      const mergedRows = mergeProductRows(stableRows, filterVisibleRows(allCachedRows), false);
+      if (mergedRows.length > 0 && effectiveBusinessId) writeCachedProducts(effectiveBusinessId, mergedRows);
+      return mergedRows.length > 0 ? mergedRows : getCachedRowsFallback();
+    } catch (stableError) {
+      logSupabaseError('workspace.loadProductsCompat.optionalFallback', stableError, {
+        table: 'products',
+        fallbackMode: 'loadFromCacheAfterOptionalFallbackFailure',
+        businessId: effectiveBusinessId,
+        showArchived,
+      });
+      return getCachedRowsFallback();
+    }
+  }
+
   if (!isMissingColumnError(error, 'is_archived', 'products')) {
     logSupabaseError('workspace.loadProductsCompat', error, {
       table: 'products',

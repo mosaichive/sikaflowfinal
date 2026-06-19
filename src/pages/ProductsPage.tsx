@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/constants';
-import { Package, Plus, Search, Pencil, Trash2, ArchiveRestore, Archive } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, ArchiveRestore, Archive, ImagePlus, X } from 'lucide-react';
 import {
   createProductRecord,
   ensureUserBusinessWorkspace,
@@ -47,9 +47,29 @@ const emptyForm = {
   low_stock_threshold: '3',
 };
 
+const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const PRODUCT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
 function generateSku(name: string) {
   const base = name.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'ITEM';
   return `${base}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function getProductImageExtension(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension && /^[a-z0-9]+$/.test(extension)) return extension;
+  if (file.type === 'image/jpeg' || file.type === 'image/jpg') return 'jpg';
+  if (file.type === 'image/webp') return 'webp';
+  return 'png';
+}
+
+async function uploadProductImage(businessId: string, productKey: string, file: File) {
+  const extension = getProductImageExtension(file);
+  const path = `${businessId}/${productKey}-${Date.now()}.${extension}`;
+  const { error } = await supabase.storage.from('product-images').upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export default function ProductsPage() {
@@ -64,8 +84,34 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canManage = isAdmin || isManager;
+
+  const resetProductImage = useCallback(() => {
+    setProductImageFile(null);
+    setProductImagePreview((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return '';
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const resetDialogState = useCallback(() => {
+    setEditing(null);
+    setForm(emptyForm);
+    resetProductImage();
+  }, [resetProductImage]);
+
+  useEffect(() => {
+    return () => {
+      if (productImagePreview.startsWith('blob:')) URL.revokeObjectURL(productImagePreview);
+    };
+  }, [productImagePreview]);
 
   const load = useCallback(async () => {
     const data = await loadProductsCompat(showArchived, businessId);
@@ -97,6 +143,7 @@ export default function ProductsPage() {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
+    resetProductImage();
     setOpen(true);
   };
 
@@ -109,7 +156,51 @@ export default function ProductsPage() {
       selling_price: String(row.selling_price ?? 0),
       low_stock_threshold: String(row.low_stock_threshold ?? row.reorder_level ?? 3),
     });
+    setProductImageFile(null);
+    setProductImagePreview((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return row.image_url || '';
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setOpen(true);
+  };
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) resetDialogState();
+  };
+
+  const handleProductImageSelect = (file?: File | null) => {
+    if (!file) return;
+
+    if (!PRODUCT_IMAGE_TYPES.includes(file.type)) {
+      toast({
+        title: 'Unsupported image type',
+        description: 'Upload a JPG, PNG, or WEBP product image.',
+        variant: 'destructive',
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+      toast({
+        title: 'Image too large',
+        description: 'Keep product images under 4MB.',
+        variant: 'destructive',
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setProductImageFile(file);
+    setProductImagePreview((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return previewUrl;
+    });
   };
 
   const saveProduct = async (event: React.FormEvent) => {
@@ -135,6 +226,16 @@ export default function ProductsPage() {
       }
 
       const lowStockThreshold = Math.max(0, Number(form.low_stock_threshold || 0));
+      let imageUrl: string | null = productImagePreview || null;
+
+      if (productImageFile) {
+        imageUrl = await uploadProductImage(
+          activeBusinessId,
+          editing?.id ?? crypto.randomUUID(),
+          productImageFile,
+        );
+      }
+
       const basePayload = {
         business_id: activeBusinessId,
         user_id: effectiveBusinessOwnerId ?? user.id,
@@ -144,6 +245,7 @@ export default function ProductsPage() {
         selling_price: Number(form.selling_price || 0),
         reorder_level: lowStockThreshold,
         low_stock_threshold: lowStockThreshold,
+        image_url: imageUrl,
         is_archived: false,
       };
 
@@ -188,7 +290,7 @@ export default function ProductsPage() {
             selling_price: Number(payload.selling_price ?? 0),
             low_stock_threshold: Number(payload.low_stock_threshold ?? payload.reorder_level ?? 0),
             reorder_level: Number(payload.reorder_level ?? payload.low_stock_threshold ?? 0),
-            image_url: null,
+            image_url: imageUrl,
             is_archived: false,
           };
 
@@ -198,7 +300,7 @@ export default function ProductsPage() {
         rememberCachedProduct(activeBusinessId, {
           id: created.id,
           ...payload,
-          image_url: null,
+          image_url: imageUrl,
         });
         toast({
           title: 'Product added',
@@ -207,8 +309,7 @@ export default function ProductsPage() {
       }
 
       setOpen(false);
-      setEditing(null);
-      setForm(emptyForm);
+      resetDialogState();
       void load();
     } catch (error) {
       logSupabaseError('products.save', error, {
@@ -280,7 +381,7 @@ export default function ProductsPage() {
           </div>
         </section>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editing ? 'Edit Product' : 'Add Product'}</DialogTitle>
@@ -306,6 +407,33 @@ export default function ProductsPage() {
                 <div className="space-y-2">
                   <Label>Low Stock Threshold</Label>
                   <Input type="number" min="0" step="1" value={form.low_stock_threshold} onChange={(event) => setForm((current) => ({ ...current, low_stock_threshold: event.target.value }))} required />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Product Image <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
+                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border bg-muted/20 p-4 sm:flex-row sm:items-center">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background">
+                      {productImagePreview ? (
+                        <img src={productImagePreview} alt="Product preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImagePlus className="h-7 w-7 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={(event) => handleProductImageSelect(event.target.files?.[0])}
+                      />
+                      <p className="text-xs text-muted-foreground">Upload a JPG, PNG, or WEBP image under 4MB.</p>
+                    </div>
+                    {productImagePreview ? (
+                      <Button type="button" variant="outline" size="sm" onClick={resetProductImage}>
+                        <X className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={saving}>
