@@ -214,7 +214,8 @@ export default function SalesPage() {
   const resetForm = useCallback(() => {
     setLines([newLine()]);
     setPaymentMethod('cash');
-    setAmountPaid(0);
+    setAmountPaid('');
+    setDiscountConfirmed(false);
     setCustomerName('');
     setCustomerPhone('');
     setSaleDate(new Date().toISOString().slice(0, 10));
