@@ -14,6 +14,7 @@ import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/constants';
 import { Package, Plus, Search, Pencil, Trash2, ArchiveRestore, Archive, ImagePlus, X } from 'lucide-react';
+import { uploadProductImage } from '@/lib/product-images';
 import {
   createProductRecord,
   ensureUserBusinessWorkspace,
@@ -53,23 +54,6 @@ const PRODUCT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 function generateSku(name: string) {
   const base = name.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'ITEM';
   return `${base}-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-
-function getProductImageExtension(file: File) {
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  if (extension && /^[a-z0-9]+$/.test(extension)) return extension;
-  if (file.type === 'image/jpeg' || file.type === 'image/jpg') return 'jpg';
-  if (file.type === 'image/webp') return 'webp';
-  return 'png';
-}
-
-async function uploadProductImage(businessId: string, productKey: string, file: File) {
-  const extension = getProductImageExtension(file);
-  const path = `${businessId}/${productKey}-${Date.now()}.${extension}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, { upsert: true });
-  if (error) throw error;
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  return data.publicUrl;
 }
 
 export default function ProductsPage() {
@@ -233,7 +217,11 @@ export default function ProductsPage() {
         if (!productImageFile) return imageUrl;
 
         try {
-          const uploadedUrl = await uploadProductImage(activeBusinessId, productId, productImageFile);
+          const uploadedUrl = await uploadProductImage({
+            businessId: activeBusinessId,
+            productId,
+            file: productImageFile,
+          });
           await updateProductRecord(productId, { image_url: uploadedUrl });
           return uploadedUrl;
         } catch (error) {

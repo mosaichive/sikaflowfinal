@@ -12,6 +12,7 @@ import { useSubscription } from '@/context/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BUSINESS_TYPES, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
+import { uploadProductImage } from '@/lib/product-images';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   createProductRecord,
@@ -71,15 +72,6 @@ async function uploadBusinessLogo(businessId: string, file: File) {
   const { error } = await supabase.storage.from('business-logos').upload(path, file, { upsert: true });
   if (error) throw error;
   const { data } = supabase.storage.from('business-logos').getPublicUrl(path);
-  return data.publicUrl;
-}
-
-async function uploadProductImage(businessId: string, productId: string, file: File) {
-  const ext = file.name.split('.').pop() || 'png';
-  const path = `${businessId}/${productId}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, { upsert: true });
-  if (error) throw error;
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -271,7 +263,11 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
 
           if (row.imageFile) {
             try {
-              const imageUrl = await uploadProductImage(businessId, createdProduct.id, row.imageFile);
+              const imageUrl = await uploadProductImage({
+                businessId,
+                productId: createdProduct.id,
+                file: row.imageFile,
+              });
               const { error: imageUpdateError } = await supabase
                 .from('products')
                 .update({ image_url: imageUrl } as never)
