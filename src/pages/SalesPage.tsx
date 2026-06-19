@@ -82,7 +82,10 @@ export default function SalesPage() {
 
   const [lines, setLines] = useState<SaleLine[]>([newLine()]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [amountPaid, setAmountPaid] = useState(0);
+  // Amount paid is a string so the field can be left empty by default;
+  // the user must type the amount they actually received.
+  const [amountPaid, setAmountPaid] = useState<string>('');
+  const [discountConfirmed, setDiscountConfirmed] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -117,12 +120,18 @@ export default function SalesPage() {
 
   const computed = useMemo(() => lines.map(computeLine), [lines, allProducts]);
   const subtotal = computed.reduce((s, c) => s + c.qty * c.defaultPrice, 0);
-  const discount = computed.reduce((s, c) => s + c.disc, 0);
+  const lineDiscount = computed.reduce((s, c) => s + c.disc, 0);
   const total = computed.reduce((s, c) => s + c.amount, 0);
   const costTotal = computed.reduce((s, c) => s + c.qty * c.costPrice, 0);
-  const balance = Math.max(0, total - amountPaid);
+  const paidNumber = amountPaid.trim() === '' ? 0 : Math.max(0, Number(amountPaid) || 0);
+  const rawShortfall = Math.max(0, total - paidNumber);
+  // When the user confirms the shortfall is a discount, fold it into the
+  // saved discount amount and zero-out the balance.
+  const extraDiscount = discountConfirmed && rawShortfall > 0 ? rawShortfall : 0;
+  const discount = lineDiscount + extraDiscount;
+  const balance = Math.max(0, total - paidNumber - extraDiscount);
   const profit = total - costTotal;
-  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : paidNumber > 0 ? 'partial' : 'unpaid';
   const validLines = computed.filter((c) => c.product && c.qty > 0);
   void isManager; // reserved for future per-row override permissions
   const allowSalesWithoutStock = Boolean(business?.allow_sales_without_stock);
@@ -205,7 +214,8 @@ export default function SalesPage() {
   const resetForm = useCallback(() => {
     setLines([newLine()]);
     setPaymentMethod('cash');
-    setAmountPaid(0);
+    setAmountPaid('');
+    setDiscountConfirmed(false);
     setCustomerName('');
     setCustomerPhone('');
     setSaleDate(new Date().toISOString().slice(0, 10));
@@ -265,7 +275,13 @@ export default function SalesPage() {
       })),
     );
     setPaymentMethod(sale.payment_method);
-    setAmountPaid(Number(sale.amount_paid));
+    setAmountPaid(sale.amount_paid != null ? String(sale.amount_paid) : '');
+    // When editing, if the saved sale is fully paid but the amount paid is
+    // less than the total, the difference was previously confirmed as a discount.
+    setDiscountConfirmed(
+      sale.payment_status === 'paid' &&
+        Number(sale.amount_paid ?? 0) < Number(sale.total ?? 0),
+    );
     setCustomerName(sale.customer_name || '');
     setCustomerPhone(sale.customer_phone || '');
     setSaleDate(new Date(sale.sale_date).toISOString().slice(0, 10));
@@ -279,6 +295,14 @@ export default function SalesPage() {
     if (!user) return;
     if (validLines.length === 0) {
       toast({ title: 'Add at least one product', description: 'Pick a product and enter a quantity.', variant: 'destructive' });
+      return;
+    }
+    if (balance > 0 && !discountConfirmed && !dueDate) {
+      toast({
+        title: 'Due date required',
+        description: `Customer has an outstanding balance of ${formatCurrency(balance)}. Please set a due date or confirm the difference as a discount.`,
+        variant: 'destructive',
+      });
       return;
     }
     if (editSaleId) {
@@ -336,7 +360,7 @@ export default function SalesPage() {
         staff_id: user.id,
         staff_name: displayName,
         subtotal, discount, total,
-        amount_paid: amountPaid, balance,
+        amount_paid: paidNumber, balance,
         payment_method: paymentMethod,
         payment_status: paymentStatus,
         due_date: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
@@ -450,7 +474,7 @@ export default function SalesPage() {
         customer_name: customerName || 'Walk-in',
         customer_phone: customerPhone,
         subtotal, discount, total,
-        amount_paid: amountPaid, balance,
+        amount_paid: paidNumber, balance,
         payment_method: paymentMethod,
         payment_status: paymentStatus,
         due_date: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
@@ -760,14 +784,70 @@ export default function SalesPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div><Label>Amount Paid (GH₵)</Label><Input type="number" min={0} value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} /></div>
+                <div>
+                  <Label>Amount Paid (GH₵)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={amountPaid}
+                    onChange={e => setAmountPaid(e.target.value)}
+                  />
+                </div>
                 <div><Label>Sale Date</Label><Input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></div>
               </div>
 
+              {rawShortfall > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Difference detected
+                      </Label>
+                      <p className="text-sm font-semibold">
+                        {formatCurrency(rawShortfall)} short of the total.
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Auto-discount: <span className="font-semibold text-foreground">{formatCurrency(rawShortfall)}</span>
+                    </span>
+                  </div>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={discountConfirmed}
+                      onCheckedChange={(v) => setDiscountConfirmed(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm leading-tight">
+                      Confirm this difference as a discount
+                      <span className="block text-[11px] text-muted-foreground">
+                        Check this box only if the difference is a discount. Leave unchecked if the customer will pay the balance later.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {balance > 0 && !discountConfirmed && (
+                <p className="text-xs text-destructive">
+                  Customer has an outstanding balance of {formatCurrency(balance)}.
+                </p>
+              )}
+
               {paymentStatus !== 'paid' && (
                 <div>
-                  <Label>Due Date</Label>
-                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  <Label>
+                    Due Date
+                    {balance > 0 && !discountConfirmed && <span className="text-destructive"> *</span>}
+                  </Label>
+                  <Input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    required={balance > 0 && !discountConfirmed}
+                  />
                 </div>
               )}
 
