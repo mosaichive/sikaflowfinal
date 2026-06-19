@@ -80,12 +80,12 @@ export function PricingSection() {
                 transition={{ duration: 0.5, delay: i * 0.08 }}
                 className={`relative rounded-3xl p-7 backdrop-blur-xl ${
                   p.highlight
-                    ? 'border border-[rgba(81,193,31,0.4)] bg-gradient-to-br from-[#51C11F]/18 via-[#45A91A]/10 to-cyan-400/8 shadow-[0_8px_24px_rgba(81,193,31,0.12)]'
+                    ? 'border border-[rgba(44,134,3,0.4)] bg-gradient-to-br from-[#2C8603]/18 via-[#2C8603]/10 to-cyan-400/8 shadow-[0_8px_24px_rgba(44,134,3,0.12)]'
                     : 'border border-white/10 bg-white/[0.03]'
                 }`}
               >
                 {p.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#51C11F] to-[#45A91A] text-white text-[10px] font-bold px-3 py-1 uppercase tracking-widest">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#2C8603] to-[#2C8603] text-white text-[10px] font-bold px-3 py-1 uppercase tracking-widest">
                     <Sparkles className="h-3 w-3" /> Most popular
                   </div>
                 )}
@@ -103,7 +103,7 @@ export function PricingSection() {
                   asChild
                   className={`mt-6 w-full rounded-full h-11 ${
                     p.highlight
-                      ? 'bg-gradient-to-r from-[#51C11F] to-[#45A91A] text-white font-semibold hover:opacity-90'
+                      ? 'bg-gradient-to-r from-[#2C8603] to-[#2C8603] text-white font-semibold hover:opacity-90'
                       : 'bg-white/10 text-white hover:bg-white/15 border border-white/15'
                   }`}
                 >

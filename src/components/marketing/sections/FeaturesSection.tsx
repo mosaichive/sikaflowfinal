@@ -31,9 +31,9 @@ const CATEGORIES: Category[] = [
     highlight: 'sales',
     subtitle: 'Sales, expenses & profit in one view',
     image: salesImage,
-    gradient: 'from-[#51C11F]/35 via-[#45A91A]/18 to-transparent',
-    glow: 'from-[#51C11F]/45 to-[#45A91A]/24',
-    accent: 'bg-[#51C11F]',
+    gradient: 'from-[#2C8603]/35 via-[#2C8603]/18 to-transparent',
+    glow: 'from-[#2C8603]/45 to-[#2C8603]/24',
+    accent: 'bg-[#2C8603]',
     mockup: 'sales',
     features: [
       { icon: TrendingUp, label: 'Sales Tracking' },
@@ -63,9 +63,9 @@ const CATEGORIES: Category[] = [
     highlight: 'business',
     subtitle: 'Team, reports & cloud anywhere',
     image: growImage,
-    gradient: 'from-[#51C11F]/35 via-[#45A91A]/18 to-transparent',
-    glow: 'from-[#51C11F]/45 to-[#45A91A]/24',
-    accent: 'bg-[#51C11F]',
+    gradient: 'from-[#2C8603]/35 via-[#2C8603]/18 to-transparent',
+    glow: 'from-[#2C8603]/45 to-[#2C8603]/24',
+    accent: 'bg-[#2C8603]',
     mockup: 'team',
     features: [
       { icon: Users, label: 'Team Management' },
@@ -134,7 +134,7 @@ export function FeaturesSection() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">{cat.eyebrow}</p>
                 <h3 className="text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-slate-950">
                   {cat.title}{' '}
-                  <span className="bg-gradient-to-r from-[#51C11F] via-[#45A91A] to-[#B7F49E] bg-clip-text text-transparent italic">
+                  <span className="bg-gradient-to-r from-[#2C8603] via-[#2C8603] to-[#2C8603] bg-clip-text text-transparent italic">
                     {cat.highlight}
                   </span>
                 </h3>
@@ -165,7 +165,7 @@ export function FeaturesSection() {
         >
           <Button
             onClick={() => navigate('/sign-up')}
-            className="bg-gradient-to-r from-[#51C11F] to-[#45A91A] text-white hover:opacity-90 rounded-full px-8 h-12 font-semibold text-base shadow-[0_8px_24px_rgba(81,193,31,0.12)]"
+            className="bg-gradient-to-r from-[#2C8603] to-[#2C8603] text-white hover:opacity-90 rounded-full px-8 h-12 font-semibold text-base shadow-[0_8px_24px_rgba(44,134,3,0.12)]"
           >
             Start Tracking Today <ArrowRight className="ml-1.5 h-4 w-4" />
           </Button>
@@ -197,7 +197,7 @@ function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }
           <div className="text-lg font-bold text-slate-900">GH₵ 12,480</div>
           <div className="mt-2 flex items-end gap-1 h-8">
             {[40, 65, 35, 80, 55, 90, 70].map((h, idx) => (
-              <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-[#51C11F] to-[#45A91A]" style={{ height: `${h}%` }} />
+              <div key={idx} className="flex-1 rounded-sm bg-gradient-to-t from-[#2C8603] to-[#2C8603]" style={{ height: `${h}%` }} />
             ))}
           </div>
         </>
@@ -226,12 +226,12 @@ function FloatingMockup({ variant }: { variant: 'sales' | 'inventory' | 'team' }
         <>
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold text-slate-900">Team Activity</span>
-            <span className="font-semibold text-[#51C11F]">5 active</span>
+            <span className="font-semibold text-[#2C8603]">5 active</span>
           </div>
           {[
-            { name: 'Ama K.', role: 'Manager', color: 'bg-[#51C11F]' },
+            { name: 'Ama K.', role: 'Manager', color: 'bg-[#2C8603]' },
             { name: 'Kwame O.', role: 'Sales', color: 'bg-cyan-500' },
-            { name: 'Zola M.', role: 'Sales', color: 'bg-[#45A91A]' },
+            { name: 'Zola M.', role: 'Sales', color: 'bg-[#2C8603]' },
           ].map((m) => (
             <div key={m.name} className="flex items-center gap-2 mb-1 last:mb-0">
               <div className={`h-5 w-5 rounded-full ${m.color} flex items-center justify-center text-white text-[8px] font-bold`}>
@@ -265,7 +265,7 @@ export function SectionHeader({
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className={`text-xs font-semibold uppercase tracking-[0.2em] mb-3 ${isLight ? 'text-emerald-700' : 'text-[#7BDF58]'}`}
+          className={`text-xs font-semibold uppercase tracking-[0.2em] mb-3 ${isLight ? 'text-emerald-700' : 'text-[#2C8603]'}`}
         >
           {eyebrow}
         </motion.p>

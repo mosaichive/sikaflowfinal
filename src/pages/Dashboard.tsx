@@ -872,7 +872,7 @@ export default function Dashboard() {
 
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
                 {hasModule('sales') ? (
-                  <Button asChild className="h-12 rounded-[8px] bg-[#51C11F] px-5 text-white hover:bg-[#45A91A]">
+                  <Button asChild className="h-12 rounded-[8px] bg-[#2C8603] px-5 text-white hover:bg-[#2C8603]">
                     <Link to="/sales?newSale=1"><Plus className="mr-2 h-4 w-4" />New Sale</Link>
                   </Button>
                 ) : null}
@@ -956,9 +956,9 @@ export default function Dashboard() {
             value={dailySales}
             icon={ShoppingCart}
             trend={trends.dailySales}
-            iconClassName="bg-[rgba(81,193,31,0.12)] text-[#51C11F] dark:bg-[rgba(81,193,31,0.18)] dark:text-[#7BDF58]"
-            glowClassName="bg-[#51C11F]"
-            sparklineColor="#51C11F"
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)] dark:text-[#2C8603]"
+            glowClassName="bg-[#2C8603]"
+            sparklineColor="#2C8603"
             sparklineData={sparklineSeries.sales}
           />
           <KpiCard
@@ -978,9 +978,9 @@ export default function Dashboard() {
             value={filteredFinancials.expenses}
             icon={Receipt}
             trend={expensesTrendDisplay}
-            iconClassName="bg-[rgba(81,193,31,0.12)] text-[#51C11F] dark:bg-[rgba(81,193,31,0.18)] dark:text-[#7BDF58]"
-            glowClassName="bg-[#51C11F]"
-            sparklineColor="#51C11F"
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)] dark:text-[#2C8603]"
+            glowClassName="bg-[#2C8603]"
+            sparklineColor="#2C8603"
             sparklineData={sparklineSeries.expenses}
           />
           <KpiCard
@@ -1004,7 +1004,7 @@ export default function Dashboard() {
             value={financials.stockLeft}
             icon={Boxes}
             helper="Live inventory units"
-            iconClassName="bg-[rgba(81,193,31,0.12)] text-[#51C11F] dark:bg-[rgba(81,193,31,0.15)] dark:text-[#7BDF58]"
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.15)] dark:text-[#2C8603]"
           />
           <MiniMetric
             index={1}
@@ -1061,12 +1061,12 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
-                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#51C11F] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
-                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#51C11F] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
-                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#51C11F] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
+                        <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#2C8603] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Sales</TabsTrigger>
+                        <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#2C8603] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Profit</TabsTrigger>
+                        <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm text-slate-600 data-[state=active]:bg-[#2C8603] data-[state=active]:text-white dark:text-slate-300 dark:data-[state=active]:text-white">Expenses</TabsTrigger>
                       </TabsList>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-[#51C11F]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#51C11F]/40">
+                        <SelectTrigger className="h-11 w-[148px] rounded-[8px] border-slate-200 bg-white px-4 text-sm text-slate-950 shadow-sm ring-offset-white focus:ring-[#2C8603]/30 dark:border-[#263247] dark:bg-[#0a111b] dark:text-white dark:ring-offset-[#070b12] dark:focus:ring-[#2C8603]/40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1081,7 +1081,7 @@ export default function Dashboard() {
                   </div>
 
                   <TabsContent value="sales" className="mt-0">
-                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#51C11F" stop1="#51C11F" stop2="#51C11F" stop1Opacity={0.18} stop2Opacity={0.02} activeDotStroke="#45A91A" emptyText="No paid sales recorded for this year yet." year={year} />
+                    <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#2C8603" stop1="#2C8603" stop2="#2C8603" stop1Opacity={0.18} stop2Opacity={0.02} activeDotStroke="#2C8603" emptyText="No paid sales recorded for this year yet." year={year} />
                   </TabsContent>
                   <TabsContent value="profit" className="mt-0">
                     <AnalyticsChart data={yearlyAnalyticsData} dataKey="profit" gradientId="gradProfit" stroke="#35df74" stop1="#22c55e" stop2="#111827" emptyText="No profit data for this year." year={year} />
@@ -1154,7 +1154,7 @@ export default function Dashboard() {
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80">
                         <Package className="h-12 w-12 text-slate-400 dark:text-slate-400" />
-                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(81,193,31,0.25)] bg-[rgba(81,193,31,0.15)] text-[#51C11F] shadow-[0_8px_24px_rgba(81,193,31,0.12)] dark:text-[#7BDF58]">
+                        <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(44,134,3,0.25)] bg-[rgba(44,134,3,0.15)] text-[#2C8603] shadow-[0_8px_24px_rgba(44,134,3,0.12)] dark:text-[#2C8603]">
                           <CheckCircle2 className="h-6 w-6" />
                         </span>
                       </div>
@@ -1165,7 +1165,7 @@ export default function Dashboard() {
                 </div>
 
                 {hasModule('inventory') ? (
-                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-[rgba(81,193,31,0.35)] bg-white text-[#51C11F] hover:border-[#51C11F] hover:bg-[rgba(81,193,31,0.08)] hover:text-[#51C11F] dark:border-[rgba(81,193,31,0.32)] dark:bg-transparent dark:text-[#7BDF58] dark:hover:border-[#45A91A] dark:hover:bg-[rgba(81,193,31,0.12)] dark:hover:text-white">
+                  <Button asChild variant="outline" className="h-12 w-full rounded-[8px] border-[rgba(44,134,3,0.35)] bg-white text-[#2C8603] hover:border-[#2C8603] hover:bg-[rgba(44,134,3,0.08)] hover:text-[#2C8603] dark:border-[rgba(44,134,3,0.32)] dark:bg-transparent dark:text-[#2C8603] dark:hover:border-[#2C8603] dark:hover:bg-[rgba(44,134,3,0.12)] dark:hover:text-white">
                     <Link to="/inventory" className="flex items-center justify-center gap-2">
                       View Inventory
                       <ChevronRight className="h-4 w-4" />

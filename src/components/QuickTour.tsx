@@ -92,7 +92,7 @@ const STEPS: Step[] = [
       'Export to PDF or share',
     ],
     cta: { label: 'View Reports', route: '/reports' },
-    accent: 'from-[#51C11F]/18 to-[#45A91A]/6',
+    accent: 'from-[#2C8603]/18 to-[#2C8603]/6',
   },
 ];
 
