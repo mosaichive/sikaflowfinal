@@ -82,7 +82,10 @@ export default function SalesPage() {
 
   const [lines, setLines] = useState<SaleLine[]>([newLine()]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [amountPaid, setAmountPaid] = useState(0);
+  // Amount paid is a string so the field can be left empty by default;
+  // the user must type the amount they actually received.
+  const [amountPaid, setAmountPaid] = useState<string>('');
+  const [discountConfirmed, setDiscountConfirmed] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
