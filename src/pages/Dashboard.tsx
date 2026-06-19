@@ -63,11 +63,13 @@ type SaleItemRow = {
 type ProductRow = {
   id: string;
   name: string;
+  category?: string | null;
   quantity: number | null;
   selling_price: number | string | null;
   cost_price?: number | string | null;
   low_stock_threshold?: number | null;
   reorder_level?: number | null;
+  image_url?: string | null;
   is_archived?: boolean | null;
 };
 
@@ -713,6 +715,14 @@ export default function Dashboard() {
         .slice(0, 4),
     [data.products],
   );
+  const stockPanelProducts = useMemo(
+    () =>
+      [...data.products]
+        .filter((product) => !product.is_archived)
+        .sort((left, right) => toNumber(left.quantity) - toNumber(right.quantity) || left.name.localeCompare(right.name))
+        .slice(0, 6),
+    [data.products],
+  );
   const negativeStockProducts = useMemo(
     () => data.products.filter((product) => !product.is_archived && toNumber(product.quantity) < 0),
     [data.products],
@@ -1126,40 +1136,73 @@ export default function Dashboard() {
                   <span className="rounded-[7px] bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">↯ Live</span>
                 </div>
 
-                <div className="flex flex-1 flex-col justify-center rounded-[12px] border border-slate-200 bg-white p-5 shadow-sm dark:border-[#223044] dark:bg-[#090f18]/75">
-                  {lowStockProducts.length > 0 ? lowStockProducts.map((product, idx) => {
-                    const qty = toNumber(product.quantity);
-                    const threshold = toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0);
-                    return (
-                      <motion.div
-                        key={product.id}
-                        initial={{ opacity: 0, x: 12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.35 + idx * 0.06 }}
-                        className="mb-3 flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:border-amber-400/60 dark:border-[#223044] dark:bg-[#0c121b] dark:hover:border-amber-500/40 last:mb-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">Threshold: {threshold}</p>
-                        </div>
-                        <span className={cn(
-                          'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
-                          qty <= 0 ? 'bg-rose-500/20 text-rose-400' : qty <= threshold / 2 ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/10 text-amber-300',
-                        )}>
-                          {qty} left
-                        </span>
-                      </motion.div>
-                    );
-                  }) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="flex flex-1 flex-col rounded-[12px] border border-slate-200 bg-white p-4 shadow-sm dark:border-[#223044] dark:bg-[#090f18]/75">
+                  {stockPanelProducts.length > 0 ? (
+                    <div className="space-y-3 overflow-y-auto pr-1">
+                      {stockPanelProducts.map((product, idx) => {
+                        const qty = Math.max(0, toNumber(product.quantity));
+                        const threshold = Math.max(0, toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0));
+                        const targetStock = Math.max(qty, threshold * 3, 1);
+                        const stockPercent = Math.min(100, Math.max(qty > 0 ? 8 : 0, Math.round((qty / targetStock) * 100)));
+                        const isLow = threshold > 0 && qty <= threshold;
+                        const isCritical = threshold > 0 && qty <= Math.max(1, threshold / 2);
+
+                        return (
+                          <motion.div
+                            key={product.id}
+                            initial={{ opacity: 0, x: 12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.35 + idx * 0.06 }}
+                            className="rounded-[10px] border border-slate-200 bg-slate-50/90 p-3 transition-colors hover:border-[rgba(44,134,3,0.35)] dark:border-[#223044] dark:bg-[#0c121b] dark:hover:border-[rgba(44,134,3,0.35)]"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-slate-100 dark:bg-slate-800/80">
+                                {product.image_url ? (
+                                  <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
+                                ) : (
+                                  <Package className="h-5 w-5 text-slate-400 dark:text-slate-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</p>
+                                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">{product.category || 'Uncategorized'}</p>
+                                  </div>
+                                  <span className={cn(
+                                    'shrink-0 text-sm font-semibold',
+                                    isCritical ? 'text-rose-500 dark:text-rose-400' : isLow ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200',
+                                  )}>
+                                    {qty} {qty === 1 ? 'unit' : 'units'}
+                                  </span>
+                                </div>
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-[#1b2637]">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${stockPercent}%` }}
+                                    transition={{ duration: 0.55, delay: 0.45 + idx * 0.05, ease: 'easeOut' }}
+                                    className={cn(
+                                      'h-full rounded-full',
+                                      isCritical ? 'bg-rose-500' : isLow ? 'bg-amber-500' : 'bg-[#2C8603]',
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
                       <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80">
                         <Package className="h-12 w-12 text-slate-400 dark:text-slate-400" />
                         <span className="absolute bottom-2 right-1 flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(44,134,3,0.25)] bg-[rgba(44,134,3,0.15)] text-[#2C8603] shadow-[0_8px_24px_rgba(44,134,3,0.12)] dark:text-[#2C8603]">
                           <CheckCircle2 className="h-6 w-6" />
                         </span>
                       </div>
-                      <p className="text-base font-medium text-slate-900 dark:text-white">All products are well stocked</p>
-                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Great job! No low-stock items at the moment.</p>
+                      <p className="text-base font-medium text-slate-900 dark:text-white">No products yet</p>
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Add products to see live stock details here.</p>
                     </div>
                   )}
                 </div>
