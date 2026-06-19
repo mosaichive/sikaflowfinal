@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const { data: sale, error: saleErr } = await admin
       .from('sales')
-      .select('id, user_id, total, customer_phone, customer_name')
+      .select('id, user_id, total, amount_paid, balance, due_date, payment_status, customer_phone, customer_name')
       .eq('id', saleId)
       .maybeSingle();
     if (saleErr || !sale) return json({ ok: false, reason: 'sale_not_found' });
@@ -61,8 +61,20 @@ Deno.serve(async (req) => {
     }
 
     const businessName = profile?.business_name?.trim() || 'our store';
-    const amount = Number(sale.total ?? 0).toFixed(2);
-    const message = `Thank you for buying from ${businessName}. Your purchase of GHS ${amount} has been recorded. We appreciate your business.`;
+    const total = Number(sale.total ?? 0);
+    const paid = Number(sale.amount_paid ?? 0);
+    const balance = Number(sale.balance ?? Math.max(0, total - paid));
+    const hasBalance = balance > 0.0049 && sale.payment_status !== 'paid';
+
+    let message: string;
+    if (hasBalance) {
+      const dueText = sale.due_date
+        ? new Date(sale.due_date as string).toISOString().slice(0, 10)
+        : 'as soon as possible';
+      message = `Thank you for buying from ${businessName}. Your total is GHS ${total.toFixed(2)}. You paid GHS ${paid.toFixed(2)}. Balance due: GHS ${balance.toFixed(2)}. Please pay by ${dueText}.`;
+    } else {
+      message = `Thank you for buying from ${businessName}. Your purchase of GHS ${total.toFixed(2)} has been recorded. We appreciate your business.`;
+    }
 
     try {
       const provider = await sendAtSms(phone, message);
