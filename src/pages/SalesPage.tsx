@@ -297,6 +297,14 @@ export default function SalesPage() {
       toast({ title: 'Add at least one product', description: 'Pick a product and enter a quantity.', variant: 'destructive' });
       return;
     }
+    if (balance > 0 && !discountConfirmed && !dueDate) {
+      toast({
+        title: 'Due date required',
+        description: `Customer has an outstanding balance of ${formatCurrency(balance)}. Please set a due date or confirm the difference as a discount.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     if (editSaleId) {
       await handleSaveEdit();
     } else {
