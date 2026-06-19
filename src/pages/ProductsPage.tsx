@@ -226,15 +226,27 @@ export default function ProductsPage() {
       }
 
       const lowStockThreshold = Math.max(0, Number(form.low_stock_threshold || 0));
-      let imageUrl: string | null = productImagePreview || null;
+      let imageUrl: string | null = productImageFile ? (editing?.image_url ?? null) : (productImagePreview || null);
+      let imageUploadError: unknown = null;
 
-      if (productImageFile) {
-        imageUrl = await uploadProductImage(
-          activeBusinessId,
-          editing?.id ?? crypto.randomUUID(),
-          productImageFile,
-        );
-      }
+      const uploadAndAttachProductImage = async (productId: string) => {
+        if (!productImageFile) return imageUrl;
+
+        try {
+          const uploadedUrl = await uploadProductImage(activeBusinessId, productId, productImageFile);
+          await updateProductRecord(productId, { image_url: uploadedUrl });
+          return uploadedUrl;
+        } catch (error) {
+          imageUploadError = error;
+          logSupabaseError('products.imageUpload', error, {
+            businessId: activeBusinessId,
+            productId,
+            fileType: productImageFile.type,
+            fileSize: productImageFile.size,
+          });
+          return imageUrl;
+        }
+      };
 
       const basePayload = {
         business_id: activeBusinessId,
@@ -255,22 +267,33 @@ export default function ProductsPage() {
           sku: editing.sku,
         };
         await updateProductRecord(editing.id, payload);
+        imageUrl = await uploadAndAttachProductImage(editing.id);
+
+        const savedPayload = {
+          ...payload,
+          image_url: imageUrl,
+        };
 
         setRows((current) =>
           current.map((row) =>
             row.id === editing.id
               ? {
                   ...row,
-                  ...payload,
+                  ...savedPayload,
                 }
               : row,
           ),
         );
         rememberCachedProduct(activeBusinessId, {
           id: editing.id,
-          ...payload,
+          ...savedPayload,
         });
-        toast({ title: 'Product updated' });
+        toast({
+          title: 'Product updated',
+          description: imageUploadError
+            ? `Product details were saved, but the image could not upload: ${getErrorMessage(imageUploadError)}`
+            : undefined,
+        });
       } else {
         const payload = {
           ...basePayload,
@@ -278,18 +301,24 @@ export default function ProductsPage() {
           quantity: 0,
         };
         const created = await createProductRecord(payload);
+        imageUrl = await uploadAndAttachProductImage(created.id);
+
+        const savedPayload = {
+          ...payload,
+          image_url: imageUrl,
+        };
 
         setRows((current) => {
           const nextRow: ProductRow = {
             id: created.id,
-            name: payload.name,
-            category: payload.category,
-            sku: payload.sku,
+            name: savedPayload.name,
+            category: savedPayload.category,
+            sku: savedPayload.sku,
             quantity: 0,
-            cost_price: Number(payload.cost_price ?? 0),
-            selling_price: Number(payload.selling_price ?? 0),
-            low_stock_threshold: Number(payload.low_stock_threshold ?? payload.reorder_level ?? 0),
-            reorder_level: Number(payload.reorder_level ?? payload.low_stock_threshold ?? 0),
+            cost_price: Number(savedPayload.cost_price ?? 0),
+            selling_price: Number(savedPayload.selling_price ?? 0),
+            low_stock_threshold: Number(savedPayload.low_stock_threshold ?? savedPayload.reorder_level ?? 0),
+            reorder_level: Number(savedPayload.reorder_level ?? savedPayload.low_stock_threshold ?? 0),
             image_url: imageUrl,
             is_archived: false,
           };
@@ -299,12 +328,13 @@ export default function ProductsPage() {
         });
         rememberCachedProduct(activeBusinessId, {
           id: created.id,
-          ...payload,
-          image_url: imageUrl,
+          ...savedPayload,
         });
         toast({
           title: 'Product added',
-          description: 'Add stock later from Inventory.',
+          description: imageUploadError
+            ? `Product was saved, but the image could not upload: ${getErrorMessage(imageUploadError)}`
+            : 'Add stock later from Inventory.',
         });
       }
 
