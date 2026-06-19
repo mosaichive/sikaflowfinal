@@ -275,7 +275,13 @@ export default function SalesPage() {
       })),
     );
     setPaymentMethod(sale.payment_method);
-    setAmountPaid(Number(sale.amount_paid));
+    setAmountPaid(sale.amount_paid != null ? String(sale.amount_paid) : '');
+    // When editing, if the saved sale is fully paid but the amount paid is
+    // less than the total, the difference was previously confirmed as a discount.
+    setDiscountConfirmed(
+      sale.payment_status === 'paid' &&
+        Number(sale.amount_paid ?? 0) < Number(sale.total ?? 0),
+    );
     setCustomerName(sale.customer_name || '');
     setCustomerPhone(sale.customer_phone || '');
     setSaleDate(new Date(sale.sale_date).toISOString().slice(0, 10));
