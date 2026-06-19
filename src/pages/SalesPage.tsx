@@ -784,14 +784,70 @@ export default function SalesPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div><Label>Amount Paid (GH₵)</Label><Input type="number" min={0} value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} /></div>
+                <div>
+                  <Label>Amount Paid (GH₵)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={amountPaid}
+                    onChange={e => setAmountPaid(e.target.value)}
+                  />
+                </div>
                 <div><Label>Sale Date</Label><Input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></div>
               </div>
 
+              {rawShortfall > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Difference detected
+                      </Label>
+                      <p className="text-sm font-semibold">
+                        {formatCurrency(rawShortfall)} short of the total.
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Auto-discount: <span className="font-semibold text-foreground">{formatCurrency(rawShortfall)}</span>
+                    </span>
+                  </div>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={discountConfirmed}
+                      onCheckedChange={(v) => setDiscountConfirmed(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm leading-tight">
+                      Confirm this difference as a discount
+                      <span className="block text-[11px] text-muted-foreground">
+                        Check this box only if the difference is a discount. Leave unchecked if the customer will pay the balance later.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {balance > 0 && !discountConfirmed && (
+                <p className="text-xs text-destructive">
+                  Customer has an outstanding balance of {formatCurrency(balance)}.
+                </p>
+              )}
+
               {paymentStatus !== 'paid' && (
                 <div>
-                  <Label>Due Date</Label>
-                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  <Label>
+                    Due Date
+                    {balance > 0 && !discountConfirmed && <span className="text-destructive"> *</span>}
+                  </Label>
+                  <Input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    required={balance > 0 && !discountConfirmed}
+                  />
                 </div>
               )}
 
