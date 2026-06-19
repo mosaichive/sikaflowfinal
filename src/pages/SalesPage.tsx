@@ -120,12 +120,18 @@ export default function SalesPage() {
 
   const computed = useMemo(() => lines.map(computeLine), [lines, allProducts]);
   const subtotal = computed.reduce((s, c) => s + c.qty * c.defaultPrice, 0);
-  const discount = computed.reduce((s, c) => s + c.disc, 0);
+  const lineDiscount = computed.reduce((s, c) => s + c.disc, 0);
   const total = computed.reduce((s, c) => s + c.amount, 0);
   const costTotal = computed.reduce((s, c) => s + c.qty * c.costPrice, 0);
-  const balance = Math.max(0, total - amountPaid);
+  const paidNumber = amountPaid.trim() === '' ? 0 : Math.max(0, Number(amountPaid) || 0);
+  const rawShortfall = Math.max(0, total - paidNumber);
+  // When the user confirms the shortfall is a discount, fold it into the
+  // saved discount amount and zero-out the balance.
+  const extraDiscount = discountConfirmed && rawShortfall > 0 ? rawShortfall : 0;
+  const discount = lineDiscount + extraDiscount;
+  const balance = Math.max(0, total - paidNumber - extraDiscount);
   const profit = total - costTotal;
-  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+  const paymentStatus = balance <= 0 && total > 0 ? 'paid' : paidNumber > 0 ? 'partial' : 'unpaid';
   const validLines = computed.filter((c) => c.product && c.qty > 0);
   void isManager; // reserved for future per-row override permissions
   const allowSalesWithoutStock = Boolean(business?.allow_sales_without_stock);
