@@ -172,26 +172,32 @@ function SignInPanel() {
     setError('');
     setSubmitting(true);
     try {
-      let email = identifier.trim();
-      if (!looksLikeEmail(email)) {
-        const normalized = normalizeGhanaPhone(email);
+      const value = identifier.trim();
+      if (looksLikeEmail(value)) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: value, password });
+        if (signInError) throw signInError;
+      } else {
+        const normalized = normalizeGhanaPhone(value);
         if (!isValidE164(normalized)) {
           throw new Error('Enter your email address or a valid phone number (e.g. 0244123456).');
         }
         const { data, error: fnErr } = await supabase.functions.invoke('resolve-phone-login', {
-          body: { phone: normalized },
+          body: { phone: normalized, password },
         });
         if (fnErr) {
-          const message = await getFunctionErrorMessage(fnErr, 'Could not sign in with this phone number.');
+          const message = await getFunctionErrorMessage(fnErr, 'Invalid phone number or password.');
           throw new Error(message);
         }
-        const resolved = (data as { email?: string } | null)?.email;
-        if (!resolved) throw new Error('No account is registered with this phone number.');
-        email = resolved;
+        const tokens = data as { access_token?: string; refresh_token?: string } | null;
+        if (!tokens?.access_token || !tokens.refresh_token) {
+          throw new Error('Invalid phone number or password.');
+        }
+        const { error: setErr } = await supabase.auth.setSession({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+        });
+        if (setErr) throw setErr;
       }
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
       navigate(afterAuthPath, { replace: true });
     } catch (authError: unknown) {
       setError(friendlyAuthError(authError));
@@ -199,6 +205,7 @@ function SignInPanel() {
       setSubmitting(false);
     }
   };
+
 
   return (
     <>

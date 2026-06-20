@@ -1,6 +1,9 @@
-// Resolve a verified phone number to its account email so the client can sign
-// in with email + password. Returns 404 if no account, 403 if phone exists but
-// is not verified, 200 with { email } if verified.
+// Server-side phone+password sign-in. Avoids disclosing the account email to
+// unauthenticated callers (which would enable phone→email PII enumeration).
+// The client posts { phone, password } and receives a Supabase session it can
+// install via supabase.auth.setSession(). Returns a single generic error
+// message regardless of whether the phone exists, is unverified, or the
+// password is wrong — preventing account enumeration.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizePhone } from '../_shared/at-sms.ts';
 
@@ -11,13 +14,16 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+const GENERIC_ERROR = 'Invalid phone number or password.';
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({}));
     const phone = normalizePhone(body.phone);
-    if (!phone || !/^\+\d{9,15}$/.test(phone)) {
-      return json({ error: 'Enter a valid phone number.' }, 400);
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!phone || !/^\+\d{9,15}$/.test(phone) || !password) {
+      return json({ error: GENERIC_ERROR }, 400);
     }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -27,15 +33,25 @@ Deno.serve(async (req) => {
       .eq('phone', phone)
       .maybeSingle();
 
-    if (!profile || !profile.email) {
-      return json({ error: 'No account is registered with this phone number.' }, 404);
+    if (!profile?.email || !profile.phone_verified) {
+      return json({ error: GENERIC_ERROR }, 400);
     }
-    if (!profile.phone_verified) {
-      return json({ error: 'This phone number has not been verified.' }, 403);
+
+    const anon = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!);
+    const { data: session, error } = await anon.auth.signInWithPassword({
+      email: profile.email,
+      password,
+    });
+    if (error || !session?.session) {
+      return json({ error: GENERIC_ERROR }, 400);
     }
-    return json({ email: profile.email });
+
+    return json({
+      access_token: session.session.access_token,
+      refresh_token: session.session.refresh_token,
+    });
   } catch (err) {
     console.error('[resolve-phone-login] error', err);
-    return json({ error: (err as Error).message || 'Internal error' }, 500);
+    return json({ error: GENERIC_ERROR }, 400);
   }
 });
