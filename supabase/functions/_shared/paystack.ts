@@ -1,5 +1,8 @@
 // Shared Paystack helpers used by paystack-verify and paystack-webhook.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { notifySuperAdmin } from "./super-admin-sms.ts";
+
+const PLAN_LABELS: Record<string, string> = { monthly: "Monthly", annual: "Annual" };
 
 export const PAYSTACK_BASE = "https://api.paystack.co";
 export const PLAN_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
