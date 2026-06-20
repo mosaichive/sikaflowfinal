@@ -49,6 +49,9 @@ export function AdvertiseSection() {
       toast.error('Could not send application. Please try again.');
       return;
     }
+    supabase.functions.invoke('notify-admin-event', {
+      body: { type: 'ad_application', business_name: form.business_name.trim(), sender_name: form.contact_name.trim() },
+    }).catch((err) => console.warn('[notify-admin-event] ad_application failed', err));
     setSuccess(true);
     setForm({ business_name: '', contact_name: '', email: '', phone: '', business_type: '', ad_goal: '', budget: '', message: '' });
     toast.success('Application sent! We will be in touch.');
