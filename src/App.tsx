@@ -48,7 +48,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-const PhoneLoginPage = lazy(() => import("./pages/PhoneLoginPage"));
+
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 
 function MarketingOrDashboard() {
@@ -164,7 +164,7 @@ const App = () => (
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/phone-login" element={<PhoneLoginPage />} />
+                <Route path="/phone-login" element={<Navigate to="/sign-in" replace />} />
                 <Route path="/change-password" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/verify" element={<Navigate to="/dashboard" replace />} />
 
