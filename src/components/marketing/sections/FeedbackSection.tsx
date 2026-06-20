@@ -42,6 +42,9 @@ export function FeedbackSection() {
       toast.error('Could not send message. Please try again.');
       return;
     }
+    supabase.functions.invoke('notify-admin-event', {
+      body: { type: 'feedback', business_name: form.name.trim(), email: form.email.trim() },
+    }).catch((err) => console.warn('[notify-admin-event] feedback failed', err));
     setSuccess(true);
     setForm({ name: '', email: '', subject: '', message: '' });
     toast.success('Message sent!');
