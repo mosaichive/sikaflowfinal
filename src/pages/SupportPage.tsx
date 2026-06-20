@@ -152,6 +152,15 @@ export default function SupportPage() {
       return;
     }
 
+    // Fire-and-forget Super Admin SMS alert (never blocks UI).
+    supabase.functions.invoke('notify-admin-event', {
+      body: {
+        type: 'support',
+        business_name: business?.name || form.name.trim(),
+        sender_name: form.name.trim(),
+      },
+    }).catch((err) => console.warn('[notify-admin-event] support failed', err));
+
     toast({ title: 'Message sent', description: 'Support has received your message.' });
     setForm((current) => ({
       ...current,

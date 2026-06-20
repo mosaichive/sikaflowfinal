@@ -1,5 +1,8 @@
 // Shared Paystack helpers used by paystack-verify and paystack-webhook.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { notifySuperAdmin } from "./super-admin-sms.ts";
+
+const PLAN_LABELS: Record<string, string> = { monthly: "Monthly", annual: "Annual" };
 
 export const PAYSTACK_BASE = "https://api.paystack.co";
 export const PLAN_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
@@ -64,6 +67,21 @@ export async function activatePayment(
     subscription_start_date: now.toISOString(),
     subscription_end_date: expires.toISOString(),
   }).eq("id", payment.user_id);
+
+  // Fire-and-forget Super Admin SMS for successful payment. Never blocks activation.
+  try {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("business_name,display_name,email")
+      .eq("id", payment.user_id)
+      .maybeSingle();
+    const businessName = profile?.business_name || profile?.display_name || profile?.email || "A KudiTrack user";
+    const planLabel = PLAN_LABELS[payment.plan] ?? payment.plan;
+    const message = `KudiTrack Payment Alert: ${businessName} completed ${planLabel} payment of GH₵${amountPaid}. Ref: ${reference}.`;
+    await notifySuperAdmin(message, { kind: "payment_success", reference, user_id: payment.user_id });
+  } catch (err) {
+    console.error("[paystack] super-admin notify error (non-blocking)", err);
+  }
 
   return { status: "confirmed", expires_at: expires.toISOString() };
 }
