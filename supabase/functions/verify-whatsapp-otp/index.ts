@@ -3,6 +3,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { hashCode } from '../_shared/at-sms.ts'
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -29,17 +31,19 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Find valid OTP
+    // Find valid OTP (compare hashed)
+    const otpHash = await hashCode(otp)
     const { data: otpRecord } = await supabase
       .from('password_reset_otps')
       .select('*')
       .eq('phone', phone)
-      .eq('otp_code', otp)
+      .eq('otp_code', otpHash)
       .eq('used', false)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
 
     if (!otpRecord) {
       // Increment attempts on latest OTP for this phone

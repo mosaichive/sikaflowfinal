@@ -3,6 +3,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { hashCode } from '../_shared/at-sms.ts'
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -60,12 +62,14 @@ Deno.serve(async (req) => {
     const otp = String(Math.floor(100000 + Math.random() * 900000))
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    // Store OTP
+    // Store hashed OTP (never plaintext)
+    const otpHash = await hashCode(otp)
     await supabase.from('password_reset_otps').insert({
       phone,
-      otp_code: otp,
+      otp_code: otpHash,
       expires_at: expiresAt,
     })
+
 
     // Format phone for WhatsApp (ensure + prefix)
     const whatsappTo = phone.startsWith('+') ? phone : `+${phone}`
