@@ -2,3 +2,6 @@ project_id = "sanssnguhbugfizgpmld"
 
 [functions.paystack-webhook]
 verify_jwt = false
+
+[functions.resolve-phone-login]
+verify_jwt = false
