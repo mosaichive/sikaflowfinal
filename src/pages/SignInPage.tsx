@@ -221,7 +221,7 @@ function SignInPanel() {
 
       <form className="space-y-4" onSubmit={submit}>
         <div className="space-y-2">
-          <Label htmlFor="identifier">Email or Phone Number</Label>
+          <Label htmlFor="identifier">Email / Phone Number</Label>
           <Input
             id="identifier"
             autoComplete="username"
