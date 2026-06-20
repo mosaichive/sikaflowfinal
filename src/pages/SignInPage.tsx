@@ -8,32 +8,34 @@ import { AboutModal } from '@/components/auth/AboutModal';
 import { ContactModal } from '@/components/auth/ContactModal';
 import { SEO } from '@/components/SEO';
 import { getOtpErrorMessage, isValidE164, normalizeGhanaPhone } from '@/lib/phone-otp';
-
-function friendlyAuthError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? '');
-  const msg = raw.toLowerCase();
-  if (!isSupabaseConfigured) {
-    return 'Supabase is not connected. Please configure environment variables.';
-  }
-  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
-    return 'Cannot connect to authentication server. Check your internet connection or Supabase URL and anon key.';
-  }
-  if (msg.includes('invalid api key') || msg.includes('invalid jwt')) {
-    return 'Authentication is misconfigured. Check Supabase URL and anon key.';
-  }
-  return raw || 'Authentication failed. Please try again.';
-}
+import { getFunctionErrorMessage } from '@/lib/function-errors';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { getOrCreateReferralDeviceId, getPendingReferralToken, setPendingReferralToken } from '@/lib/referrals';
 
 type AuthMode = 'sign-in' | 'sign-up';
-type SignupChannel = 'email' | 'phone';
-type PhoneStage = 'collect' | 'verify';
+
+function friendlyAuthError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const msg = raw.toLowerCase();
+  if (!isSupabaseConfigured) {
+    return 'Backend is not connected. Please configure environment variables.';
+  }
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+    return 'Cannot connect to authentication server. Check your internet connection.';
+  }
+  if (msg.includes('invalid api key') || msg.includes('invalid jwt')) {
+    return 'Authentication is misconfigured. Please contact support.';
+  }
+  return raw || 'Authentication failed. Please try again.';
+}
+
+function looksLikeEmail(value: string) {
+  return /.+@.+\..+/.test(value.trim());
+}
 
 function AuthShell({ children }: { children: ReactNode }) {
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -41,7 +43,6 @@ function AuthShell({ children }: { children: ReactNode }) {
 
   return (
     <main className="relative min-h-screen bg-background text-foreground">
-      {/* Top-right navigation */}
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
         <button
           type="button"
@@ -101,42 +102,195 @@ function AuthShell({ children }: { children: ReactNode }) {
   );
 }
 
-function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [signupChannel, setSignupChannel] = useState<SignupChannel>('email');
-  const [phoneStage, setPhoneStage] = useState<PhoneStage>('collect');
-  const [phone, setPhone] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { toast } = useToast();
-  const referralToken = useMemo(
-    () => new URLSearchParams(location.search).get('ref')?.trim() || getPendingReferralToken(),
-    [location.search],
+function GoogleButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  return (
+    <Button type="button" variant="outline" className="w-full" disabled={disabled} onClick={onClick}>
+      <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35.5 24 35.5c-6.3 0-11.5-5.2-11.5-11.5S17.7 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.3-.4-3.5z" />
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 16.3 4.5 9.7 8.9 6.3 14.7z" />
+        <path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-2 13.3-5.2l-6.1-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.6 39 16.2 43.5 24 43.5z" />
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.1 5.2C40.8 36 43.5 30.5 43.5 24c0-1.2-.1-2.3-.4-3.5z" />
+      </svg>
+      Continue with Google
+    </Button>
   );
+}
 
+function OrDivider() {
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+function useAuthRedirect() {
+  const location = useLocation();
   const redirectTo = useMemo(() => {
     if (typeof window === 'undefined') return '/dashboard';
     const from = (location.state as { from?: string } | null)?.from;
     const nextPath = from && !from.startsWith('/sign-') && !from.startsWith('/auth') ? from : '/dashboard';
     return `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
   }, [location.state]);
-
   const afterAuthPath = useMemo(() => {
     const from = (location.state as { from?: string } | null)?.from;
     return from && !from.startsWith('/sign-') && !from.startsWith('/auth') ? from : '/dashboard';
   }, [location.state]);
+  return { redirectTo, afterAuthPath };
+}
 
-  const switchMode = (nextMode: AuthMode) => {
-    setMode(nextMode);
+function SignInPanel() {
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { redirectTo, afterAuthPath } = useAuthRedirect();
+
+  const handleGoogle = async () => {
     setError('');
-    navigate(`${nextMode === 'sign-in' ? '/sign-in' : '/sign-up'}${location.search}`, { replace: true, state: location.state });
+    setSubmitting(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: redirectTo,
+        extraParams: { prompt: 'select_account' },
+      });
+      if (result.error) throw result.error;
+      if (result.redirected) return;
+      navigate(afterAuthPath, { replace: true });
+    } catch (authError: unknown) {
+      setError(friendlyAuthError(authError));
+      setSubmitting(false);
+    }
   };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      let email = identifier.trim();
+      if (!looksLikeEmail(email)) {
+        const normalized = normalizeGhanaPhone(email);
+        if (!isValidE164(normalized)) {
+          throw new Error('Enter your email address or a valid phone number (e.g. 0244123456).');
+        }
+        const { data, error: fnErr } = await supabase.functions.invoke('resolve-phone-login', {
+          body: { phone: normalized },
+        });
+        if (fnErr) {
+          const message = await getFunctionErrorMessage(fnErr, 'Could not sign in with this phone number.');
+          throw new Error(message);
+        }
+        const resolved = (data as { email?: string } | null)?.email;
+        if (!resolved) throw new Error('No account is registered with this phone number.');
+        email = resolved;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      navigate(afterAuthPath, { replace: true });
+    } catch (authError: unknown) {
+      setError(friendlyAuthError(authError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Welcome back</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-normal">Sign in to KudiTrack</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Use your existing business account to continue.</p>
+      </div>
+
+      {location.search.includes('reason=removed') && (
+        <Alert className="mb-4">
+          <AlertDescription>
+            This account was removed from KudiTrack. Sign up again, or ask an admin to invite you back.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <GoogleButton disabled={submitting} onClick={handleGoogle} />
+      <OrDivider />
+
+      <form className="space-y-4" onSubmit={submit}>
+        <div className="space-y-2">
+          <Label htmlFor="identifier">Email or Phone Number</Label>
+          <Input
+            id="identifier"
+            autoComplete="username"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Enter your email or verified phone number"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
+            required
+          />
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Sign In
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Don't have an account?{' '}
+        <Link to="/sign-up" className="font-medium text-primary hover:underline">
+          Create Account
+        </Link>
+      </p>
+    </>
+  );
+}
+
+function SignUpPanel() {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [otpStage, setOtpStage] = useState<'idle' | 'sending' | 'collect' | 'verifying'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+  const { redirectTo, afterAuthPath } = useAuthRedirect();
+
+  const referralToken = useMemo(
+    () => new URLSearchParams(location.search).get('ref')?.trim() || getPendingReferralToken(),
+    [location.search],
+  );
 
   useEffect(() => {
     const queryToken = new URLSearchParams(location.search).get('ref')?.trim();
@@ -160,95 +314,25 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     }
   };
 
-  const sendPhoneOtp = async () => {
-    setError('');
-    if (!fullName.trim()) { setError('Enter your full name.'); return; }
-    const normalized = normalizeGhanaPhone(phone);
-    if (!isValidE164(normalized)) { setError('Enter a valid phone number (e.g. 0244123456 or +233244123456).'); return; }
-    if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
-    setSubmitting(true);
-    try {
-      const { error: fnErr } = await supabase.functions.invoke('phone-signup-send-otp', {
-        body: { phone: normalized },
-      });
-      if (fnErr) throw fnErr;
-      setPhone(normalized);
-      toast({ title: 'Verification code sent', description: `Please check the SMS sent to ${normalized}.` });
-      setPhoneStage('verify');
-    } catch (err) {
-      const message = await getOtpErrorMessage(err);
-      console.error('[phone-signup] send failed', err);
-      setError(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const verifyPhoneOtp = async () => {
-    setError('');
-    setSubmitting(true);
-    try {
-      const { data, error: fnErr } = await supabase.functions.invoke('phone-signup-verify-otp', {
-        body: {
-          phone: normalizeGhanaPhone(phone),
-          otp: otpCode,
-          password,
-          full_name: fullName.trim(),
-          email: email.trim() || undefined,
-          referral_token: referralToken || undefined,
-          signup_device_id: getOrCreateReferralDeviceId(),
-          redirect_to: `${window.location.origin}/auth/callback?next=/dashboard`,
-        },
-      });
-      if (fnErr) throw fnErr;
-      const link = (data as { action_link?: string } | null)?.action_link;
-      if (link) {
-        window.location.href = link;
-        return;
-      }
-      toast({ title: 'Account created', description: 'Sign in with your email and password to continue.' });
-      setMode('sign-in');
-      setSignupChannel('email');
-      setPhoneStage('collect');
-      setOtpCode('');
-    } catch (err) {
-      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
-      console.error('[phone-signup] verify failed', err);
-      setError(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
 
-    if (mode === 'sign-up' && signupChannel === 'phone') {
-      if (phoneStage === 'collect') {
-        await sendPhoneOtp();
-      } else {
-        await verifyPhoneOtp();
+    if (!fullName.trim()) { setError('Enter your full name.'); return; }
+    if (!looksLikeEmail(email)) { setError('Enter a valid email address.'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
+    let normalizedPhone = '';
+    if (phone.trim()) {
+      normalizedPhone = normalizeGhanaPhone(phone);
+      if (!isValidE164(normalizedPhone)) {
+        setError('Enter a valid phone number, or leave it empty.');
+        return;
       }
-      return;
     }
 
     setSubmitting(true);
     try {
-      if (mode === 'sign-in') {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInError) throw signInError;
-        navigate(afterAuthPath, { replace: true });
-        return;
-      }
-
-      if (!fullName.trim()) {
-        throw new Error('Enter your full name to create the account.');
-      }
-
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -256,6 +340,7 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
           data: {
             display_name: fullName.trim(),
             full_name: fullName.trim(),
+            phone: normalizedPhone || undefined,
             referral_token: referralToken || undefined,
             signup_device_id: getOrCreateReferralDeviceId(),
           },
@@ -264,8 +349,38 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
       });
       if (signUpError) throw signUpError;
 
+      // Persist phone (unverified) on the profile if we have a session.
+      if (data.session && normalizedPhone && data.user) {
+        await supabase
+          .from('profiles')
+          .update({ phone: normalizedPhone, phone_verified: false })
+          .eq('id', data.user.id);
+      }
+
       if (data.session) {
         toast({ title: 'Account created', description: 'Your 30-day trial setup starts on the dashboard.' });
+
+        // Offer to verify the phone now if one was provided.
+        if (normalizedPhone) {
+          setOtpStage('sending');
+          try {
+            const { error: fnErr } = await supabase.functions.invoke('send-signup-otp', {
+              body: { phone: normalizedPhone },
+            });
+            if (fnErr) throw fnErr;
+            setOtpStage('collect');
+            return;
+          } catch (otpErr) {
+            console.warn('[signup] phone OTP send failed', otpErr);
+            toast({
+              title: 'Account ready',
+              description: 'You can verify your phone later from Settings.',
+            });
+            navigate('/dashboard', { replace: true });
+            return;
+          }
+        }
+
         navigate('/dashboard', { replace: true });
         return;
       }
@@ -274,7 +389,6 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         title: 'Confirm your email',
         description: 'Open the confirmation link, then sign in to continue to your dashboard.',
       });
-      setMode('sign-in');
       navigate('/sign-in', { replace: true });
     } catch (authError: unknown) {
       setError(friendlyAuthError(authError));
@@ -283,22 +397,85 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
     }
   };
 
-  const usePhone = mode === 'sign-up' && signupChannel === 'phone';
-  const onVerifyStage = usePhone && phoneStage === 'verify';
+  const verifyPhone = async () => {
+    setOtpError('');
+    setOtpStage('verifying');
+    try {
+      const normalized = normalizeGhanaPhone(phone);
+      const { error: fnErr } = await supabase.functions.invoke('verify-signup-otp', {
+        body: { phone: normalized, otp: otpCode },
+      });
+      if (fnErr) throw fnErr;
+      toast({ title: 'Phone verified', description: 'You can now receive SMS notifications.' });
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      const message = await getOtpErrorMessage(err, 'Invalid or expired code.');
+      setOtpError(message);
+      setOtpStage('collect');
+    }
+  };
+
+  if (otpStage === 'collect' || otpStage === 'verifying' || otpStage === 'sending') {
+    return (
+      <>
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">One last step</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-normal">Verify your phone</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Enter the 6-digit code we sent to {normalizeGhanaPhone(phone)}. You can skip and verify later from Settings.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="otp">Verification code</Label>
+            <Input
+              id="otp"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              disabled={otpStage !== 'collect'}
+            />
+          </div>
+
+          {otpError && (
+            <Alert variant="destructive">
+              <AlertDescription>{otpError}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            type="button"
+            className="w-full"
+            onClick={verifyPhone}
+            disabled={otpStage !== 'collect' || otpCode.length !== 6}
+          >
+            {otpStage === 'verifying' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Verify phone
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => navigate('/dashboard', { replace: true })}
+          >
+            Skip for now
+          </Button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <div className="mb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-          {mode === 'sign-in' ? 'Welcome back' : 'Start free'}
-        </p>
-        <h2 className="mt-2 text-2xl font-bold tracking-normal">
-          {mode === 'sign-in' ? 'Sign in to KudiTrack' : 'Create your account'}
-        </h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Start free</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-normal">Create your account</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === 'sign-in'
-            ? 'Use your existing business account to continue.'
-            : 'Your account opens the dashboard first, then a quick setup dialog.'}
+          Your account opens the dashboard first, then a quick setup dialog.
         </p>
         {referralToken && (
           <p className="mt-2 text-xs text-primary">
@@ -307,165 +484,64 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
         )}
       </div>
 
-      <div className="mb-5 grid grid-cols-2 rounded-lg border border-border bg-muted p-1">
-        <button
-          type="button"
-          onClick={() => switchMode('sign-in')}
-          className={cn(
-            'h-9 rounded-md text-sm font-medium transition-colors',
-            mode === 'sign-in' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode('sign-up')}
-          className={cn(
-            'h-9 rounded-md text-sm font-medium transition-colors',
-            mode === 'sign-up' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Sign up
-        </button>
-      </div>
-
-      {location.search.includes('reason=removed') && (
-        <Alert className="mt-4">
-          <AlertDescription>
-            This account was removed from KudiTrack. Sign up again, or ask an admin to invite you back.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {mode === 'sign-up' && (
-        <div className="mb-4 grid grid-cols-2 rounded-lg border border-border bg-muted p-1">
-          <button
-            type="button"
-            onClick={() => { setSignupChannel('email'); setError(''); setPhoneStage('collect'); setOtpCode(''); }}
-            className={cn(
-              'h-9 rounded-md text-sm font-medium transition-colors',
-              signupChannel === 'email' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Email
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSignupChannel('phone'); setError(''); }}
-            className={cn(
-              'h-9 rounded-md text-sm font-medium transition-colors',
-              signupChannel === 'phone' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Phone number
-          </button>
-        </div>
-      )}
+      <GoogleButton disabled={submitting} onClick={handleGoogle} />
+      <OrDivider />
 
       <form className="space-y-4" onSubmit={submit}>
-        {mode === 'sign-up' && (
-          <div className="space-y-2">
-            <Label htmlFor="full-name">Full name</Label>
-            <Input
-              id="full-name"
-              autoComplete="name"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ama Mensah"
-              disabled={onVerifyStage}
-              required
-            />
-          </div>
-        )}
-
-        {usePhone ? (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="+233 24 123 4567"
-                disabled={onVerifyStage}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email-optional">Email (optional)</Label>
-              <Input
-                id="email-optional"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@business.com"
-                disabled={onVerifyStage}
-              />
-              <p className="text-xs text-muted-foreground">Used for password recovery. You can add this later.</p>
-            </div>
-          </>
-        ) : (
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@business.com"
-              required
-            />
-          </div>
-        )}
-
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            {mode === 'sign-in' && (
-              <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
-                Forgot password?
-              </Link>
-            )}
-          </div>
+          <Label htmlFor="full-name">Full Name</Label>
           <Input
-            id="password"
-            type="password"
-            autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={6}
-            disabled={onVerifyStage}
+            id="full-name"
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Ama Mensah"
             required
           />
         </div>
 
-        {onVerifyStage && (
-          <div className="space-y-2">
-            <Label htmlFor="otp">6-digit verification code</Label>
-            <Input
-              id="otp"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              value={otpCode}
-              onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ''))}
-              placeholder="123456"
-              required
-            />
-            <button
-              type="button"
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => { setPhoneStage('collect'); setOtpCode(''); setError(''); }}
-            >
-              Use a different phone number
-            </button>
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="email">Email Address</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@business.com"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone">
+            Phone Number <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+          </Label>
+          <Input
+            id="phone"
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="0244 123 4567"
+          />
+          <p className="text-xs text-muted-foreground">
+            Verify your phone number to receive SMS notifications and account recovery benefits.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
+            required
+          />
+        </div>
 
         {error && (
           <Alert variant="destructive">
@@ -473,54 +549,21 @@ function AuthPanel({ initialMode }: { initialMode: AuthMode }) {
           </Alert>
         )}
 
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={submitting || (onVerifyStage && otpCode.length !== 6)}
-        >
+        <Button type="submit" className="w-full" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'sign-in'
-            ? 'Sign in'
-            : usePhone
-              ? (onVerifyStage ? 'Verify & create account' : 'Send verification code')
-              : 'Create account'}
+          Create Account
         </Button>
       </form>
 
-
-      <div className="my-4 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        disabled={submitting}
-        onClick={handleGoogle}
-      >
-        <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
-          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35.5 24 35.5c-6.3 0-11.5-5.2-11.5-11.5S17.7 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.3-.4-3.5z"/>
-          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 16.3 4.5 9.7 8.9 6.3 14.7z"/>
-          <path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-2 13.3-5.2l-6.1-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.6 39 16.2 43.5 24 43.5z"/>
-          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.1 5.2C40.8 36 43.5 30.5 43.5 24c0-1.2-.1-2.3-.4-3.5z"/>
-        </svg>
-        Continue with Google
-      </Button>
-
-      <p className="mt-3 text-center text-xs text-muted-foreground">
-        <Link to="/phone-login" className="font-medium text-primary hover:underline">
-          Sign in with phone number
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link to="/sign-in" className="font-medium text-primary hover:underline">
+          Sign in
         </Link>
       </p>
-
-      {mode === 'sign-up' && (
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          New businesses start with a 30-day free trial. No card required.
-        </p>
-      )}
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        New businesses start with a 30-day free trial. No card required.
+      </p>
     </>
   );
 }
@@ -535,7 +578,7 @@ export function SignInPage() {
         noindex
       />
       <AuthShell>
-        <AuthPanel initialMode="sign-in" />
+        <SignInPanel />
       </AuthShell>
     </>
   );
@@ -550,7 +593,7 @@ export function SignUpPage() {
         path="/sign-up"
       />
       <AuthShell>
-        <AuthPanel initialMode="sign-up" />
+        <SignUpPanel />
       </AuthShell>
     </>
   );
