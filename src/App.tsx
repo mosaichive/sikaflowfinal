@@ -48,7 +48,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-const PhoneLoginPage = lazy(() => import("./pages/PhoneLoginPage"));
+
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 
 function MarketingOrDashboard() {
