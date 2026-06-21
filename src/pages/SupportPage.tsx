@@ -139,7 +139,6 @@ export default function SupportPage() {
     setSubmitting(true);
     const { error } = await supabase.from('support_messages' as any).insert({
       user_id: user.id,
-      business_id: business?.id ?? null,
       sender_name: form.name.trim(),
       sender_contact: form.contact.trim(),
       subject: form.subject.trim(),
