@@ -21,6 +21,7 @@ const NAV = [
   { to: '/super-admin/feedback', label: 'Feedback', icon: MessageSquare },
   { to: '/super-admin/support', label: 'Support', icon: LifeBuoy },
   { to: '/super-admin/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/super-admin/security', label: 'Security (MFA)', icon: ShieldCheck },
 ];
 
 export default function PlatformLayout() {
