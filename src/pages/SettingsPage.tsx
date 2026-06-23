@@ -736,7 +736,6 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <PasswordInput
-                    type="password"
                     value={newPassword}
                     onChange={(event) => setNewPassword(event.target.value)}
                     placeholder="New password"
