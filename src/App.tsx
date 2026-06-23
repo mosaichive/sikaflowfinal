@@ -186,6 +186,7 @@ const App = () => (
                   <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
                   <Route path="reviews" element={<PlatformReviewsPage />} />
                   <Route path="sms" element={<PlatformSmsPage />} />
+                  <Route path="security" element={<PlatformSecurityMfaPage />} />
                 </Route>
 
                 {/* Public marketing site */}
