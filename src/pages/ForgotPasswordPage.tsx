@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SEO } from '@/components/SEO';
@@ -190,9 +191,8 @@ function PhoneReset() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="reset-new-password">New password</Label>
-        <Input
+        <PasswordInput
           id="reset-new-password"
-          type="password"
           autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
