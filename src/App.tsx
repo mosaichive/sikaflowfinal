@@ -45,6 +45,7 @@ const PlatformFeedbackPage = lazy(() => import("./pages/platform/FeedbackPage"))
 const PlatformAdApplicationsPage = lazy(() => import("./pages/platform/AdApplicationsPage"));
 const PlatformReviewsPage = lazy(() => import("./pages/platform/ReviewsPage"));
 const PlatformSmsPage = lazy(() => import("./pages/platform/SmsPage"));
+const PlatformSecurityMfaPage = lazy(() => import("./pages/platform/SecurityMfaPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -185,6 +186,7 @@ const App = () => (
                   <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
                   <Route path="reviews" element={<PlatformReviewsPage />} />
                   <Route path="sms" element={<PlatformSmsPage />} />
+                  <Route path="security" element={<PlatformSecurityMfaPage />} />
                 </Route>
 
                 {/* Public marketing site */}

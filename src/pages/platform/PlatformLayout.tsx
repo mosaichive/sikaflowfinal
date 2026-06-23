@@ -4,7 +4,7 @@ import { useSubscription } from '@/context/SubscriptionContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/super-admin/feedback', label: 'Feedback', icon: MessageSquare },
   { to: '/super-admin/support', label: 'Support', icon: LifeBuoy },
   { to: '/super-admin/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/super-admin/security', label: 'Security (MFA)', icon: ShieldCheck },
 ];
 
 export default function PlatformLayout() {
