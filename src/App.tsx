@@ -46,6 +46,8 @@ const PlatformAdApplicationsPage = lazy(() => import("./pages/platform/AdApplica
 const PlatformReviewsPage = lazy(() => import("./pages/platform/ReviewsPage"));
 const PlatformSmsPage = lazy(() => import("./pages/platform/SmsPage"));
 const PlatformSecurityMfaPage = lazy(() => import("./pages/platform/SecurityMfaPage"));
+const SuperAdminLoginPage = lazy(() => import("./pages/platform/SuperAdminLoginPage"));
+const PlatformProfilePage = lazy(() => import("./pages/platform/ProfilePage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -172,6 +174,7 @@ const App = () => (
 
                 {/* Platform Super Admin */}
                 <Route path="/platform/*" element={<Navigate to="/super-admin" replace />} />
+                <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />
                 <Route path="/super-admin" element={<PlatformLayout />}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="businesses" element={<BusinessesPage />} />
@@ -187,6 +190,7 @@ const App = () => (
                   <Route path="reviews" element={<PlatformReviewsPage />} />
                   <Route path="sms" element={<PlatformSmsPage />} />
                   <Route path="security" element={<PlatformSecurityMfaPage />} />
+                  <Route path="profile" element={<PlatformProfilePage />} />
                 </Route>
 
                 {/* Public marketing site */}
