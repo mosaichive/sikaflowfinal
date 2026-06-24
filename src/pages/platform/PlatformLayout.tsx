@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2 } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
@@ -22,15 +24,48 @@ const NAV = [
   { to: '/super-admin/support', label: 'Support', icon: LifeBuoy },
   { to: '/super-admin/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/super-admin/security', label: 'Security (MFA)', icon: ShieldCheck },
+  { to: '/super-admin/profile', label: 'Profile', icon: UserCircle2 },
 ];
+
+type MfaState = 'checking' | 'ok' | 'needs-challenge' | 'needs-enroll';
 
 export default function PlatformLayout() {
   const { user, loading, signOut } = useAuth();
   const { isSuperAdmin, loading: subLoading } = useSubscription();
+  const [mfaState, setMfaState] = useState<MfaState>('checking');
+
+  useEffect(() => {
+    if (!user || !isSuperAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const { data: f } = await supabase.auth.mfa.listFactors();
+        const verified = (f?.totp ?? []).find((x: any) => x.status === 'verified');
+        if (cancelled) return;
+        if (!verified) {
+          setMfaState('needs-enroll');
+        } else if (aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+          setMfaState('needs-challenge');
+        } else {
+          setMfaState('ok');
+        }
+      } catch {
+        if (!cancelled) setMfaState('ok'); // fail-open to avoid lockout if API unreachable
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, isSuperAdmin]);
 
   if (loading || subLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Loading..." size="md" /></div>;
-  if (!user) return <Navigate to="/sign-in" replace />;
+  if (!user) return <Navigate to="/super-admin/login" replace />;
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+
+  if (mfaState === 'checking') {
+    return <div className="min-h-screen flex items-center justify-center bg-background"><BrandLoader text="Verifying security..." size="md" /></div>;
+  }
+  if (mfaState === 'needs-challenge') return <Navigate to="/super-admin/login?step=mfa" replace />;
+  if (mfaState === 'needs-enroll') return <Navigate to="/super-admin/login?step=enroll" replace />;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -43,7 +78,7 @@ export default function PlatformLayout() {
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Platform Admin</p>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-auto">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
@@ -66,7 +101,7 @@ export default function PlatformLayout() {
               Platform-level access. Tenant business data is private.
             </p>
           </div>
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={async () => { await signOut(); window.location.assign('/super-admin/login'); }}>
             <LogOut className="h-4 w-4 mr-2" /> Sign Out
           </Button>
         </div>
