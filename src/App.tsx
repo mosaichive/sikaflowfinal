@@ -48,6 +48,7 @@ const PlatformSmsPage = lazy(() => import("./pages/platform/SmsPage"));
 const PlatformSecurityMfaPage = lazy(() => import("./pages/platform/SecurityMfaPage"));
 const SuperAdminLoginPage = lazy(() => import("./pages/platform/SuperAdminLoginPage"));
 const PlatformProfilePage = lazy(() => import("./pages/platform/ProfilePage"));
+const PlatformUserActivityPage = lazy(() => import("./pages/platform/UserActivityPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
