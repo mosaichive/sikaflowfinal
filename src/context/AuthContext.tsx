@@ -151,9 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setAuthLoading(false);
+      // Record a login stamp on actual sign-in events (not session restore).
+      if (event === 'SIGNED_IN' && nextSession?.user) {
+        void (supabase as any).rpc('record_user_login').catch(() => {});
+      }
     });
 
     return () => {
@@ -161,6 +165,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  // Lightweight activity ping. Server throttles writes to once per 5 min.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const ping = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void (supabase as any).rpc('touch_user_activity').catch(() => {});
+    };
+    ping();
+    const interval = window.setInterval(ping, 5 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') ping(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [session?.user?.id]);
+
 
   const user = useMemo<AppUser | null>(() => {
     const authUser = session?.user;

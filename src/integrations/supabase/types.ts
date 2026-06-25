@@ -811,8 +811,11 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          last_activity_at: string | null
+          last_login_at: string | null
           last_verified_phone: string | null
           location: string | null
+          login_count: number
           logo_url: string | null
           num_employees: string | null
           onboarding_completed: boolean
@@ -846,8 +849,11 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id: string
+          last_activity_at?: string | null
+          last_login_at?: string | null
           last_verified_phone?: string | null
           location?: string | null
+          login_count?: number
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
@@ -881,8 +887,11 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          last_activity_at?: string | null
+          last_login_at?: string | null
           last_verified_phone?: string | null
           location?: string | null
+          login_count?: number
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
@@ -1609,6 +1618,24 @@ export type Database = {
             Returns: Json
           }
       admin_platform_stats: { Args: never; Returns: Json }
+      admin_user_activity: {
+        Args: never
+        Returns: {
+          business_name: string
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          last_activity_at: string
+          last_login_at: string
+          login_count: number
+          phone: string
+          role: string
+          subscription_plan: string
+          subscription_status: string
+          suspended: boolean
+        }[]
+      }
       ensure_referral_code: { Args: { _user_id: string }; Returns: string }
       get_table_columns: {
         Args: { _table_name: string }
@@ -1633,10 +1660,12 @@ export type Database = {
           product_id: string
         }[]
       }
+      record_user_login: { Args: never; Returns: undefined }
       sync_product_stock: {
         Args: { _product_id: string; _user_id: string }
         Returns: number
       }
+      touch_user_activity: { Args: never; Returns: undefined }
     }
     Enums: {
       announcement_audience: "all" | "trial" | "active" | "expired"
