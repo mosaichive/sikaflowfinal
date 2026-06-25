@@ -156,7 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthLoading(false);
       // Record a login stamp on actual sign-in events (not session restore).
       if (event === 'SIGNED_IN' && nextSession?.user) {
-        void (supabase as any).rpc('record_user_login').catch(() => {});
+        void (async () => {
+          try { await (supabase as any).rpc('record_user_login'); } catch { /* non-fatal */ }
+        })();
       }
     });
 
@@ -172,7 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!uid) return;
     const ping = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      void (supabase as any).rpc('touch_user_activity').catch(() => {});
+      void (async () => {
+        try { await (supabase as any).rpc('touch_user_activity'); } catch { /* non-fatal */ }
+      })();
     };
     ping();
     const interval = window.setInterval(ping, 5 * 60 * 1000);
@@ -183,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [session?.user?.id]);
+
 
 
   const user = useMemo<AppUser | null>(() => {
