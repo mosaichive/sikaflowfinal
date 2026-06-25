@@ -192,6 +192,7 @@ const App = () => (
                   <Route path="sms" element={<PlatformSmsPage />} />
                   <Route path="security" element={<PlatformSecurityMfaPage />} />
                   <Route path="profile" element={<PlatformProfilePage />} />
+                  <Route path="user-activity" element={<PlatformUserActivityPage />} />
                 </Route>
 
                 {/* Public marketing site */}
