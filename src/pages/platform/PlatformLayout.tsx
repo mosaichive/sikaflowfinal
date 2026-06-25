@@ -6,12 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2 } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
   { to: '/super-admin', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/super-admin/businesses', label: 'Businesses', icon: Building2 },
+  { to: '/super-admin/user-activity', label: 'User Activity', icon: Activity },
   { to: '/super-admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { to: '/super-admin/payments', label: 'Payments', icon: Receipt },
   { to: '/super-admin/payment-methods', label: 'Payment Methods', icon: Wallet },
