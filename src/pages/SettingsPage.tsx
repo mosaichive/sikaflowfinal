@@ -767,6 +767,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <SmsNotificationsCard />
         <OnlineStoreCard />
 
 
