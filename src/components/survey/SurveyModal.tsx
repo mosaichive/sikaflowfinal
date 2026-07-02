@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { toast } from '@/hooks/use-toast';
 import type { Survey, SurveyQuestion } from '@/lib/survey';
-import { SKIP_DAYS, sessionShownKey, DEFAULT_THANK_YOU_MESSAGE } from '@/lib/survey';
+import { SKIP_DAYS, sessionShownKey, DEFAULT_THANK_YOU_MESSAGE, NEW_USER_DELAY_DAYS } from '@/lib/survey';
 
 type AnswerValue = string | string[] | number | null;
 
