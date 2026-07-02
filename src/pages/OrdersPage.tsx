@@ -845,6 +845,17 @@ export default function OrdersPage() {
                           <div>
                             <p className="font-medium">{order.customer_name || 'Walk-in'}</p>
                             <p className="text-xs text-muted-foreground">{order.customer_phone || order.delivery_location || 'No contact provided'}</p>
+                            {order.customer_payment_name || order.customer_payment_reference ? (
+                              <div className="mt-1 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] leading-tight">
+                                <p className="font-medium text-foreground">Momo payment</p>
+                                {order.customer_payment_name ? (
+                                  <p className="text-muted-foreground">Name: <span className="text-foreground">{order.customer_payment_name}</span></p>
+                                ) : null}
+                                {order.customer_payment_reference ? (
+                                  <p className="text-muted-foreground">Ref: <span className="font-mono text-foreground">{order.customer_payment_reference}</span></p>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell>
