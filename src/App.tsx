@@ -49,6 +49,8 @@ const PlatformSecurityMfaPage = lazy(() => import("./pages/platform/SecurityMfaP
 const SuperAdminLoginPage = lazy(() => import("./pages/platform/SuperAdminLoginPage"));
 const PlatformProfilePage = lazy(() => import("./pages/platform/ProfilePage"));
 const PlatformUserActivityPage = lazy(() => import("./pages/platform/UserActivityPage"));
+const PlatformSurveysPage = lazy(() => import("./pages/platform/SurveysPage"));
+const PlatformSurveyResponsesPage = lazy(() => import("./pages/platform/SurveyResponsesPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -193,6 +195,8 @@ const App = () => (
                   <Route path="security" element={<PlatformSecurityMfaPage />} />
                   <Route path="profile" element={<PlatformProfilePage />} />
                   <Route path="user-activity" element={<PlatformUserActivityPage />} />
+                  <Route path="surveys" element={<PlatformSurveysPage />} />
+                  <Route path="survey-responses" element={<PlatformSurveyResponsesPage />} />
                 </Route>
 
                 {/* Public marketing site */}

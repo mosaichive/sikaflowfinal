@@ -1585,6 +1585,204 @@ export type Database = {
         }
         Relationships: []
       }
+      survey_questions: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          options: Json
+          position: number
+          required: boolean
+          survey_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          options?: Json
+          position?: number
+          required?: boolean
+          survey_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          options?: Json
+          position?: number
+          required?: boolean
+          survey_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_questions_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_response_answers: {
+        Row: {
+          answer: Json
+          created_at: string
+          id: string
+          question_id: string
+          response_id: string
+        }
+        Insert: {
+          answer?: Json
+          created_at?: string
+          id?: string
+          question_id: string
+          response_id: string
+        }
+        Update: {
+          answer?: Json
+          created_at?: string
+          id?: string
+          question_id?: string
+          response_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_response_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "survey_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_response_answers_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "survey_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_responses: {
+        Row: {
+          business_id: string | null
+          email: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          rating: number | null
+          submitted_at: string
+          survey_id: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          rating?: number | null
+          submitted_at?: string
+          survey_id: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          rating?: number | null
+          submitted_at?: string
+          survey_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_responses_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_user_status: {
+        Row: {
+          id: string
+          shown_at: string | null
+          skipped_at: string | null
+          status: string
+          submitted_at: string | null
+          survey_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          shown_at?: string | null
+          skipped_at?: string | null
+          status: string
+          submitted_at?: string | null
+          survey_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          shown_at?: string | null
+          skipped_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          survey_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_user_status_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      surveys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          enabled: boolean
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
