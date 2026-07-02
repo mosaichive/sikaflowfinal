@@ -508,6 +508,8 @@ export type Database = {
           created_by_name: string | null
           customer_confirmed_at: string | null
           customer_name: string | null
+          customer_payment_name: string | null
+          customer_payment_reference: string | null
           customer_phone: string | null
           delivered_at: string | null
           delivery_fee: number
@@ -543,6 +545,8 @@ export type Database = {
           created_by_name?: string | null
           customer_confirmed_at?: string | null
           customer_name?: string | null
+          customer_payment_name?: string | null
+          customer_payment_reference?: string | null
           customer_phone?: string | null
           delivered_at?: string | null
           delivery_fee?: number
@@ -578,6 +582,8 @@ export type Database = {
           created_by_name?: string | null
           customer_confirmed_at?: string | null
           customer_name?: string | null
+          customer_payment_name?: string | null
+          customer_payment_reference?: string | null
           customer_phone?: string | null
           delivered_at?: string | null
           delivery_fee?: number
