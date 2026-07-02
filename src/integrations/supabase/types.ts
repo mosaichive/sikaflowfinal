@@ -868,6 +868,9 @@ export type Database = {
           sms_notify_order_status: boolean
           sms_notify_sale_thanks: boolean
           sms_notify_team_invite: boolean
+          store_allow_delivery: boolean
+          store_allow_pickup: boolean
+          store_default_delivery_fee: number
           store_enable_delivery_address: boolean
           store_enable_notes: boolean
           store_enable_product_images: boolean
@@ -917,6 +920,9 @@ export type Database = {
           sms_notify_order_status?: boolean
           sms_notify_sale_thanks?: boolean
           sms_notify_team_invite?: boolean
+          store_allow_delivery?: boolean
+          store_allow_pickup?: boolean
+          store_default_delivery_fee?: number
           store_enable_delivery_address?: boolean
           store_enable_notes?: boolean
           store_enable_product_images?: boolean
@@ -966,6 +972,9 @@ export type Database = {
           sms_notify_order_status?: boolean
           sms_notify_sale_thanks?: boolean
           sms_notify_team_invite?: boolean
+          store_allow_delivery?: boolean
+          store_allow_pickup?: boolean
+          store_default_delivery_fee?: number
           store_enable_delivery_address?: boolean
           store_enable_notes?: boolean
           store_enable_product_images?: boolean
@@ -1933,6 +1942,10 @@ export type Database = {
       preview_staff_invite: { Args: { _token: string }; Returns: Json }
       public_confirm_order_receipt: {
         Args: { _code: string; _phone_last4: string }
+        Returns: Json
+      }
+      public_confirm_order_receipt_by_code: {
+        Args: { _code: string }
         Returns: Json
       }
       public_get_order_by_tracking: { Args: { _code: string }; Returns: Json }
