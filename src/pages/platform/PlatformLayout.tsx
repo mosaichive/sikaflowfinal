@@ -21,6 +21,8 @@ const NAV = [
   { to: '/super-admin/ad-applications', label: 'Ad Applications', icon: Sparkles },
   { to: '/super-admin/reviews', label: 'Reviews', icon: Star },
   { to: '/super-admin/sms', label: 'SMS', icon: Send },
+  { to: '/super-admin/surveys', label: 'Surveys', icon: ClipboardList },
+  { to: '/super-admin/survey-responses', label: 'Survey Responses', icon: MessageSquare },
   { to: '/super-admin/feedback', label: 'Feedback', icon: MessageSquare },
   { to: '/super-admin/support', label: 'Support', icon: LifeBuoy },
   { to: '/super-admin/announcements', label: 'Announcements', icon: Megaphone },
