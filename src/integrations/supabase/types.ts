@@ -1760,6 +1760,7 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
+          thank_you_message: string | null
           title: string
           updated_at: string
         }
@@ -1769,6 +1770,7 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
+          thank_you_message?: string | null
           title: string
           updated_at?: string
         }
@@ -1778,6 +1780,7 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
+          thank_you_message?: string | null
           title?: string
           updated_at?: string
         }
