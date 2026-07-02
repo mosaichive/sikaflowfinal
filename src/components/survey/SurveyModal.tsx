@@ -31,7 +31,7 @@ export function SurveyModal() {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const { data: surveys } = await supabase
+      const { data: surveys } = await db
         .from('surveys')
         .select('*')
         .eq('enabled', true)
@@ -43,7 +43,7 @@ export function SurveyModal() {
       if (sessionStorage.getItem(sessionShownKey(active.id))) return;
 
       // Check user status
-      const { data: statusRow } = await supabase
+      const { data: statusRow } = await db
         .from('survey_user_status')
         .select('status, skipped_at, submitted_at')
         .eq('survey_id', active.id)
@@ -57,7 +57,7 @@ export function SurveyModal() {
         if (ageMs < SKIP_DAYS * 24 * 60 * 60 * 1000) return;
       }
 
-      const { data: qs } = await supabase
+      const { data: qs } = await db
         .from('survey_questions')
         .select('*')
         .eq('survey_id', active.id)
@@ -115,7 +115,7 @@ export function SurveyModal() {
     setSubmitting(true);
     try {
       const rating = ratingQuestion ? (answers[ratingQuestion.id] as number | null) ?? null : null;
-      const { data: resp, error: respErr } = await supabase
+      const { data: resp, error: respErr } = await db
         .from('survey_responses')
         .insert({
           survey_id: survey.id,
