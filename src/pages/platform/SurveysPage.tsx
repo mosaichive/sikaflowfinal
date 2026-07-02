@@ -129,6 +129,7 @@ export default function SurveysPage() {
 function SurveyEditorDialog({ survey, onClose, onSaved }: { survey: Survey; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState(survey.title);
   const [description, setDescription] = useState(survey.description ?? '');
+  const [thankYouMessage, setThankYouMessage] = useState(survey.thank_you_message ?? '');
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -172,7 +173,10 @@ function SurveyEditorDialog({ survey, onClose, onSaved }: { survey: Survey; onCl
   async function save() {
     setSaving(true);
     try {
-      const { error: sErr } = await db.from('surveys').update({ title, description }).eq('id', survey.id);
+      const { error: sErr } = await db
+        .from('surveys')
+        .update({ title, description, thank_you_message: thankYouMessage.trim() ? thankYouMessage : null })
+        .eq('id', survey.id);
       if (sErr) throw sErr;
 
       for (let i = 0; i < questions.length; i++) {
@@ -221,6 +225,19 @@ function SurveyEditorDialog({ survey, onClose, onSaved }: { survey: Survey; onCl
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </div>
+          <div className="space-y-2">
+            <Label>Thank You Message</Label>
+            <Textarea
+              value={thankYouMessage}
+              onChange={(e) => setThankYouMessage(e.target.value.slice(0, 1000))}
+              rows={4}
+              maxLength={1000}
+              placeholder={'🎉 Thank You!\n\nWe sincerely appreciate your feedback. Your responses help us improve KudiTrack and build a better experience for your business.'}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown after a user submits the survey. Leave empty to use the default message. {thankYouMessage.length}/1000
+            </p>
           </div>
 
           <div className="flex items-center justify-between">

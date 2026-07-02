@@ -6,14 +6,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Star, Loader2 } from 'lucide-react';
+import { Star, Loader2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 const db = supabase as any;
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { toast } from '@/hooks/use-toast';
 import type { Survey, SurveyQuestion } from '@/lib/survey';
-import { SKIP_DAYS, sessionShownKey } from '@/lib/survey';
+import { SKIP_DAYS, sessionShownKey, DEFAULT_THANK_YOU_MESSAGE } from '@/lib/survey';
 
 type AnswerValue = string | string[] | number | null;
 
@@ -164,11 +164,15 @@ export function SurveyModal() {
     <Dialog open={open} onOpenChange={(v) => { if (!v && !done) return; setOpen(v); }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         {done ? (
-          <div className="py-8 text-center space-y-3">
-            <div className="text-3xl">🎉</div>
-            <h3 className="text-lg font-semibold">Thank you!</h3>
-            <p className="text-sm text-muted-foreground">Your feedback helps us improve KudiTrack.</p>
-            <Button onClick={() => setOpen(false)}>Close</Button>
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/15">
+              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-xl font-semibold">Thank You!</h3>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap px-2">
+              {(survey.thank_you_message?.trim() || DEFAULT_THANK_YOU_MESSAGE)}
+            </p>
+            <Button onClick={() => setOpen(false)}>Done</Button>
           </div>
         ) : (
           <>

@@ -14,10 +14,14 @@ export interface Survey {
   id: string;
   title: string;
   description: string | null;
+  thank_you_message: string | null;
   enabled: boolean;
   created_at: string;
   updated_at: string;
 }
+
+export const DEFAULT_THANK_YOU_MESSAGE =
+  '🎉 Thank You!\n\nWe sincerely appreciate your feedback. Your responses help us improve KudiTrack and build a better experience for your business.';
 
 export interface SurveyResponse {
   id: string;
