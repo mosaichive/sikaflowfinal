@@ -109,5 +109,15 @@
   "bugs": {
     "url": "https://github.com/mosaichive/sikaflow/issues"
   },
-  "homepage": "https://github.com/mosaichive/sikaflow#readme"
+  "homepage": "https://github.com/mosaichive/sikaflow#readme",
+  "overrides": {
+    "dompurify": "^3.4.7",
+    "js-yaml": "^4.1.1",
+    "picomatch": "^4.0.3"
+  },
+  "resolutions": {
+    "dompurify": "^3.4.7",
+    "js-yaml": "^4.1.1",
+    "picomatch": "^4.0.3"
+  }
 }
