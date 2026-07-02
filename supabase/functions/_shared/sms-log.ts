@@ -5,7 +5,13 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 type LogInput = {
   business_id: string;
   recipient_phone: string;
-  notification_type: 'sale_thanks' | 'low_stock' | 'team_invite';
+  notification_type:
+    | 'sale_thanks'
+    | 'low_stock'
+    | 'team_invite'
+    | 'new_order'
+    | 'order_confirmation'
+    | 'order_status';
   message: string;
   status: 'sent' | 'failed';
   provider_response?: unknown;

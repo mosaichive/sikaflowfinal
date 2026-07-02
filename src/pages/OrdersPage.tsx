@@ -14,12 +14,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, ORDER_STATUSES, PAYMENT_METHODS } from '@/lib/constants';
-import { ClipboardList, Plus, Truck, Pencil, Trash2 } from 'lucide-react';
+import { ClipboardList, Plus, Truck, Pencil, Trash2, Search, Copy, ExternalLink } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
+import { notifyOrderEvent } from '@/lib/order-sms';
 
 type ProductRow = {
   id: string;
@@ -50,6 +52,12 @@ type OrderRow = {
   created_by_name: string | null;
   order_date: string;
   due_date?: string | null;
+  tracking_code?: string | null;
+  carrier_name?: string | null;
+  carrier_phone?: string | null;
+  tracking_notes?: string | null;
+  source?: string | null;
+  delivered_at?: string | null;
 };
 
 type OrderItemRow = {
@@ -95,7 +103,13 @@ export default function OrdersPage() {
     notes: '',
     status: 'pending',
     due_date: '',
+    carrier_name: '',
+    carrier_phone: '',
+    tracking_notes: '',
   });
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const canCreate = isAdmin || isManager || isSalesperson;
   const canManageStatus = isAdmin || isManager || isSalesperson;
@@ -160,6 +174,51 @@ export default function OrdersPage() {
     return orders;
   }, [isAdmin, isDistributor, isManager, isSalesperson, orders, user?.id]);
 
+  const startOfToday = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+  const startOfWeek = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d.getTime(); }, []);
+  const startOfMonth = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(1); return d.getTime(); }, []);
+
+  const filteredOrders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return visibleOrders.filter((o) => {
+      if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+      if (dateFilter !== 'all') {
+        const t = new Date(o.order_date).getTime();
+        if (dateFilter === 'today' && t < startOfToday) return false;
+        if (dateFilter === 'week' && t < startOfWeek) return false;
+        if (dateFilter === 'month' && t < startOfMonth) return false;
+      }
+      if (q) {
+        const hay = `${o.customer_name ?? ''} ${o.customer_phone ?? ''} ${o.tracking_code ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [visibleOrders, statusFilter, dateFilter, searchQuery, startOfToday, startOfWeek, startOfMonth]);
+
+  const stats = useMemo(() => {
+    const s = {
+      total: visibleOrders.length,
+      pending: 0,
+      processing: 0,
+      out_for_delivery: 0,
+      delivered_today: 0,
+      cancelled: 0,
+    };
+    for (const o of visibleOrders) {
+      const st = normalizeStatus(o.status);
+      if (st === 'pending') s.pending += 1;
+      else if (st === 'processing') s.processing += 1;
+      else if (st === 'out_for_delivery') s.out_for_delivery += 1;
+      else if (st === 'cancelled') s.cancelled += 1;
+      if (st === 'delivered') {
+        const ts = new Date((o.delivered_at as any) || o.order_date).getTime();
+        if (ts >= startOfToday) s.delivered_today += 1;
+      }
+    }
+    return s;
+  }, [visibleOrders, startOfToday]);
+
   const selectedItems = useMemo(() => {
     return orderLines
       .map((line) => {
@@ -200,6 +259,9 @@ export default function OrdersPage() {
       notes: '',
       status: 'pending',
       due_date: '',
+      carrier_name: '',
+      carrier_phone: '',
+      tracking_notes: '',
     });
     setOrderLines([makeDraftItem()]);
     setEditingId(null);
@@ -217,6 +279,9 @@ export default function OrdersPage() {
       notes: order.notes || '',
       status: order.status || 'pending',
       due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+      carrier_name: order.carrier_name || '',
+      carrier_phone: order.carrier_phone || '',
+      tracking_notes: order.tracking_notes || '',
     });
     const lines = orderItems
       .filter((it) => it.order_id === order.id)
@@ -268,6 +333,13 @@ export default function OrdersPage() {
     setSaving(true);
 
     try {
+      // Require carrier info when the order is being sent out for delivery.
+      if (form.status === 'out_for_delivery' && (!form.carrier_name.trim() || !form.carrier_phone.trim())) {
+        toast({ title: 'Carrier required', description: 'Enter carrier name and phone for out-for-delivery orders.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
       const orderPayload = {
         business_id: businessId,
         customer_name: form.customer_name || 'Walk-in',
@@ -283,8 +355,12 @@ export default function OrdersPage() {
         payment_status: paymentStatus,
         status: form.status,
         due_date: form.due_date || null,
+        carrier_name: form.status === 'out_for_delivery' ? form.carrier_name.trim() || null : (form.carrier_name.trim() || null),
+        carrier_phone: form.status === 'out_for_delivery' ? form.carrier_phone.trim() || null : (form.carrier_phone.trim() || null),
+        tracking_notes: form.tracking_notes.trim() || null,
       };
 
+      const previousStatus = editingId ? (orders.find((o) => o.id === editingId)?.status ?? null) : null;
       let orderId: string | null = editingId;
       if (editingId) {
         const { error: upErr } = await supabase.from('orders' as any).update(orderPayload).eq('id', editingId);
@@ -296,6 +372,7 @@ export default function OrdersPage() {
           .from('orders' as any)
           .insert({
             ...orderPayload,
+            source: 'manual',
             created_by: user.id,
             created_by_name: displayName || user.email || '',
             assigned_to: user.id,
@@ -322,6 +399,16 @@ export default function OrdersPage() {
         })),
       );
       if (itemsError) throw itemsError;
+
+      // Fire-and-forget SMS: on new order → confirmation with tracking link.
+      // On edit → status update if status changed.
+      if (orderId) {
+        if (!editingId) {
+          void notifyOrderEvent(orderId, 'created');
+        } else if (previousStatus && previousStatus !== form.status) {
+          void notifyOrderEvent(orderId, 'status');
+        }
+      }
 
       toast({ title: editingId ? 'Order updated' : 'Order created' });
       resetForm();
@@ -399,6 +486,14 @@ export default function OrdersPage() {
 
   const handleStatusChange = async (order: OrderRow, nextStatus: string) => {
     if (!canManageStatus) return;
+    // For out_for_delivery we need carrier info — always open the edit dialog
+    // so the user provides it before saving.
+    if (nextStatus === 'out_for_delivery' && !order.carrier_name) {
+      openEditDialog({ ...order, status: 'out_for_delivery' });
+      setForm((current) => ({ ...current, status: 'out_for_delivery' }));
+      toast({ title: 'Add carrier details', description: 'Enter carrier name and phone, then save.' });
+      return;
+    }
     try {
       if (nextStatus === 'delivered' && normalizeStatus(order.status) !== 'delivered') {
         await finalizeDeliveredOrder(order);
@@ -420,6 +515,11 @@ export default function OrdersPage() {
         })
         .eq('id', order.id);
       if (error) throw error;
+
+      // Fire-and-forget customer SMS about the status change.
+      if (nextStatus !== order.status) {
+        void notifyOrderEvent(order.id, 'status');
+      }
 
       toast({ title: 'Order updated', description: `Order moved to ${nextStatus.replaceAll('_', ' ')}.` });
       void load();
@@ -521,7 +621,7 @@ export default function OrdersPage() {
                       <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {ORDER_STATUSES.filter((status) => status.value !== 'delivered').map((status) => (
+                          {ORDER_STATUSES.map((status) => (
                             <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
                           ))}
                         </SelectContent>
@@ -540,6 +640,28 @@ export default function OrdersPage() {
                       <Textarea rows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
                     </div>
                   </div>
+
+                  {form.status === 'out_for_delivery' ? (
+                    <Card className="border-primary/40 bg-primary/5">
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Carrier Name *</Label>
+                          <Input required value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Carrier Phone *</Label>
+                          <Input required value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Tracking notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                          <Textarea rows={2} value={form.tracking_notes} onChange={(e) => setForm((c) => ({ ...c, tracking_notes: e.target.value }))} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
 
                   <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-4">
                     <div>
@@ -569,27 +691,96 @@ export default function OrdersPage() {
           ) : null}
         </section>
 
+        {/* Dashboard stats */}
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard label="Total Orders" value={stats.total} />
+          <StatCard label="Pending" value={stats.pending} />
+          <StatCard label="Processing" value={stats.processing} />
+          <StatCard label="Out for Delivery" value={stats.out_for_delivery} />
+          <StatCard label="Delivered Today" value={stats.delivered_today} />
+          <StatCard label="Cancelled" value={stats.cancelled} />
+        </div>
+
+        {/* Filters */}
+        <Card className="border-border/70">
+          <CardContent className="p-4 grid gap-3 md:grid-cols-4">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by customer, phone or order #"
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {ORDER_STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
+              <SelectTrigger><SelectValue placeholder="Date" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         <Card className="border-border/70">
           <CardContent className="p-0">
-            {visibleOrders.length > 0 ? (
+            {filteredOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Order #</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
-                      <TableHead>Assigned To</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleOrders.map((order) => (
+                    {filteredOrders.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell>{new Date(order.order_date).toLocaleDateString('en-GH')}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-xs">{order.tracking_code || '—'}</span>
+                            {order.tracking_code ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={async () => {
+                                    const url = `${window.location.origin}/track/${order.tracking_code}`;
+                                    try { await navigator.clipboard.writeText(url); toast({ title: 'Tracking link copied' }); } catch { /* ignore */ }
+                                  }}
+                                  title="Copy tracking link"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                                <a href={`/track/${order.tracking_code}`} target="_blank" rel="noreferrer" title="Open tracking">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6"><ExternalLink className="h-3 w-3" /></Button>
+                                </a>
+                              </>
+                            ) : null}
+                            {order.source === 'online' ? <Badge variant="secondary" className="ml-1 h-5 text-[10px]">Online</Badge> : null}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{order.customer_name || 'Walk-in'}</p>
@@ -613,7 +804,6 @@ export default function OrdersPage() {
                           )}
                         </TableCell>
                         <TableCell>{order.payment_status}</TableCell>
-                        <TableCell>{order.assigned_to_name || 'Unassigned'}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(Number(order.total || 0))}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(order.balance || 0))}</TableCell>
                         <TableCell className="text-right">
@@ -632,9 +822,9 @@ export default function OrdersPage() {
             ) : (
               <EmptyState
                 icon={<ClipboardList className="h-7 w-7 text-muted-foreground" />}
-                title="No orders yet"
-                description="Track delivery, pickup, and pending orders here. Orders only count in sales after they are delivered."
-                action={canCreate ? <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Order</Button> : undefined}
+                title={visibleOrders.length ? 'No orders match your filters' : 'No orders yet'}
+                description={visibleOrders.length ? 'Try adjusting the status, date, or search filters.' : 'Track delivery, pickup, and pending orders here. Orders only count in sales after they are delivered.'}
+                action={canCreate && !visibleOrders.length ? <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Order</Button> : undefined}
               />
             )}
           </CardContent>
@@ -661,4 +851,13 @@ export default function OrdersPage() {
 
 function normalizeStatus(value: string | null | undefined) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </div>
+  );
 }

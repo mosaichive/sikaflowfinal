@@ -55,6 +55,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const StorePage = lazy(() => import("./pages/StorePage"));
+const TrackOrderPage = lazy(() => import("./pages/TrackOrderPage"));
 
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 
@@ -174,6 +176,10 @@ const App = () => (
                 <Route path="/phone-login" element={<Navigate to="/sign-in" replace />} />
                 <Route path="/change-password" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/verify" element={<Navigate to="/dashboard" replace />} />
+
+                {/* Public customer-facing store & tracking */}
+                <Route path="/store/:slug" element={<StorePage />} />
+                <Route path="/track/:code" element={<TrackOrderPage />} />
 
                 {/* Platform Super Admin */}
                 <Route path="/platform/*" element={<Navigate to="/super-admin" replace />} />
