@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Trash2, Plus, Eye, MessageSquare, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+const db = supabase as any;
 import { toast } from '@/hooks/use-toast';
 import type { Survey, SurveyQuestion, SurveyQuestionType } from '@/lib/survey';
 
@@ -32,7 +33,7 @@ export default function SurveysPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('surveys').select('*').order('created_at', { ascending: false });
+    const { data } = await db.from('surveys').select('*').order('created_at', { ascending: false });
     setSurveys((data ?? []) as Survey[]);
     setLoading(false);
   };
@@ -52,16 +53,16 @@ export default function SurveysPage() {
   async function toggleEnabled(s: Survey, value: boolean) {
     if (value) {
       // Disable others first (only one enabled at a time)
-      await supabase.from('surveys').update({ enabled: false }).neq('id', s.id).eq('enabled', true);
+      await db.from('surveys').update({ enabled: false }).neq('id', s.id).eq('enabled', true);
     }
-    const { error } = await supabase.from('surveys').update({ enabled: value }).eq('id', s.id);
+    const { error } = await db.from('surveys').update({ enabled: value }).eq('id', s.id);
     if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
     await load();
   }
 
   async function deleteSurvey(s: Survey) {
     if (!confirm(`Delete "${s.title}"? Responses will also be removed.`)) return;
-    const { error } = await supabase.from('surveys').delete().eq('id', s.id);
+    const { error } = await db.from('surveys').delete().eq('id', s.id);
     if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
     await load();
   }
@@ -171,13 +172,13 @@ function SurveyEditorDialog({ survey, onClose, onSaved }: { survey: Survey; onCl
   async function save() {
     setSaving(true);
     try {
-      const { error: sErr } = await supabase.from('surveys').update({ title, description }).eq('id', survey.id);
+      const { error: sErr } = await db.from('surveys').update({ title, description }).eq('id', survey.id);
       if (sErr) throw sErr;
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         if (q._deleted && q.id) {
-          await supabase.from('survey_questions').delete().eq('id', q.id);
+          await db.from('survey_questions').delete().eq('id', q.id);
           continue;
         }
         if (q._deleted) continue;
@@ -190,9 +191,9 @@ function SurveyEditorDialog({ survey, onClose, onSaved }: { survey: Survey; onCl
           position: i,
         };
         if (q.id) {
-          await supabase.from('survey_questions').update(payload).eq('id', q.id);
+          await db.from('survey_questions').update(payload).eq('id', q.id);
         } else {
-          await supabase.from('survey_questions').insert(payload);
+          await db.from('survey_questions').insert(payload);
         }
       }
       toast({ title: 'Saved' });

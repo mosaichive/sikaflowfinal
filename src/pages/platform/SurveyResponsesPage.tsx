@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Download, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+const db = supabase as any;
 import type { Survey, SurveyQuestion } from '@/lib/survey';
 
 interface ResponseRow {
@@ -44,7 +45,7 @@ export default function SurveyResponsesPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('surveys').select('*').order('created_at', { ascending: false });
+      const { data } = await db.from('surveys').select('*').order('created_at', { ascending: false });
       const list = (data ?? []) as Survey[];
       setSurveys(list);
       if (!surveyId && list[0]) setParams({ survey: list[0].id }, { replace: true });
@@ -55,15 +56,15 @@ export default function SurveyResponsesPage() {
     if (!surveyId) return;
     (async () => {
       const [{ data: qs }, { data: resps }, { data: statuses }] = await Promise.all([
-        supabase.from('survey_questions').select('*').eq('survey_id', surveyId).order('position'),
-        supabase.from('survey_responses').select('*').eq('survey_id', surveyId).order('submitted_at', { ascending: false }),
-        supabase.from('survey_user_status').select('status').eq('survey_id', surveyId),
+        db.from('survey_questions').select('*').eq('survey_id', surveyId).order('position'),
+        db.from('survey_responses').select('*').eq('survey_id', surveyId).order('submitted_at', { ascending: false }),
+        db.from('survey_user_status').select('status').eq('survey_id', surveyId),
       ]);
       setQuestions((qs ?? []) as any);
       setResponses((resps ?? []) as any);
       const respIds = ((resps ?? []) as ResponseRow[]).map((r) => r.id);
       if (respIds.length) {
-        const { data: ans } = await supabase.from('survey_response_answers').select('*').in('response_id', respIds);
+        const { data: ans } = await db.from('survey_response_answers').select('*').in('response_id', respIds);
         setAnswers((ans ?? []) as any);
       } else {
         setAnswers([]);

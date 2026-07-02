@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Star, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+const db = supabase as any;
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { toast } from '@/hooks/use-toast';
@@ -69,7 +70,7 @@ export function SurveyModal() {
       sessionStorage.setItem(sessionShownKey(active.id), '1');
 
       // Record shown
-      await supabase.from('survey_user_status').upsert(
+      await db.from('survey_user_status').upsert(
         {
           survey_id: active.id,
           user_id: user.id,
@@ -88,7 +89,7 @@ export function SurveyModal() {
 
   async function handleSkip() {
     if (!survey || !user) return;
-    await supabase.from('survey_user_status').upsert(
+    await db.from('survey_user_status').upsert(
       {
         survey_id: survey.id,
         user_id: user.id,
@@ -135,11 +136,11 @@ export function SurveyModal() {
         answer: { value: answers[q.id] ?? null },
       }));
       if (rows.length) {
-        const { error: ansErr } = await supabase.from('survey_response_answers').insert(rows);
+        const { error: ansErr } = await db.from('survey_response_answers').insert(rows);
         if (ansErr) throw ansErr;
       }
 
-      await supabase.from('survey_user_status').upsert(
+      await db.from('survey_user_status').upsert(
         {
           survey_id: survey.id,
           user_id: user.id,
