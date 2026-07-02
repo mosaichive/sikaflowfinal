@@ -1,0 +1,1 @@
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS thank_you_message text;
