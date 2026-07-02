@@ -178,7 +178,10 @@ Deno.serve(async (req) => {
     if (profile.sms_notify_new_order !== false) {
       const businessName = profile.business_name?.trim() || 'your store';
       const itemCount = orderItems.reduce((s, r) => s + r.quantity, 0);
-      const summary = `New ${fulfillmentType} order from ${customerName} at ${businessName}. ${itemCount} item${itemCount === 1 ? '' : 's'}. Open KudiTrack to process.`;
+      const momoLine = paymentName || paymentReference
+        ? ` Momo: ${paymentName || '—'}${paymentReference ? ` / Ref ${paymentReference}` : ''}.`
+        : '';
+      const summary = `New ${fulfillmentType} order from ${customerName} at ${businessName}. ${itemCount} item${itemCount === 1 ? '' : 's'}. GHS ${total.toFixed(2)}.${momoLine} Open KudiTrack to process.`;
       const recipients = new Set<string>();
       const ownerPhone = normalizePhone(String(profile.phone ?? ''));
       if (/^\+\d{9,15}$/.test(ownerPhone)) recipients.add(ownerPhone);
@@ -216,7 +219,10 @@ Deno.serve(async (req) => {
 
     // Customer confirmation SMS
     const businessName = profile.business_name?.trim() || 'the store';
-    const customerMsg = `Hi ${customerName}, your ${fulfillmentType} order (#${order.tracking_code}) at ${businessName} has been received. Track it: ${trackingUrl}`;
+    const momoTail = paymentName || paymentReference
+      ? ` Payment details on file: ${paymentName || '—'}${paymentReference ? ` (Ref: ${paymentReference})` : ''}.`
+      : '';
+    const customerMsg = `Hi ${customerName}, your ${fulfillmentType} order (#${order.tracking_code}) at ${businessName} has been received.${momoTail} Track it: ${trackingUrl}`;
     try {
       const provider = await sendAtSms(customerPhone, customerMsg);
       await logSms({ business_id: businessId, recipient_phone: customerPhone, notification_type: 'order_confirmation', message: customerMsg, status: 'sent', provider_response: provider, reference_id: order.id });

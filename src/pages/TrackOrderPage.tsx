@@ -12,6 +12,7 @@ type OrderData = {
   tracking_code: string;
   status: string;
   payment_status: string;
+  payment_method?: string | null;
   customer_name: string;
   total: number;
   subtotal: number;
@@ -27,6 +28,8 @@ type OrderData = {
   tracking_notes: string | null;
   delivery_location: string | null;
   notes: string | null;
+  customer_payment_name: string | null;
+  customer_payment_reference: string | null;
   items: { name: string; quantity: number; unit_price: number; line_total: number }[];
   business: { name: string; logo_url: string | null; phone: string | null; slug: string | null };
 };
@@ -264,7 +267,18 @@ export default function TrackOrderPage() {
             <p><span className="text-muted-foreground">Placed:</span> {new Date(order.order_date).toLocaleString()}</p>
             {order.delivery_location ? <p><span className="text-muted-foreground">Delivery:</span> {order.delivery_location}</p> : null}
             {order.notes ? <p><span className="text-muted-foreground">Notes:</span> {order.notes}</p> : null}
-            {order.business.phone ? <p><span className="text-muted-foreground">Contact business:</span> {order.business.phone}</p> : null}
+            {(order.customer_payment_name || order.customer_payment_reference) ? (
+              <div className="pt-2 mt-2 border-t border-border">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Payment details submitted</p>
+                {order.customer_payment_name ? (
+                  <p><span className="text-muted-foreground">Momo name:</span> <span className="font-medium">{order.customer_payment_name}</span></p>
+                ) : null}
+                {order.customer_payment_reference ? (
+                  <p><span className="text-muted-foreground">Reference:</span> <span className="font-mono">{order.customer_payment_reference}</span></p>
+                ) : null}
+              </div>
+            ) : null}
+            {order.business.phone ? <p className="pt-1"><span className="text-muted-foreground">Contact business:</span> {order.business.phone}</p> : null}
           </CardContent>
         </Card>
       </main>

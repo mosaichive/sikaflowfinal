@@ -62,6 +62,8 @@ type OrderRow = {
   delivery_fee?: number | string | null;
   fulfillment_type?: string | null;
   estimated_delivery_date?: string | null;
+  customer_payment_name?: string | null;
+  customer_payment_reference?: string | null;
 };
 
 type OrderItemRow = {
@@ -162,7 +164,21 @@ export default function OrdersPage() {
     void load();
     const channel = supabase
       .channel('orders-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void load(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        const row = payload.new as any;
+        if (row?.source === 'online') {
+          const momo = row.customer_payment_name || row.customer_payment_reference
+            ? ` · Momo: ${row.customer_payment_name || '—'}${row.customer_payment_reference ? ` / ${row.customer_payment_reference}` : ''}`
+            : '';
+          toast({
+            title: 'New online order received',
+            description: `${row.customer_name || 'Customer'} · ${formatCurrency(Number(row.total || 0))}${momo}`,
+          });
+        }
+        void load();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => { void load(); })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { void load(); })
       .subscribe();
@@ -170,7 +186,7 @@ export default function OrdersPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, toast]);
 
   const visibleOrders = useMemo(() => {
     if (isAdmin || isManager) return orders;
@@ -829,6 +845,17 @@ export default function OrdersPage() {
                           <div>
                             <p className="font-medium">{order.customer_name || 'Walk-in'}</p>
                             <p className="text-xs text-muted-foreground">{order.customer_phone || order.delivery_location || 'No contact provided'}</p>
+                            {order.customer_payment_name || order.customer_payment_reference ? (
+                              <div className="mt-1 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] leading-tight">
+                                <p className="font-medium text-foreground">Momo payment</p>
+                                {order.customer_payment_name ? (
+                                  <p className="text-muted-foreground">Name: <span className="text-foreground">{order.customer_payment_name}</span></p>
+                                ) : null}
+                                {order.customer_payment_reference ? (
+                                  <p className="text-muted-foreground">Ref: <span className="font-mono text-foreground">{order.customer_payment_reference}</span></p>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell>
