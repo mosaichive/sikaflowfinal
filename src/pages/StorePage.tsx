@@ -121,6 +121,10 @@ export default function StorePage() {
       toast({ title: 'Delivery address required', description: 'Please enter where you want the order delivered.', variant: 'destructive' });
       return;
     }
+    if (requirePaymentProof && (!form.payment_name.trim() || !form.payment_reference.trim())) {
+      toast({ title: 'Payment details required', description: 'Please enter the Momo name and reference used for payment.', variant: 'destructive' });
+      return;
+    }
     setSubmitting(true);
     try {
       const items: CartItem[] = cartItems.map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
@@ -133,6 +137,8 @@ export default function StorePage() {
           notes: form.notes.trim(),
           fulfillment_type: fulfillment,
           payment_method: paymentMethod,
+          payment_name: form.payment_name.trim() || undefined,
+          payment_reference: form.payment_reference.trim() || undefined,
           items,
         },
       });
