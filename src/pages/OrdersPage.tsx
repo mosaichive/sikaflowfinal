@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { notifyOrderEvent } from '@/lib/order-sms';
+import { OrderSettingsDialog } from '@/components/orders/OrderSettingsDialog';
 
 type ProductRow = {
   id: string;
@@ -58,6 +59,9 @@ type OrderRow = {
   tracking_notes?: string | null;
   source?: string | null;
   delivered_at?: string | null;
+  delivery_fee?: number | string | null;
+  fulfillment_type?: string | null;
+  estimated_delivery_date?: string | null;
 };
 
 type OrderItemRow = {
@@ -106,6 +110,8 @@ export default function OrdersPage() {
     carrier_name: '',
     carrier_phone: '',
     tracking_notes: '',
+    delivery_fee: '0',
+    fulfillment_type: 'delivery' as 'delivery' | 'pickup',
   });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
@@ -240,7 +246,8 @@ export default function OrdersPage() {
     [selectedItems],
   );
   const discount = Number(form.discount || 0);
-  const total = Math.max(0, subtotal - discount);
+  const deliveryFee = form.fulfillment_type === 'delivery' ? Number(form.delivery_fee || 0) : 0;
+  const total = Math.max(0, subtotal - discount + deliveryFee);
   const amountPaid = Number(form.amount_paid || 0);
   const balance = Math.max(0, total - amountPaid);
   const paymentStatus = balance <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
@@ -262,6 +269,8 @@ export default function OrdersPage() {
       carrier_name: '',
       carrier_phone: '',
       tracking_notes: '',
+      delivery_fee: '0',
+      fulfillment_type: 'delivery',
     });
     setOrderLines([makeDraftItem()]);
     setEditingId(null);
@@ -278,10 +287,12 @@ export default function OrdersPage() {
       payment_method: order.payment_method || PAYMENT_METHODS[0].value,
       notes: order.notes || '',
       status: order.status || 'pending',
-      due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+      due_date: order.due_date ? String(order.due_date).slice(0, 10) : (order.estimated_delivery_date ? String(order.estimated_delivery_date).slice(0, 10) : ''),
       carrier_name: order.carrier_name || '',
       carrier_phone: order.carrier_phone || '',
       tracking_notes: order.tracking_notes || '',
+      delivery_fee: String(order.delivery_fee ?? '0'),
+      fulfillment_type: (order.fulfillment_type === 'pickup' ? 'pickup' : 'delivery'),
     });
     const lines = orderItems
       .filter((it) => it.order_id === order.id)
