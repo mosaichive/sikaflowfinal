@@ -209,6 +209,7 @@ export default function OrdersPage() {
       processing: 0,
       out_for_delivery: 0,
       delivered_today: 0,
+      completed: 0,
       cancelled: 0,
     };
     for (const o of visibleOrders) {
@@ -216,8 +217,9 @@ export default function OrdersPage() {
       if (st === 'pending') s.pending += 1;
       else if (st === 'processing') s.processing += 1;
       else if (st === 'out_for_delivery') s.out_for_delivery += 1;
+      else if (st === 'completed') s.completed += 1;
       else if (st === 'cancelled') s.cancelled += 1;
-      if (st === 'delivered') {
+      if (st === 'delivered' || st === 'completed') {
         const ts = new Date((o.delivered_at as any) || o.order_date).getTime();
         if (ts >= startOfToday) s.delivered_today += 1;
       }
@@ -728,16 +730,18 @@ export default function OrdersPage() {
                 </form>
               </DialogContent>
             </Dialog>
-          ) : null}
+            ) : null}
+          </div>
         </section>
 
         {/* Dashboard stats */}
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
           <StatCard label="Total Orders" value={stats.total} />
           <StatCard label="Pending" value={stats.pending} />
           <StatCard label="Processing" value={stats.processing} />
           <StatCard label="Out for Delivery" value={stats.out_for_delivery} />
           <StatCard label="Delivered Today" value={stats.delivered_today} />
+          <StatCard label="Completed" value={stats.completed} />
           <StatCard label="Cancelled" value={stats.cancelled} />
         </div>
 
