@@ -691,27 +691,96 @@ export default function OrdersPage() {
           ) : null}
         </section>
 
+        {/* Dashboard stats */}
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard label="Total Orders" value={stats.total} />
+          <StatCard label="Pending" value={stats.pending} />
+          <StatCard label="Processing" value={stats.processing} />
+          <StatCard label="Out for Delivery" value={stats.out_for_delivery} />
+          <StatCard label="Delivered Today" value={stats.delivered_today} />
+          <StatCard label="Cancelled" value={stats.cancelled} />
+        </div>
+
+        {/* Filters */}
+        <Card className="border-border/70">
+          <CardContent className="p-4 grid gap-3 md:grid-cols-4">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by customer, phone or order #"
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {ORDER_STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
+              <SelectTrigger><SelectValue placeholder="Date" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         <Card className="border-border/70">
           <CardContent className="p-0">
-            {visibleOrders.length > 0 ? (
+            {filteredOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Order #</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
-                      <TableHead>Assigned To</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleOrders.map((order) => (
+                    {filteredOrders.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell>{new Date(order.order_date).toLocaleDateString('en-GH')}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-xs">{order.tracking_code || '—'}</span>
+                            {order.tracking_code ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={async () => {
+                                    const url = `${window.location.origin}/track/${order.tracking_code}`;
+                                    try { await navigator.clipboard.writeText(url); toast({ title: 'Tracking link copied' }); } catch { /* ignore */ }
+                                  }}
+                                  title="Copy tracking link"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                                <a href={`/track/${order.tracking_code}`} target="_blank" rel="noreferrer" title="Open tracking">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6"><ExternalLink className="h-3 w-3" /></Button>
+                                </a>
+                              </>
+                            ) : null}
+                            {order.source === 'online' ? <Badge variant="secondary" className="ml-1 h-5 text-[10px]">Online</Badge> : null}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{order.customer_name || 'Walk-in'}</p>
@@ -735,7 +804,6 @@ export default function OrdersPage() {
                           )}
                         </TableCell>
                         <TableCell>{order.payment_status}</TableCell>
-                        <TableCell>{order.assigned_to_name || 'Unassigned'}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(Number(order.total || 0))}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(order.balance || 0))}</TableCell>
                         <TableCell className="text-right">
@@ -754,9 +822,9 @@ export default function OrdersPage() {
             ) : (
               <EmptyState
                 icon={<ClipboardList className="h-7 w-7 text-muted-foreground" />}
-                title="No orders yet"
-                description="Track delivery, pickup, and pending orders here. Orders only count in sales after they are delivered."
-                action={canCreate ? <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Order</Button> : undefined}
+                title={visibleOrders.length ? 'No orders match your filters' : 'No orders yet'}
+                description={visibleOrders.length ? 'Try adjusting the status, date, or search filters.' : 'Track delivery, pickup, and pending orders here. Orders only count in sales after they are delivered.'}
+                action={canCreate && !visibleOrders.length ? <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Order</Button> : undefined}
               />
             )}
           </CardContent>
@@ -783,4 +851,13 @@ export default function OrdersPage() {
 
 function normalizeStatus(value: string | null | undefined) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </div>
+  );
 }
