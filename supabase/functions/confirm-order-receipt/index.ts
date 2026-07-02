@@ -1,7 +1,6 @@
-// Public endpoint: customer confirms receipt of their order.
-// Verified by the unguessable tracking_code alone (already used as the secure
-// tracking link secret). Marks the order 'completed' and notifies the business
-// owner + staff-with-orders-access by SMS. Fire-and-forget for SMS.
+// Public endpoint: customer confirms receipt of their order via tracking code.
+// Marks the order 'completed' and notifies the business owner + staff with
+// orders access by SMS. Fire-and-forget SMS.
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
 
@@ -12,8 +11,7 @@ const corsHeaders = {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
@@ -35,7 +33,6 @@ Deno.serve(async (req) => {
     const r = res as any;
     if (!r?.ok) return json(r ?? { ok: false, reason: 'unknown' }, 400);
 
-    // Notify owner + staff-with-orders-access (skip if already completed).
     if (!r.already) {
       const businessId = r.business_id as string;
       const orderId = r.order_id as string;
@@ -48,7 +45,7 @@ Deno.serve(async (req) => {
         .eq('id', businessId)
         .maybeSingle();
 
-      if (profile?.sms_notify_order_status !== false) {
+      if ((profile as any)?.sms_notify_order_status !== false) {
         const businessName = (profile as any)?.business_name?.trim() || 'your store';
         const msg = `${customerName} confirmed delivery of order #${trackingCode}. It is now Completed on ${businessName}.`;
 
@@ -57,10 +54,8 @@ Deno.serve(async (req) => {
         if (/^\+\d{9,15}$/.test(ownerPhone)) recipients.add(ownerPhone);
 
         const { data: staff } = await admin
-          .from('staff_members')
-          .select('staff_user_id, permissions, active')
-          .eq('business_owner_id', businessId)
-          .eq('active', true);
+          .from('staff_members').select('staff_user_id, permissions, active')
+          .eq('business_owner_id', businessId).eq('active', true);
         const staffIds: string[] = [];
         for (const s of staff ?? []) {
           const perms = (s as any).permissions || {};
@@ -80,25 +75,9 @@ Deno.serve(async (req) => {
         for (const to of recipients) {
           try {
             const provider = await sendAtSms(to, msg);
-            await logSms({
-              business_id: businessId,
-              recipient_phone: to,
-              notification_type: 'order_completed',
-              message: msg,
-              status: 'sent',
-              provider_response: provider,
-              reference_id: orderId,
-            });
+            await logSms({ business_id: businessId, recipient_phone: to, notification_type: 'order_completed', message: msg, status: 'sent', provider_response: provider, reference_id: orderId });
           } catch (err) {
-            await logSms({
-              business_id: businessId,
-              recipient_phone: to,
-              notification_type: 'order_completed',
-              message: msg,
-              status: 'failed',
-              error_message: err instanceof Error ? err.message : String(err),
-              reference_id: orderId,
-            });
+            await logSms({ business_id: businessId, recipient_phone: to, notification_type: 'order_completed', message: msg, status: 'failed', error_message: err instanceof Error ? err.message : String(err), reference_id: orderId });
           }
         }
       }
