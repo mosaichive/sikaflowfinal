@@ -195,6 +195,8 @@ export default function StorePage() {
 
   const paymentMethods = business.payment_methods || ['cash_on_delivery'];
   const showPaymentChoice = paymentMethods.length > 1;
+  const requirePaymentProof = !!(business.payment_instructions && business.payment_instructions.trim());
+  const canSubmit = !submitting && (!requirePaymentProof || (form.payment_name.trim() && form.payment_reference.trim()));
 
   return (
     <div className="min-h-screen bg-background">
