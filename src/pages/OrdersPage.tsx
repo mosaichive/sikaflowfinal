@@ -121,6 +121,11 @@ export default function OrdersPage() {
 
   const canCreate = isAdmin || isManager || isSalesperson;
   const canManageStatus = isAdmin || isManager || isSalesperson;
+  const isOwner = !!user && !!businessId && user.id === businessId;
+  const isLocked = (status: string | null | undefined) => {
+    const s = normalizeStatus(status || '');
+    return s === 'delivered' || s === 'completed';
+  };
 
   const load = useCallback(async () => {
     const [productsRes, ordersRes, itemsRes] = await Promise.allSettled([
