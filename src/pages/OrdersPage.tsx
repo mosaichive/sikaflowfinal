@@ -121,6 +121,11 @@ export default function OrdersPage() {
 
   const canCreate = isAdmin || isManager || isSalesperson;
   const canManageStatus = isAdmin || isManager || isSalesperson;
+  const isOwner = !!user && !!businessId && user.id === businessId;
+  const isLocked = (status: string | null | undefined) => {
+    const s = normalizeStatus(status || '');
+    return s === 'delivered' || s === 'completed';
+  };
 
   const load = useCallback(async () => {
     const [productsRes, ordersRes, itemsRes] = await Promise.allSettled([
@@ -859,7 +864,9 @@ export default function OrdersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {canManageStatus ? (
+                          {isLocked(order.status) ? (
+                            <Badge variant="secondary">{ORDER_STATUSES.find((s) => s.value === order.status)?.label || order.status}</Badge>
+                          ) : canManageStatus ? (
                             <Select value={order.status} onValueChange={(value) => void handleStatusChange(order, value)}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue />
@@ -880,8 +887,14 @@ export default function OrdersPage() {
                         <TableCell className="text-right">
                           {canCreate ? (
                             <div className="flex justify-end gap-1">
-                              <Button type="button" variant="ghost" size="sm" onClick={() => openEditDialog(order)} title="Edit"><Pencil className="h-4 w-4" /></Button>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteId(order.id)} title="Delete"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              {isLocked(order.status) ? (
+                                <Badge variant="outline" className="text-[10px]">Locked</Badge>
+                              ) : (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => openEditDialog(order)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                              )}
+                              {isOwner ? (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteId(order.id)} title="Delete"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              ) : null}
                             </div>
                           ) : null}
                         </TableCell>
