@@ -62,6 +62,8 @@ type OrderRow = {
   delivery_fee?: number | string | null;
   fulfillment_type?: string | null;
   estimated_delivery_date?: string | null;
+  customer_payment_name?: string | null;
+  customer_payment_reference?: string | null;
 };
 
 type OrderItemRow = {
