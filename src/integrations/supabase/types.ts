@@ -502,16 +502,20 @@ export type Database = {
           business_id: string
           carrier_name: string | null
           carrier_phone: string | null
+          confirmation_token: string | null
           created_at: string
           created_by: string | null
           created_by_name: string | null
+          customer_confirmed_at: string | null
           customer_name: string | null
           customer_phone: string | null
           delivered_at: string | null
+          delivery_fee: number
           delivery_location: string | null
           discount: number
           due_date: string | null
           estimated_delivery_date: string | null
+          fulfillment_type: string
           id: string
           notes: string | null
           order_date: string
@@ -533,16 +537,20 @@ export type Database = {
           business_id: string
           carrier_name?: string | null
           carrier_phone?: string | null
+          confirmation_token?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          customer_confirmed_at?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           delivered_at?: string | null
+          delivery_fee?: number
           delivery_location?: string | null
           discount?: number
           due_date?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_type?: string
           id?: string
           notes?: string | null
           order_date?: string
@@ -564,16 +572,20 @@ export type Database = {
           business_id?: string
           carrier_name?: string | null
           carrier_phone?: string | null
+          confirmation_token?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          customer_confirmed_at?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           delivered_at?: string | null
+          delivery_fee?: number
           delivery_location?: string | null
           discount?: number
           due_date?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_type?: string
           id?: string
           notes?: string | null
           order_date?: string
@@ -845,6 +857,7 @@ export type Database = {
           onboarding_completed: boolean
           online_ordering_enabled: boolean
           opening_cash_balance: number
+          orders_auto_publish_products: boolean
           phone: string | null
           phone_verified: boolean
           phone_verified_at: string | null
@@ -858,6 +871,8 @@ export type Database = {
           store_enable_delivery_address: boolean
           store_enable_notes: boolean
           store_enable_product_images: boolean
+          store_payment_instructions: string | null
+          store_payment_methods: string[]
           store_show_stock: boolean
           store_slug: string | null
           subscription_end_date: string | null
@@ -891,6 +906,7 @@ export type Database = {
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean
           opening_cash_balance?: number
+          orders_auto_publish_products?: boolean
           phone?: string | null
           phone_verified?: boolean
           phone_verified_at?: string | null
@@ -904,6 +920,8 @@ export type Database = {
           store_enable_delivery_address?: boolean
           store_enable_notes?: boolean
           store_enable_product_images?: boolean
+          store_payment_instructions?: string | null
+          store_payment_methods?: string[]
           store_show_stock?: boolean
           store_slug?: string | null
           subscription_end_date?: string | null
@@ -937,6 +955,7 @@ export type Database = {
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean
           opening_cash_balance?: number
+          orders_auto_publish_products?: boolean
           phone?: string | null
           phone_verified?: boolean
           phone_verified_at?: string | null
@@ -950,6 +969,8 @@ export type Database = {
           store_enable_delivery_address?: boolean
           store_enable_notes?: boolean
           store_enable_product_images?: boolean
+          store_payment_instructions?: string | null
+          store_payment_methods?: string[]
           store_show_stock?: boolean
           store_slug?: string | null
           subscription_end_date?: string | null
@@ -1910,6 +1931,10 @@ export type Database = {
       }
       is_business_member: { Args: { _owner_id: string }; Returns: boolean }
       preview_staff_invite: { Args: { _token: string }; Returns: Json }
+      public_confirm_order_receipt: {
+        Args: { _code: string; _phone_last4: string }
+        Returns: Json
+      }
       public_get_order_by_tracking: { Args: { _code: string }; Returns: Json }
       public_get_store: { Args: { _slug: string }; Returns: Json }
       recompute_product_stock: {
