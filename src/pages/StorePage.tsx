@@ -367,7 +367,14 @@ export default function StorePage() {
                         placeholder="Name on the Momo account you paid from"
                         maxLength={120}
                         required
+                        aria-invalid={!!paymentNameError}
+                        className={paymentNameError ? 'border-destructive focus-visible:ring-destructive' : ''}
                       />
+                      {paymentNameError ? (
+                        <p className="mt-1 text-xs text-destructive">{paymentNameError}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">This helps the store match your payment.</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="pay-ref">Momo reference *</Label>
@@ -378,8 +385,20 @@ export default function StorePage() {
                         placeholder="Transaction ID / reference from the Momo SMS"
                         maxLength={80}
                         required
+                        aria-invalid={!!paymentRefError}
+                        className={paymentRefError ? 'border-destructive focus-visible:ring-destructive' : ''}
                       />
+                      {paymentRefError ? (
+                        <p className="mt-1 text-xs text-destructive">{paymentRefError}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">Copy the reference from the Momo confirmation SMS.</p>
+                      )}
                     </div>
+                    {requirePaymentProof && (!paymentNameValid || !paymentRefValid) ? (
+                      <p className="text-xs text-muted-foreground">
+                        The <span className="font-medium">Place order</span> button will unlock once both fields are filled in correctly.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 
