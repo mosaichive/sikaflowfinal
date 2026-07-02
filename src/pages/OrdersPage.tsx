@@ -174,6 +174,51 @@ export default function OrdersPage() {
     return orders;
   }, [isAdmin, isDistributor, isManager, isSalesperson, orders, user?.id]);
 
+  const startOfToday = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+  const startOfWeek = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d.getTime(); }, []);
+  const startOfMonth = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(1); return d.getTime(); }, []);
+
+  const filteredOrders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return visibleOrders.filter((o) => {
+      if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+      if (dateFilter !== 'all') {
+        const t = new Date(o.order_date).getTime();
+        if (dateFilter === 'today' && t < startOfToday) return false;
+        if (dateFilter === 'week' && t < startOfWeek) return false;
+        if (dateFilter === 'month' && t < startOfMonth) return false;
+      }
+      if (q) {
+        const hay = `${o.customer_name ?? ''} ${o.customer_phone ?? ''} ${o.tracking_code ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [visibleOrders, statusFilter, dateFilter, searchQuery, startOfToday, startOfWeek, startOfMonth]);
+
+  const stats = useMemo(() => {
+    const s = {
+      total: visibleOrders.length,
+      pending: 0,
+      processing: 0,
+      out_for_delivery: 0,
+      delivered_today: 0,
+      cancelled: 0,
+    };
+    for (const o of visibleOrders) {
+      const st = normalizeStatus(o.status);
+      if (st === 'pending') s.pending += 1;
+      else if (st === 'processing') s.processing += 1;
+      else if (st === 'out_for_delivery') s.out_for_delivery += 1;
+      else if (st === 'cancelled') s.cancelled += 1;
+      if (st === 'delivered') {
+        const ts = new Date((o.delivered_at as any) || o.order_date).getTime();
+        if (ts >= startOfToday) s.delivered_today += 1;
+      }
+    }
+    return s;
+  }, [visibleOrders, startOfToday]);
+
   const selectedItems = useMemo(() => {
     return orderLines
       .map((line) => {
