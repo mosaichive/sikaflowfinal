@@ -58,6 +58,8 @@ export default function StorePage() {
     customer_phone: '',
     delivery_location: '',
     notes: '',
+    payment_name: '',
+    payment_reference: '',
   });
 
   useEffect(() => {
