@@ -562,7 +562,9 @@ export default function OrdersPage() {
               Track pending, processing, and delivered orders separately from walk-in POS sales. Delivered orders turn into real sales automatically.
             </p>
           </div>
-          {canCreate ? (
+          <div className="flex items-center gap-2">
+            <OrderSettingsDialog />
+            {canCreate ? (
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
@@ -581,13 +583,23 @@ export default function OrdersPage() {
                       <Label>Phone Number</Label>
                       <Input value={form.customer_phone} onChange={(event) => setForm((current) => ({ ...current, customer_phone: event.target.value }))} placeholder="+233..." />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Delivery / Pickup Location</Label>
-                      <Input value={form.delivery_location} onChange={(event) => setForm((current) => ({ ...current, delivery_location: event.target.value }))} placeholder="Pickup point or delivery address" />
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Fulfillment</Label>
+                      <Select value={form.fulfillment_type} onValueChange={(v) => setForm((c) => ({ ...c, fulfillment_type: v as 'delivery' | 'pickup' }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="delivery">Delivery</SelectItem>
+                          <SelectItem value="pickup">Pickup</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Due Date</Label>
-                      <Input type="date" value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} />
+                      <Label>{form.fulfillment_type === 'pickup' ? 'Pickup Location' : 'Delivery Address'}</Label>
+                      <Input value={form.delivery_location} onChange={(event) => setForm((current) => ({ ...current, delivery_location: event.target.value }))} placeholder={form.fulfillment_type === 'pickup' ? 'Pickup point' : 'Delivery address'} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delivery Date {form.fulfillment_type === 'delivery' ? '*' : ''}</Label>
+                      <Input type="date" required={form.fulfillment_type === 'delivery'} value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} />
                     </div>
                   </div>
 
