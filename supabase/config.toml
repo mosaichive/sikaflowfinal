@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.resolve-phone-login]
 verify_jwt = false
+
+[functions.submit-public-order]
+verify_jwt = false
