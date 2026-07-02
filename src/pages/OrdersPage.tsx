@@ -441,6 +441,14 @@ export default function OrdersPage() {
 
   const handleStatusChange = async (order: OrderRow, nextStatus: string) => {
     if (!canManageStatus) return;
+    // For out_for_delivery we need carrier info — always open the edit dialog
+    // so the user provides it before saving.
+    if (nextStatus === 'out_for_delivery' && !order.carrier_name) {
+      openEditDialog({ ...order, status: 'out_for_delivery' });
+      setForm((current) => ({ ...current, status: 'out_for_delivery' }));
+      toast({ title: 'Add carrier details', description: 'Enter carrier name and phone, then save.' });
+      return;
+    }
     try {
       if (nextStatus === 'delivered' && normalizeStatus(order.status) !== 'delivered') {
         await finalizeDeliveredOrder(order);
@@ -462,6 +470,11 @@ export default function OrdersPage() {
         })
         .eq('id', order.id);
       if (error) throw error;
+
+      // Fire-and-forget customer SMS about the status change.
+      if (nextStatus !== order.status) {
+        void notifyOrderEvent(order.id, 'status');
+      }
 
       toast({ title: 'Order updated', description: `Order moved to ${nextStatus.replaceAll('_', ' ')}.` });
       void load();
