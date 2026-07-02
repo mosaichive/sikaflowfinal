@@ -152,6 +152,8 @@ Deno.serve(async (req) => {
         payment_status: 'unpaid',
         status: 'pending',
         source: 'online',
+        customer_payment_name: paymentName || null,
+        customer_payment_reference: paymentReference || null,
         order_date: new Date().toISOString(),
       })
       .select('id, tracking_code')
