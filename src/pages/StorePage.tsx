@@ -121,6 +121,7 @@ export default function StorePage() {
       toast({ title: 'Delivery address required', description: 'Please enter where you want the order delivered.', variant: 'destructive' });
       return;
     }
+    const requirePaymentProof = !!(business?.payment_instructions && business.payment_instructions.trim());
     if (requirePaymentProof && (!form.payment_name.trim() || !form.payment_reference.trim())) {
       toast({ title: 'Payment details required', description: 'Please enter the Momo name and reference used for payment.', variant: 'destructive' });
       return;
