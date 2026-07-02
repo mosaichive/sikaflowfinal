@@ -16,9 +16,12 @@ export interface Survey {
   description: string | null;
   thank_you_message: string | null;
   enabled: boolean;
+  enabled_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export const NEW_USER_DELAY_DAYS = 20;
 
 export const DEFAULT_THANK_YOU_MESSAGE =
   '🎉 Thank You!\n\nWe sincerely appreciate your feedback. Your responses help us improve KudiTrack and build a better experience for your business.';
