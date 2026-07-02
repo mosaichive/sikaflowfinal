@@ -621,7 +621,7 @@ export default function OrdersPage() {
                       <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {ORDER_STATUSES.filter((status) => status.value !== 'delivered').map((status) => (
+                          {ORDER_STATUSES.map((status) => (
                             <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
                           ))}
                         </SelectContent>
@@ -640,6 +640,28 @@ export default function OrdersPage() {
                       <Textarea rows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
                     </div>
                   </div>
+
+                  {form.status === 'out_for_delivery' ? (
+                    <Card className="border-primary/40 bg-primary/5">
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Carrier Name *</Label>
+                          <Input required value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Carrier Phone *</Label>
+                          <Input required value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Tracking notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                          <Textarea rows={2} value={form.tracking_notes} onChange={(e) => setForm((c) => ({ ...c, tracking_notes: e.target.value }))} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
 
                   <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-4">
                     <div>
