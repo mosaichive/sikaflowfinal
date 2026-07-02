@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
@@ -38,6 +40,8 @@ type ProductRow = {
   reorder_level?: number | null;
   image_url?: string | null;
   is_archived?: boolean | null;
+  available_online?: boolean | null;
+  online_description?: string | null;
 };
 
 const emptyForm = {
@@ -46,6 +50,8 @@ const emptyForm = {
   cost_price: '0',
   selling_price: '0',
   low_stock_threshold: '3',
+  available_online: false,
+  online_description: '',
 };
 
 const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -139,6 +145,8 @@ export default function ProductsPage() {
       cost_price: String(row.cost_price ?? 0),
       selling_price: String(row.selling_price ?? 0),
       low_stock_threshold: String(row.low_stock_threshold ?? row.reorder_level ?? 3),
+      available_online: Boolean(row.available_online),
+      online_description: row.online_description ?? '',
     });
     setProductImageFile(null);
     setProductImagePreview((current) => {
@@ -247,6 +255,8 @@ export default function ProductsPage() {
         low_stock_threshold: lowStockThreshold,
         image_url: imageUrl,
         is_archived: false,
+        available_online: !!form.available_online,
+        online_description: form.online_description?.trim() || null,
       };
 
       if (editing) {
@@ -452,6 +462,30 @@ export default function ProductsPage() {
                       </Button>
                     ) : null}
                   </div>
+                </div>
+                <div className="space-y-2 sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label className="font-medium">Available for online ordering</Label>
+                      <p className="text-xs text-muted-foreground mt-1">Show this product on your public store link.</p>
+                    </div>
+                    <Switch
+                      checked={!!form.available_online}
+                      onCheckedChange={(v) => setForm((current) => ({ ...current, available_online: v }))}
+                    />
+                  </div>
+                  {form.available_online ? (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-xs">Public description <span className="text-muted-foreground">(optional)</span></Label>
+                      <Textarea
+                        rows={3}
+                        maxLength={500}
+                        placeholder="Short description customers will see on your store."
+                        value={form.online_description}
+                        onChange={(event) => setForm((current) => ({ ...current, online_description: event.target.value }))}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={saving}>

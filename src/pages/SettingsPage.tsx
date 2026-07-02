@@ -24,6 +24,7 @@ import { EmailVerificationCard } from '@/components/settings/EmailVerificationCa
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard';
+import { OnlineStoreCard } from '@/components/settings/OnlineStoreCard';
 import { useToast } from '@/hooks/use-toast';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 

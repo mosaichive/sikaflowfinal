@@ -46,6 +46,7 @@ export const ORDER_STATUSES = [
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'processing', label: 'Processing' },
   { value: 'ready_for_pickup', label: 'Ready for Pickup' },
+  { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const;

@@ -500,6 +500,8 @@ export type Database = {
           assigned_to_name: string | null
           balance: number
           business_id: string
+          carrier_name: string | null
+          carrier_phone: string | null
           created_at: string
           created_by: string | null
           created_by_name: string | null
@@ -509,14 +511,18 @@ export type Database = {
           delivery_location: string | null
           discount: number
           due_date: string | null
+          estimated_delivery_date: string | null
           id: string
           notes: string | null
           order_date: string
           payment_method: string
           payment_status: string
+          source: string
           status: string
           subtotal: number
           total: number
+          tracking_code: string | null
+          tracking_notes: string | null
           updated_at: string
         }
         Insert: {
@@ -525,6 +531,8 @@ export type Database = {
           assigned_to_name?: string | null
           balance?: number
           business_id: string
+          carrier_name?: string | null
+          carrier_phone?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
@@ -534,14 +542,18 @@ export type Database = {
           delivery_location?: string | null
           discount?: number
           due_date?: string | null
+          estimated_delivery_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string
           payment_method?: string
           payment_status?: string
+          source?: string
           status?: string
           subtotal?: number
           total?: number
+          tracking_code?: string | null
+          tracking_notes?: string | null
           updated_at?: string
         }
         Update: {
@@ -550,6 +562,8 @@ export type Database = {
           assigned_to_name?: string | null
           balance?: number
           business_id?: string
+          carrier_name?: string | null
+          carrier_phone?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
@@ -559,14 +573,18 @@ export type Database = {
           delivery_location?: string | null
           discount?: number
           due_date?: string | null
+          estimated_delivery_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string
           payment_method?: string
           payment_status?: string
+          source?: string
           status?: string
           subtotal?: number
           total?: number
+          tracking_code?: string | null
+          tracking_notes?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -753,6 +771,7 @@ export type Database = {
       }
       products: {
         Row: {
+          available_online: boolean
           category: string
           cost: number
           created_at: string
@@ -761,6 +780,7 @@ export type Database = {
           is_archived: boolean
           low_stock_threshold: number
           name: string
+          online_description: string | null
           price: number
           sku: string | null
           stock: number
@@ -768,6 +788,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          available_online?: boolean
           category?: string
           cost?: number
           created_at?: string
@@ -776,6 +797,7 @@ export type Database = {
           is_archived?: boolean
           low_stock_threshold?: number
           name: string
+          online_description?: string | null
           price?: number
           sku?: string | null
           stock?: number
@@ -783,6 +805,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          available_online?: boolean
           category?: string
           cost?: number
           created_at?: string
@@ -791,6 +814,7 @@ export type Database = {
           is_archived?: boolean
           low_stock_threshold?: number
           name?: string
+          online_description?: string | null
           price?: number
           sku?: string | null
           stock?: number
@@ -819,6 +843,7 @@ export type Database = {
           logo_url: string | null
           num_employees: string | null
           onboarding_completed: boolean
+          online_ordering_enabled: boolean
           opening_cash_balance: number
           phone: string | null
           phone_verified: boolean
@@ -826,8 +851,15 @@ export type Database = {
           referred_by_user_id: string | null
           role: string | null
           sms_notify_low_stock: boolean
+          sms_notify_new_order: boolean
+          sms_notify_order_status: boolean
           sms_notify_sale_thanks: boolean
           sms_notify_team_invite: boolean
+          store_enable_delivery_address: boolean
+          store_enable_notes: boolean
+          store_enable_product_images: boolean
+          store_show_stock: boolean
+          store_slug: string | null
           subscription_end_date: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date: string | null
@@ -857,6 +889,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          online_ordering_enabled?: boolean
           opening_cash_balance?: number
           phone?: string | null
           phone_verified?: boolean
@@ -864,8 +897,15 @@ export type Database = {
           referred_by_user_id?: string | null
           role?: string | null
           sms_notify_low_stock?: boolean
+          sms_notify_new_order?: boolean
+          sms_notify_order_status?: boolean
           sms_notify_sale_thanks?: boolean
           sms_notify_team_invite?: boolean
+          store_enable_delivery_address?: boolean
+          store_enable_notes?: boolean
+          store_enable_product_images?: boolean
+          store_show_stock?: boolean
+          store_slug?: string | null
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date?: string | null
@@ -895,6 +935,7 @@ export type Database = {
           logo_url?: string | null
           num_employees?: string | null
           onboarding_completed?: boolean
+          online_ordering_enabled?: boolean
           opening_cash_balance?: number
           phone?: string | null
           phone_verified?: boolean
@@ -902,8 +943,15 @@ export type Database = {
           referred_by_user_id?: string | null
           role?: string | null
           sms_notify_low_stock?: boolean
+          sms_notify_new_order?: boolean
+          sms_notify_order_status?: boolean
           sms_notify_sale_thanks?: boolean
           sms_notify_team_invite?: boolean
+          store_enable_delivery_address?: boolean
+          store_enable_notes?: boolean
+          store_enable_product_images?: boolean
+          store_show_stock?: boolean
+          store_slug?: string | null
           subscription_end_date?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           subscription_start_date?: string | null
@@ -1841,6 +1889,11 @@ export type Database = {
         }[]
       }
       ensure_referral_code: { Args: { _user_id: string }; Returns: string }
+      ensure_unique_store_slug: {
+        Args: { _base: string; _owner: string }
+        Returns: string
+      }
+      gen_tracking_code: { Args: never; Returns: string }
       get_table_columns: {
         Args: { _table_name: string }
         Returns: {
@@ -1857,6 +1910,8 @@ export type Database = {
       }
       is_business_member: { Args: { _owner_id: string }; Returns: boolean }
       preview_staff_invite: { Args: { _token: string }; Returns: Json }
+      public_get_order_by_tracking: { Args: { _code: string }; Returns: Json }
+      public_get_store: { Args: { _slug: string }; Returns: Json }
       recompute_product_stock: {
         Args: never
         Returns: {
@@ -1865,6 +1920,7 @@ export type Database = {
         }[]
       }
       record_user_login: { Args: never; Returns: undefined }
+      slugify: { Args: { _input: string }; Returns: string }
       sync_product_stock: {
         Args: { _product_id: string; _user_id: string }
         Returns: number

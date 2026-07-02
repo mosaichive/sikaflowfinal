@@ -14,12 +14,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, ORDER_STATUSES, PAYMENT_METHODS } from '@/lib/constants';
-import { ClipboardList, Plus, Truck, Pencil, Trash2 } from 'lucide-react';
+import { ClipboardList, Plus, Truck, Pencil, Trash2, Search, Copy, ExternalLink } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
+import { notifyOrderEvent } from '@/lib/order-sms';
 
 type ProductRow = {
   id: string;
@@ -50,6 +52,12 @@ type OrderRow = {
   created_by_name: string | null;
   order_date: string;
   due_date?: string | null;
+  tracking_code?: string | null;
+  carrier_name?: string | null;
+  carrier_phone?: string | null;
+  tracking_notes?: string | null;
+  source?: string | null;
+  delivered_at?: string | null;
 };
 
 type OrderItemRow = {
@@ -95,7 +103,13 @@ export default function OrdersPage() {
     notes: '',
     status: 'pending',
     due_date: '',
+    carrier_name: '',
+    carrier_phone: '',
+    tracking_notes: '',
   });
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const canCreate = isAdmin || isManager || isSalesperson;
   const canManageStatus = isAdmin || isManager || isSalesperson;
@@ -200,6 +214,9 @@ export default function OrdersPage() {
       notes: '',
       status: 'pending',
       due_date: '',
+      carrier_name: '',
+      carrier_phone: '',
+      tracking_notes: '',
     });
     setOrderLines([makeDraftItem()]);
     setEditingId(null);
@@ -217,6 +234,9 @@ export default function OrdersPage() {
       notes: order.notes || '',
       status: order.status || 'pending',
       due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+      carrier_name: order.carrier_name || '',
+      carrier_phone: order.carrier_phone || '',
+      tracking_notes: order.tracking_notes || '',
     });
     const lines = orderItems
       .filter((it) => it.order_id === order.id)
@@ -268,6 +288,13 @@ export default function OrdersPage() {
     setSaving(true);
 
     try {
+      // Require carrier info when the order is being sent out for delivery.
+      if (form.status === 'out_for_delivery' && (!form.carrier_name.trim() || !form.carrier_phone.trim())) {
+        toast({ title: 'Carrier required', description: 'Enter carrier name and phone for out-for-delivery orders.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
       const orderPayload = {
         business_id: businessId,
         customer_name: form.customer_name || 'Walk-in',
@@ -283,8 +310,12 @@ export default function OrdersPage() {
         payment_status: paymentStatus,
         status: form.status,
         due_date: form.due_date || null,
+        carrier_name: form.status === 'out_for_delivery' ? form.carrier_name.trim() || null : (form.carrier_name.trim() || null),
+        carrier_phone: form.status === 'out_for_delivery' ? form.carrier_phone.trim() || null : (form.carrier_phone.trim() || null),
+        tracking_notes: form.tracking_notes.trim() || null,
       };
 
+      const previousStatus = editingId ? (orders.find((o) => o.id === editingId)?.status ?? null) : null;
       let orderId: string | null = editingId;
       if (editingId) {
         const { error: upErr } = await supabase.from('orders' as any).update(orderPayload).eq('id', editingId);
@@ -296,6 +327,7 @@ export default function OrdersPage() {
           .from('orders' as any)
           .insert({
             ...orderPayload,
+            source: 'manual',
             created_by: user.id,
             created_by_name: displayName || user.email || '',
             assigned_to: user.id,
@@ -322,6 +354,16 @@ export default function OrdersPage() {
         })),
       );
       if (itemsError) throw itemsError;
+
+      // Fire-and-forget SMS: on new order → confirmation with tracking link.
+      // On edit → status update if status changed.
+      if (orderId) {
+        if (!editingId) {
+          void notifyOrderEvent(orderId, 'created');
+        } else if (previousStatus && previousStatus !== form.status) {
+          void notifyOrderEvent(orderId, 'status');
+        }
+      }
 
       toast({ title: editingId ? 'Order updated' : 'Order created' });
       resetForm();
