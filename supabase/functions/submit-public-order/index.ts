@@ -219,7 +219,10 @@ Deno.serve(async (req) => {
 
     // Customer confirmation SMS
     const businessName = profile.business_name?.trim() || 'the store';
-    const customerMsg = `Hi ${customerName}, your ${fulfillmentType} order (#${order.tracking_code}) at ${businessName} has been received. Track it: ${trackingUrl}`;
+    const momoTail = paymentName || paymentReference
+      ? ` Payment details on file: ${paymentName || '—'}${paymentReference ? ` (Ref: ${paymentReference})` : ''}.`
+      : '';
+    const customerMsg = `Hi ${customerName}, your ${fulfillmentType} order (#${order.tracking_code}) at ${businessName} has been received.${momoTail} Track it: ${trackingUrl}`;
     try {
       const provider = await sendAtSms(customerPhone, customerMsg);
       await logSms({ business_id: businessId, recipient_phone: customerPhone, notification_type: 'order_confirmation', message: customerMsg, status: 'sent', provider_response: provider, reference_id: order.id });
