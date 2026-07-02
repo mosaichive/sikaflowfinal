@@ -195,6 +195,8 @@ const App = () => (
                   <Route path="security" element={<PlatformSecurityMfaPage />} />
                   <Route path="profile" element={<PlatformProfilePage />} />
                   <Route path="user-activity" element={<PlatformUserActivityPage />} />
+                  <Route path="surveys" element={<PlatformSurveysPage />} />
+                  <Route path="survey-responses" element={<PlatformSurveyResponsesPage />} />
                 </Route>
 
                 {/* Public marketing site */}
