@@ -110,6 +110,26 @@ export default function StorePage() {
     });
   };
 
+  // Momo validation
+  const paymentNameTrim = form.payment_name.trim();
+  const paymentRefTrim = form.payment_reference.trim();
+  const paymentNameError = paymentNameTrim.length === 0
+    ? null
+    : paymentNameTrim.length < 2
+      ? 'Enter the full name on your Momo account (at least 2 characters).'
+      : !/[a-zA-Z]/.test(paymentNameTrim)
+        ? 'Momo name should contain letters.'
+        : null;
+  const paymentRefError = paymentRefTrim.length === 0
+    ? null
+    : paymentRefTrim.length < 4
+      ? 'Momo reference should be at least 4 characters.'
+      : !/^[A-Za-z0-9._-]+$/.test(paymentRefTrim)
+        ? 'Reference can only contain letters, numbers, dots, dashes or underscores.'
+        : null;
+  const paymentNameValid = paymentNameTrim.length >= 2 && /[a-zA-Z]/.test(paymentNameTrim);
+  const paymentRefValid = paymentRefTrim.length >= 4 && /^[A-Za-z0-9._-]+$/.test(paymentRefTrim);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!business || cartItems.length === 0) return;
@@ -122,8 +142,8 @@ export default function StorePage() {
       return;
     }
     const requirePaymentProof = !!(business?.payment_instructions && business.payment_instructions.trim());
-    if (requirePaymentProof && (!form.payment_name.trim() || !form.payment_reference.trim())) {
-      toast({ title: 'Payment details required', description: 'Please enter the Momo name and reference used for payment.', variant: 'destructive' });
+    if (requirePaymentProof && (!paymentNameValid || !paymentRefValid)) {
+      toast({ title: 'Payment details required', description: 'Enter a valid Momo name and reference before placing your order.', variant: 'destructive' });
       return;
     }
     setSubmitting(true);
@@ -138,8 +158,8 @@ export default function StorePage() {
           notes: form.notes.trim(),
           fulfillment_type: fulfillment,
           payment_method: paymentMethod,
-          payment_name: form.payment_name.trim() || undefined,
-          payment_reference: form.payment_reference.trim() || undefined,
+          payment_name: paymentNameTrim || undefined,
+          payment_reference: paymentRefTrim || undefined,
           items,
         },
       });
@@ -178,6 +198,13 @@ export default function StorePage() {
               Your order number is <span className="font-mono font-semibold text-foreground">{successCode}</span>.
               We've sent you an SMS with a tracking link.
             </p>
+            {paymentNameTrim || paymentRefTrim ? (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 text-left text-sm">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Payment details saved</p>
+                {paymentNameTrim ? <p><span className="text-muted-foreground">Momo name:</span> <span className="font-medium">{paymentNameTrim}</span></p> : null}
+                {paymentRefTrim ? <p><span className="text-muted-foreground">Reference:</span> <span className="font-mono">{paymentRefTrim}</span></p> : null}
+              </div>
+            ) : null}
             <Link to={`/track/${successCode}`} className="block">
               <Button className="w-full">Track my order</Button>
             </Link>
@@ -196,7 +223,7 @@ export default function StorePage() {
   const paymentMethods = business.payment_methods || ['cash_on_delivery'];
   const showPaymentChoice = paymentMethods.length > 1;
   const requirePaymentProof = !!(business.payment_instructions && business.payment_instructions.trim());
-  const canSubmit = !submitting && (!requirePaymentProof || (form.payment_name.trim() && form.payment_reference.trim()));
+  const canSubmit = !submitting && (!requirePaymentProof || (paymentNameValid && paymentRefValid));
 
   return (
     <div className="min-h-screen bg-background">
