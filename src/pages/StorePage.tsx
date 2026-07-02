@@ -58,6 +58,8 @@ export default function StorePage() {
     customer_phone: '',
     delivery_location: '',
     notes: '',
+    payment_name: '',
+    payment_reference: '',
   });
 
   useEffect(() => {
@@ -119,6 +121,11 @@ export default function StorePage() {
       toast({ title: 'Delivery address required', description: 'Please enter where you want the order delivered.', variant: 'destructive' });
       return;
     }
+    const requirePaymentProof = !!(business?.payment_instructions && business.payment_instructions.trim());
+    if (requirePaymentProof && (!form.payment_name.trim() || !form.payment_reference.trim())) {
+      toast({ title: 'Payment details required', description: 'Please enter the Momo name and reference used for payment.', variant: 'destructive' });
+      return;
+    }
     setSubmitting(true);
     try {
       const items: CartItem[] = cartItems.map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
@@ -131,6 +138,8 @@ export default function StorePage() {
           notes: form.notes.trim(),
           fulfillment_type: fulfillment,
           payment_method: paymentMethod,
+          payment_name: form.payment_name.trim() || undefined,
+          payment_reference: form.payment_reference.trim() || undefined,
           items,
         },
       });
@@ -186,6 +195,8 @@ export default function StorePage() {
 
   const paymentMethods = business.payment_methods || ['cash_on_delivery'];
   const showPaymentChoice = paymentMethods.length > 1;
+  const requirePaymentProof = !!(business.payment_instructions && business.payment_instructions.trim());
+  const canSubmit = !submitting && (!requirePaymentProof || (form.payment_name.trim() && form.payment_reference.trim()));
 
   return (
     <div className="min-h-screen bg-background">
@@ -315,6 +326,36 @@ export default function StorePage() {
                   </div>
                 ) : null}
 
+                {requirePaymentProof ? (
+                  <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
+                    <p className="text-xs font-medium">
+                      After paying, enter the Momo name and reference so the store can confirm your payment.
+                    </p>
+                    <div>
+                      <Label htmlFor="pay-name">Momo name *</Label>
+                      <Input
+                        id="pay-name"
+                        value={form.payment_name}
+                        onChange={(e) => setForm({ ...form, payment_name: e.target.value })}
+                        placeholder="Name on the Momo account you paid from"
+                        maxLength={120}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="pay-ref">Momo reference *</Label>
+                      <Input
+                        id="pay-ref"
+                        value={form.payment_reference}
+                        onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
+                        placeholder="Transaction ID / reference from the Momo SMS"
+                        maxLength={80}
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Totals */}
                 <div className="rounded-xl border border-border p-3 space-y-1 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(cartSubtotal)}</span></div>
@@ -327,7 +368,7 @@ export default function StorePage() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={submitting}>
+                <Button type="submit" className="w-full" disabled={!canSubmit}>
                   {submitting ? 'Placing order…' : `Place order · ${formatCurrency(cartTotal)}`}
                 </Button>
               </form>

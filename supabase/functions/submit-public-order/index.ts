@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
     const items = Array.isArray(body?.items) ? body.items : [];
     const fulfillmentType = String(body?.fulfillment_type ?? 'delivery').toLowerCase() === 'pickup' ? 'pickup' : 'delivery';
     const paymentMethodChoice = String(body?.payment_method ?? '').trim().toLowerCase();
+    const paymentName = String(body?.payment_name ?? '').trim().slice(0, 120);
+    const paymentReference = String(body?.payment_reference ?? '').trim().slice(0, 80);
 
     if (!slug || !customerName || !customerPhoneRaw || items.length === 0) {
       return json({ ok: false, reason: 'missing_fields' }, 400);
@@ -150,6 +152,8 @@ Deno.serve(async (req) => {
         payment_status: 'unpaid',
         status: 'pending',
         source: 'online',
+        customer_payment_name: paymentName || null,
+        customer_payment_reference: paymentReference || null,
         order_date: new Date().toISOString(),
       })
       .select('id, tracking_code')
