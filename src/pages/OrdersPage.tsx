@@ -673,19 +673,23 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  {form.status === 'out_for_delivery' ? (
+                  {(form.status === 'out_for_delivery' || form.fulfillment_type === 'delivery') ? (
                     <Card className="border-primary/40 bg-primary/5">
                       <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier information</CardTitle>
+                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier & delivery</CardTitle>
                       </CardHeader>
                       <CardContent className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>Carrier Name *</Label>
-                          <Input required value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                          <Label>Delivery Fee (GHS)</Label>
+                          <Input type="number" min="0" step="0.01" value={form.delivery_fee} onChange={(e) => setForm((c) => ({ ...c, delivery_fee: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
-                          <Label>Carrier Phone *</Label>
-                          <Input required value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
+                          <Label>Carrier Name {form.status === 'out_for_delivery' ? '*' : ''}</Label>
+                          <Input required={form.status === 'out_for_delivery'} value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Carrier Phone {form.status === 'out_for_delivery' ? '*' : ''}</Label>
+                          <Input required={form.status === 'out_for_delivery'} value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <Label>Tracking notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
@@ -695,7 +699,7 @@ export default function OrdersPage() {
                     </Card>
                   ) : null}
 
-                  <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-4">
+                  <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-5">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Subtotal</p>
                       <p className="mt-1 text-lg font-semibold">{formatCurrency(subtotal)}</p>
@@ -703,6 +707,10 @@ export default function OrdersPage() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Discount</p>
                       <p className="mt-1 text-lg font-semibold">{formatCurrency(discount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Delivery Fee</p>
+                      <p className="mt-1 text-lg font-semibold">{formatCurrency(deliveryFee)}</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Amount Paid</p>
