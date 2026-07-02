@@ -350,6 +350,12 @@ export default function OrdersPage() {
         setSaving(false);
         return;
       }
+      // Delivery date required for delivery orders.
+      if (form.fulfillment_type === 'delivery' && !form.due_date) {
+        toast({ title: 'Delivery date required', description: 'Please set the delivery date for delivery orders.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
 
       const orderPayload = {
         business_id: businessId,
@@ -366,6 +372,9 @@ export default function OrdersPage() {
         payment_status: paymentStatus,
         status: form.status,
         due_date: form.due_date || null,
+        estimated_delivery_date: form.due_date || null,
+        delivery_fee: deliveryFee,
+        fulfillment_type: form.fulfillment_type,
         carrier_name: form.status === 'out_for_delivery' ? form.carrier_name.trim() || null : (form.carrier_name.trim() || null),
         carrier_phone: form.status === 'out_for_delivery' ? form.carrier_phone.trim() || null : (form.carrier_phone.trim() || null),
         tracking_notes: form.tracking_notes.trim() || null,
