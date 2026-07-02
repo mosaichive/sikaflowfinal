@@ -24,7 +24,7 @@ import { EmailVerificationCard } from '@/components/settings/EmailVerificationCa
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard';
-import { OnlineStoreCard } from '@/components/settings/OnlineStoreCard';
+// OnlineStoreCard was moved to Orders → Order Settings dialog.
 import { useToast } from '@/hooks/use-toast';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 
@@ -768,7 +768,7 @@ export default function SettingsPage() {
         </Card>
 
         <SmsNotificationsCard />
-        <OnlineStoreCard />
+        {/* Online store settings moved to Orders → Order Settings */}
 
 
 

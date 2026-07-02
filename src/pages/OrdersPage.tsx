@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { notifyOrderEvent } from '@/lib/order-sms';
+import { OrderSettingsDialog } from '@/components/orders/OrderSettingsDialog';
 
 type ProductRow = {
   id: string;
@@ -58,6 +59,9 @@ type OrderRow = {
   tracking_notes?: string | null;
   source?: string | null;
   delivered_at?: string | null;
+  delivery_fee?: number | string | null;
+  fulfillment_type?: string | null;
+  estimated_delivery_date?: string | null;
 };
 
 type OrderItemRow = {
@@ -106,6 +110,8 @@ export default function OrdersPage() {
     carrier_name: '',
     carrier_phone: '',
     tracking_notes: '',
+    delivery_fee: '0',
+    fulfillment_type: 'delivery' as 'delivery' | 'pickup',
   });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
@@ -203,6 +209,7 @@ export default function OrdersPage() {
       processing: 0,
       out_for_delivery: 0,
       delivered_today: 0,
+      completed: 0,
       cancelled: 0,
     };
     for (const o of visibleOrders) {
@@ -210,8 +217,9 @@ export default function OrdersPage() {
       if (st === 'pending') s.pending += 1;
       else if (st === 'processing') s.processing += 1;
       else if (st === 'out_for_delivery') s.out_for_delivery += 1;
+      else if (st === 'completed') s.completed += 1;
       else if (st === 'cancelled') s.cancelled += 1;
-      if (st === 'delivered') {
+      if (st === 'delivered' || st === 'completed') {
         const ts = new Date((o.delivered_at as any) || o.order_date).getTime();
         if (ts >= startOfToday) s.delivered_today += 1;
       }
@@ -240,7 +248,8 @@ export default function OrdersPage() {
     [selectedItems],
   );
   const discount = Number(form.discount || 0);
-  const total = Math.max(0, subtotal - discount);
+  const deliveryFee = form.fulfillment_type === 'delivery' ? Number(form.delivery_fee || 0) : 0;
+  const total = Math.max(0, subtotal - discount + deliveryFee);
   const amountPaid = Number(form.amount_paid || 0);
   const balance = Math.max(0, total - amountPaid);
   const paymentStatus = balance <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
@@ -262,6 +271,8 @@ export default function OrdersPage() {
       carrier_name: '',
       carrier_phone: '',
       tracking_notes: '',
+      delivery_fee: '0',
+      fulfillment_type: 'delivery',
     });
     setOrderLines([makeDraftItem()]);
     setEditingId(null);
@@ -278,10 +289,12 @@ export default function OrdersPage() {
       payment_method: order.payment_method || PAYMENT_METHODS[0].value,
       notes: order.notes || '',
       status: order.status || 'pending',
-      due_date: order.due_date ? String(order.due_date).slice(0, 10) : '',
+      due_date: order.due_date ? String(order.due_date).slice(0, 10) : (order.estimated_delivery_date ? String(order.estimated_delivery_date).slice(0, 10) : ''),
       carrier_name: order.carrier_name || '',
       carrier_phone: order.carrier_phone || '',
       tracking_notes: order.tracking_notes || '',
+      delivery_fee: String(order.delivery_fee ?? '0'),
+      fulfillment_type: (order.fulfillment_type === 'pickup' ? 'pickup' : 'delivery'),
     });
     const lines = orderItems
       .filter((it) => it.order_id === order.id)
@@ -339,6 +352,12 @@ export default function OrdersPage() {
         setSaving(false);
         return;
       }
+      // Delivery date required for delivery orders.
+      if (form.fulfillment_type === 'delivery' && !form.due_date) {
+        toast({ title: 'Delivery date required', description: 'Please set the delivery date for delivery orders.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
 
       const orderPayload = {
         business_id: businessId,
@@ -355,6 +374,9 @@ export default function OrdersPage() {
         payment_status: paymentStatus,
         status: form.status,
         due_date: form.due_date || null,
+        estimated_delivery_date: form.due_date || null,
+        delivery_fee: deliveryFee,
+        fulfillment_type: form.fulfillment_type,
         carrier_name: form.status === 'out_for_delivery' ? form.carrier_name.trim() || null : (form.carrier_name.trim() || null),
         carrier_phone: form.status === 'out_for_delivery' ? form.carrier_phone.trim() || null : (form.carrier_phone.trim() || null),
         tracking_notes: form.tracking_notes.trim() || null,
@@ -542,7 +564,9 @@ export default function OrdersPage() {
               Track pending, processing, and delivered orders separately from walk-in POS sales. Delivered orders turn into real sales automatically.
             </p>
           </div>
-          {canCreate ? (
+          <div className="flex items-center gap-2">
+            <OrderSettingsDialog />
+            {canCreate ? (
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
@@ -561,13 +585,23 @@ export default function OrdersPage() {
                       <Label>Phone Number</Label>
                       <Input value={form.customer_phone} onChange={(event) => setForm((current) => ({ ...current, customer_phone: event.target.value }))} placeholder="+233..." />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Delivery / Pickup Location</Label>
-                      <Input value={form.delivery_location} onChange={(event) => setForm((current) => ({ ...current, delivery_location: event.target.value }))} placeholder="Pickup point or delivery address" />
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Fulfillment</Label>
+                      <Select value={form.fulfillment_type} onValueChange={(v) => setForm((c) => ({ ...c, fulfillment_type: v as 'delivery' | 'pickup' }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="delivery">Delivery</SelectItem>
+                          <SelectItem value="pickup">Pickup</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Due Date</Label>
-                      <Input type="date" value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} />
+                      <Label>{form.fulfillment_type === 'pickup' ? 'Pickup Location' : 'Delivery Address'}</Label>
+                      <Input value={form.delivery_location} onChange={(event) => setForm((current) => ({ ...current, delivery_location: event.target.value }))} placeholder={form.fulfillment_type === 'pickup' ? 'Pickup point' : 'Delivery address'} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delivery Date {form.fulfillment_type === 'delivery' ? '*' : ''}</Label>
+                      <Input type="date" required={form.fulfillment_type === 'delivery'} value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} />
                     </div>
                   </div>
 
@@ -641,19 +675,23 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  {form.status === 'out_for_delivery' ? (
+                  {(form.status === 'out_for_delivery' || form.fulfillment_type === 'delivery') ? (
                     <Card className="border-primary/40 bg-primary/5">
                       <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier information</CardTitle>
+                        <CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> Carrier & delivery</CardTitle>
                       </CardHeader>
                       <CardContent className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>Carrier Name *</Label>
-                          <Input required value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                          <Label>Delivery Fee (GHS)</Label>
+                          <Input type="number" min="0" step="0.01" value={form.delivery_fee} onChange={(e) => setForm((c) => ({ ...c, delivery_fee: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
-                          <Label>Carrier Phone *</Label>
-                          <Input required value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
+                          <Label>Carrier Name {form.status === 'out_for_delivery' ? '*' : ''}</Label>
+                          <Input required={form.status === 'out_for_delivery'} value={form.carrier_name} onChange={(e) => setForm((c) => ({ ...c, carrier_name: e.target.value }))} placeholder="John Doe" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Carrier Phone {form.status === 'out_for_delivery' ? '*' : ''}</Label>
+                          <Input required={form.status === 'out_for_delivery'} value={form.carrier_phone} onChange={(e) => setForm((c) => ({ ...c, carrier_phone: e.target.value }))} placeholder="024 XXX XXXX" />
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <Label>Tracking notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
@@ -663,7 +701,7 @@ export default function OrdersPage() {
                     </Card>
                   ) : null}
 
-                  <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-4">
+                  <div className="grid gap-3 rounded-2xl border border-border/60 p-4 md:grid-cols-5">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Subtotal</p>
                       <p className="mt-1 text-lg font-semibold">{formatCurrency(subtotal)}</p>
@@ -671,6 +709,10 @@ export default function OrdersPage() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Discount</p>
                       <p className="mt-1 text-lg font-semibold">{formatCurrency(discount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Delivery Fee</p>
+                      <p className="mt-1 text-lg font-semibold">{formatCurrency(deliveryFee)}</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Amount Paid</p>
@@ -688,16 +730,18 @@ export default function OrdersPage() {
                 </form>
               </DialogContent>
             </Dialog>
-          ) : null}
+            ) : null}
+          </div>
         </section>
 
         {/* Dashboard stats */}
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
           <StatCard label="Total Orders" value={stats.total} />
           <StatCard label="Pending" value={stats.pending} />
           <StatCard label="Processing" value={stats.processing} />
           <StatCard label="Out for Delivery" value={stats.out_for_delivery} />
           <StatCard label="Delivered Today" value={stats.delivered_today} />
+          <StatCard label="Completed" value={stats.completed} />
           <StatCard label="Cancelled" value={stats.cancelled} />
         </div>
 

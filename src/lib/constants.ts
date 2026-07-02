@@ -48,6 +48,7 @@ export const ORDER_STATUSES = [
   { value: 'ready_for_pickup', label: 'Ready for Pickup' },
   { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
+  { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const;
 

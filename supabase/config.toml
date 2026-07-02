@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.submit-public-order]
 verify_jwt = false
+
+[functions.confirm-order-receipt]
+verify_jwt = false

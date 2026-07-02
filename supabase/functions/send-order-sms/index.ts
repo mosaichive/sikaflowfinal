@@ -1,6 +1,5 @@
 // Authenticated endpoint: sends an SMS to the customer about an order event.
-// Called from the OrdersPage after: (a) a manual order is created, and
-// (b) an order status changes. Fire-and-forget from the UI.
+// Includes delivery date + delivery fee in relevant messages.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
@@ -19,28 +18,43 @@ function json(body: unknown, status = 200) {
 
 const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
 
+function fmtDate(d: string | null | undefined) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('en-GH', { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return String(d); }
+}
+
 function statusMessage(
   status: string,
-  ctx: { businessName: string; trackingUrl: string; carrierName?: string | null; carrierPhone?: string | null; trackingCode: string; customerName: string }
+  ctx: {
+    businessName: string; trackingUrl: string;
+    carrierName?: string | null; carrierPhone?: string | null;
+    trackingCode: string; customerName: string;
+    deliveryDate?: string | null; deliveryFee?: number | null;
+    fulfillmentType?: string | null;
+  }
 ): string | null {
   const s = String(status || '').toLowerCase();
   const hi = `Hi ${ctx.customerName},`;
+  const dd = ctx.deliveryDate ? ` Delivery date: ${fmtDate(ctx.deliveryDate)}.` : '';
+  const fee = ctx.deliveryFee && Number(ctx.deliveryFee) > 0 ? ` Delivery fee: GHS ${Number(ctx.deliveryFee).toFixed(2)}.` : '';
   switch (s) {
     case 'pending':
-      return `${hi} your order #${ctx.trackingCode} at ${ctx.businessName} has been received. Track: ${ctx.trackingUrl}`;
+      return `${hi} your order #${ctx.trackingCode} at ${ctx.businessName} has been received.${dd}${fee} Track: ${ctx.trackingUrl}`;
     case 'confirmed':
-      return `${hi} your order #${ctx.trackingCode} has been confirmed and is being prepared. Track: ${ctx.trackingUrl}`;
+      return `${hi} your order #${ctx.trackingCode} has been confirmed.${dd} Track: ${ctx.trackingUrl}`;
     case 'processing':
-      return `${hi} your order #${ctx.trackingCode} is currently being processed. Track: ${ctx.trackingUrl}`;
+      return `${hi} your order #${ctx.trackingCode} is being processed.${dd} Track: ${ctx.trackingUrl}`;
     case 'ready_for_pickup':
       return `${hi} your order #${ctx.trackingCode} is ready for pickup at ${ctx.businessName}. Track: ${ctx.trackingUrl}`;
     case 'out_for_delivery': {
       const carrier = ctx.carrierName?.trim() ? `Carrier: ${ctx.carrierName}. ` : '';
       const carrierPhone = ctx.carrierPhone?.trim() ? `Phone: ${ctx.carrierPhone}. ` : '';
-      return `${hi} your order #${ctx.trackingCode} is on the way. ${carrier}${carrierPhone}Track: ${ctx.trackingUrl}`;
+      return `${hi} your order #${ctx.trackingCode} is on the way.${dd}${fee} ${carrier}${carrierPhone}Track: ${ctx.trackingUrl}`;
     }
     case 'delivered':
-      return `${hi} your order #${ctx.trackingCode} has been delivered. Thank you for choosing ${ctx.businessName}.`;
+      return `${hi} your order #${ctx.trackingCode} has been delivered. Please confirm receipt: ${ctx.trackingUrl}`;
+    case 'completed':
+      return `${hi} thanks for confirming receipt of order #${ctx.trackingCode}. We appreciate your business at ${ctx.businessName}.`;
     case 'cancelled':
       return `${hi} your order #${ctx.trackingCode} has been cancelled. Please contact ${ctx.businessName} if you have questions.`;
     default:
@@ -66,40 +80,31 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const orderId = String(body?.order_id ?? '').trim();
-    const eventRaw = String(body?.event ?? '').trim().toLowerCase(); // 'created' | 'status'
+    const eventRaw = String(body?.event ?? '').trim().toLowerCase();
     const event = eventRaw === 'created' ? 'created' : 'status';
     if (!orderId) return json({ ok: false, reason: 'missing_order_id' }, 400);
 
     const admin = adminClient();
     const { data: order } = await admin
       .from('orders')
-      .select('id, business_id, customer_name, customer_phone, status, tracking_code, carrier_name, carrier_phone')
+      .select('id, business_id, customer_name, customer_phone, status, tracking_code, carrier_name, carrier_phone, estimated_delivery_date, delivery_fee, fulfillment_type')
       .eq('id', orderId)
       .maybeSingle();
     if (!order) return json({ ok: false, reason: 'order_not_found' });
 
     const businessId = order.business_id as string;
 
-    // Authorize caller
     if (callerId !== businessId) {
       const { data: membership } = await admin
-        .from('staff_members')
-        .select('id, active')
-        .eq('business_owner_id', businessId)
-        .eq('staff_user_id', callerId)
-        .eq('active', true)
-        .maybeSingle();
+        .from('staff_members').select('id, active')
+        .eq('business_owner_id', businessId).eq('staff_user_id', callerId).eq('active', true).maybeSingle();
       if (!membership) return json({ ok: false, reason: 'forbidden' }, 403);
     }
 
     const { data: profile } = await admin
-      .from('profiles')
-      .select('business_name, sms_notify_order_status')
-      .eq('id', businessId)
-      .maybeSingle();
-    if (profile?.sms_notify_order_status === false) {
-      return json({ ok: false, reason: 'disabled' });
-    }
+      .from('profiles').select('business_name, sms_notify_order_status')
+      .eq('id', businessId).maybeSingle();
+    if (profile?.sms_notify_order_status === false) return json({ ok: false, reason: 'disabled' });
 
     const phone = normalizePhone(String(order.customer_phone ?? ''));
     if (!/^\+\d{9,15}$/.test(phone)) return json({ ok: false, reason: 'no_valid_phone' });
@@ -112,6 +117,9 @@ Deno.serve(async (req) => {
       carrierPhone: order.carrier_phone as string | null,
       trackingCode: order.tracking_code as string,
       customerName: (order.customer_name as string) || 'there',
+      deliveryDate: (order as any).estimated_delivery_date,
+      deliveryFee: Number((order as any).delivery_fee ?? 0),
+      fulfillmentType: (order as any).fulfillment_type,
     });
     if (!message) return json({ ok: false, reason: 'no_message_for_status' });
 
@@ -121,22 +129,15 @@ Deno.serve(async (req) => {
         business_id: businessId,
         recipient_phone: phone,
         notification_type: event === 'created' ? 'order_confirmation' : 'order_status',
-        message,
-        status: 'sent',
-        provider_response: provider,
-        reference_id: order.id,
+        message, status: 'sent', provider_response: provider, reference_id: order.id,
       });
       return json({ ok: true });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await logSms({
-        business_id: businessId,
-        recipient_phone: phone,
+        business_id: businessId, recipient_phone: phone,
         notification_type: event === 'created' ? 'order_confirmation' : 'order_status',
-        message,
-        status: 'failed',
-        error_message: errMsg,
-        reference_id: order.id,
+        message, status: 'failed', error_message: errMsg, reference_id: order.id,
       });
       return json({ ok: false, reason: 'send_failed', error: errMsg });
     }

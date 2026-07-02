@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/constants';
-import { Minus, Plus, ShoppingCart, Trash2, Package, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Trash2, Package, ArrowLeft, CheckCircle2, Truck, Store as StoreIcon } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 
 type Product = {
@@ -17,6 +18,7 @@ type Product = {
   online_description: string | null;
   price: number;
   stock: number | null;
+  available: boolean;
   image_url: string | null;
   category: string | null;
 };
@@ -30,6 +32,11 @@ type Business = {
   enable_notes: boolean;
   enable_delivery_address: boolean;
   enable_product_images: boolean;
+  payment_methods: string[];
+  payment_instructions: string | null;
+  default_delivery_fee: number;
+  allow_pickup: boolean;
+  allow_delivery: boolean;
 };
 
 type CartItem = { product_id: string; quantity: number };
@@ -44,6 +51,8 @@ export default function StorePage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successCode, setSuccessCode] = useState<string | null>(null);
+  const [fulfillment, setFulfillment] = useState<'delivery' | 'pickup'>('delivery');
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'paystack'>('cash_on_delivery');
   const [form, setForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -61,8 +70,14 @@ export default function StorePage() {
         setBusiness(null);
         setProducts([]);
       } else {
-        setBusiness((data as any).business);
+        const biz = (data as any).business as Business;
+        setBusiness(biz);
         setProducts(((data as any).products || []) as Product[]);
+        // Pick sensible defaults
+        if (biz.allow_delivery === false && biz.allow_pickup) setFulfillment('pickup');
+        else setFulfillment('delivery');
+        const methods = biz.payment_methods || ['cash_on_delivery'];
+        setPaymentMethod(methods.includes('cash_on_delivery') ? 'cash_on_delivery' : (methods[0] as any) || 'cash_on_delivery');
       }
       setLoading(false);
     })();
@@ -79,11 +94,11 @@ export default function StorePage() {
   }, [cart, products]);
 
   const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cartItems.reduce((s, i) => s + i.quantity * Number(i.product.price || 0), 0);
+  const cartSubtotal = cartItems.reduce((s, i) => s + i.quantity * Number(i.product.price || 0), 0);
+  const deliveryFee = fulfillment === 'delivery' ? Number(business?.default_delivery_fee || 0) : 0;
+  const cartTotal = cartSubtotal + deliveryFee;
 
-  const addToCart = (p: Product) => {
-    setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 }));
-  };
+  const addToCart = (p: Product) => setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 }));
   const setQty = (id: string, qty: number) => {
     setCart((c) => {
       const next = { ...c };
@@ -100,7 +115,7 @@ export default function StorePage() {
       toast({ title: 'Missing information', description: 'Please enter your name and phone number.', variant: 'destructive' });
       return;
     }
-    if (business.enable_delivery_address && !form.delivery_location.trim()) {
+    if (fulfillment === 'delivery' && !form.delivery_location.trim()) {
       toast({ title: 'Delivery address required', description: 'Please enter where you want the order delivered.', variant: 'destructive' });
       return;
     }
@@ -112,33 +127,27 @@ export default function StorePage() {
           slug,
           customer_name: form.customer_name.trim(),
           customer_phone: form.customer_phone.trim(),
-          delivery_location: form.delivery_location.trim(),
+          delivery_location: fulfillment === 'delivery' ? form.delivery_location.trim() : '',
           notes: form.notes.trim(),
+          fulfillment_type: fulfillment,
+          payment_method: paymentMethod,
           items,
         },
       });
       if (error) throw error;
       const res = data as { ok: boolean; tracking_code?: string; reason?: string };
-      if (!res.ok || !res.tracking_code) {
-        throw new Error(res.reason || 'Could not place order.');
-      }
+      if (!res.ok || !res.tracking_code) throw new Error(res.reason || 'Could not place order.');
       setSuccessCode(res.tracking_code);
       setCart({});
       setCheckoutOpen(false);
     } catch (err) {
-      toast({
-        title: 'Could not place order',
-        description: err instanceof Error ? err.message : String(err),
-        variant: 'destructive',
-      });
+      toast({ title: 'Could not place order', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">Loading store…</div>;
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">Loading store…</div>;
   if (!business) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
@@ -175,6 +184,9 @@ export default function StorePage() {
     );
   }
 
+  const paymentMethods = business.payment_methods || ['cash_on_delivery'];
+  const showPaymentChoice = paymentMethods.length > 1;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 sticky top-0 z-10 backdrop-blur">
@@ -190,13 +202,9 @@ export default function StorePage() {
               {business.location ? <p className="text-xs text-muted-foreground truncate">{business.location}</p> : null}
             </div>
           </div>
-          <Button
-            onClick={() => setCheckoutOpen(true)}
-            disabled={cartCount === 0}
-            className="shrink-0"
-          >
+          <Button onClick={() => setCheckoutOpen(true)} disabled={cartCount === 0} className="shrink-0">
             <ShoppingCart className="mr-2 h-4 w-4" />
-            {cartCount > 0 ? `${cartCount} · ${formatCurrency(cartTotal)}` : 'Cart'}
+            {cartCount > 0 ? `${cartCount} · ${formatCurrency(cartSubtotal)}` : 'Cart'}
           </Button>
         </div>
       </header>
@@ -224,29 +232,38 @@ export default function StorePage() {
                       <p className="text-sm text-muted-foreground">{formatCurrency(Number(product.price))}</p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button variant="outline" size="icon" onClick={() => setQty(product.id, quantity - 1)}>
-                        <Minus className="h-3 w-3" />
-                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => setQty(product.id, quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="min-w-[2ch] text-center">{quantity}</span>
-                      <Button variant="outline" size="icon" onClick={() => setQty(product.id, quantity + 1)}>
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setQty(product.id, 0)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => setQty(product.id, quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setQty(product.id, 0)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-between text-lg font-semibold pt-2">
-                  <span>Total</span>
-                  <span>{formatCurrency(cartTotal)}</span>
-                </div>
               </div>
 
               <form onSubmit={submit} className="space-y-4 pt-2">
+                {/* Fulfillment choice */}
+                {business.allow_pickup && business.allow_delivery ? (
+                  <div className="space-y-2">
+                    <Label>How would you like to receive your order?</Label>
+                    <RadioGroup value={fulfillment} onValueChange={(v) => setFulfillment(v as any)} className="grid grid-cols-2 gap-3">
+                      <label className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer ${fulfillment === 'delivery' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                        <RadioGroupItem value="delivery" id="fx-delivery" />
+                        <Truck className="h-4 w-4" />
+                        <span className="text-sm">Delivery</span>
+                      </label>
+                      <label className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer ${fulfillment === 'pickup' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                        <RadioGroupItem value="pickup" id="fx-pickup" />
+                        <StoreIcon className="h-4 w-4" />
+                        <span className="text-sm">Pickup</span>
+                      </label>
+                    </RadioGroup>
+                  </div>
+                ) : null}
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label>Your name *</Label>
+                    <Label>Full name *</Label>
                     <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} required maxLength={120} />
                   </div>
                   <div>
@@ -254,18 +271,62 @@ export default function StorePage() {
                     <Input type="tel" value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} placeholder="+233..." required />
                   </div>
                 </div>
-                {business.enable_delivery_address ? (
+
+                {fulfillment === 'delivery' ? (
                   <div>
-                    <Label>Delivery / pickup address *</Label>
+                    <Label>Delivery address *</Label>
                     <Input value={form.delivery_location} onChange={(e) => setForm({ ...form, delivery_location: e.target.value })} required maxLength={500} />
                   </div>
-                ) : null}
-                {business.enable_notes ? (
-                  <div>
-                    <Label>Notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                    <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                    <p className="font-medium flex items-center gap-2"><StoreIcon className="h-4 w-4" /> Pickup at store</p>
+                    {business.location ? <p className="text-xs text-muted-foreground mt-1">{business.location}</p> : null}
+                  </div>
+                )}
+
+                <div>
+                  <Label>Notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                  <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
+                </div>
+
+                {showPaymentChoice ? (
+                  <div className="space-y-2">
+                    <Label>Payment method</Label>
+                    <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)} className="grid gap-2">
+                      {paymentMethods.includes('cash_on_delivery') ? (
+                        <label className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer ${paymentMethod === 'cash_on_delivery' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                          <RadioGroupItem value="cash_on_delivery" id="pm-cod" />
+                          <span className="text-sm">Cash on delivery / pickup</span>
+                        </label>
+                      ) : null}
+                      {paymentMethods.includes('paystack') ? (
+                        <label className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer ${paymentMethod === 'paystack' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                          <RadioGroupItem value="paystack" id="pm-ps" />
+                          <span className="text-sm">Pay online (Paystack) — the store will send you a payment link</span>
+                        </label>
+                      ) : null}
+                    </RadioGroup>
                   </div>
                 ) : null}
+
+                {business.payment_instructions ? (
+                  <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+                    {business.payment_instructions}
+                  </div>
+                ) : null}
+
+                {/* Totals */}
+                <div className="rounded-xl border border-border p-3 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(cartSubtotal)}</span></div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Delivery fee</span>
+                    <span>{fulfillment === 'delivery' ? formatCurrency(deliveryFee) : '—'}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                    <span>Total</span><span>{formatCurrency(cartTotal)}</span>
+                  </div>
+                </div>
+
                 <Button type="submit" className="w-full" disabled={submitting}>
                   {submitting ? 'Placing order…' : `Place order · ${formatCurrency(cartTotal)}`}
                 </Button>
@@ -281,7 +342,7 @@ export default function StorePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {products.map((p) => {
               const qty = cart[p.id] || 0;
-              const outOfStock = business.show_stock && p.stock !== null && Number(p.stock) <= 0;
+              const outOfStock = p.available === false || (business.show_stock && p.stock !== null && Number(p.stock) <= 0);
               return (
                 <Card key={p.id} className="overflow-hidden">
                   {business.enable_product_images ? (
@@ -300,9 +361,9 @@ export default function StorePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">{formatCurrency(Number(p.price))}</span>
-                      {business.show_stock && p.stock !== null ? (
-                        <span className="text-xs text-muted-foreground">{Number(p.stock)} in stock</span>
-                      ) : null}
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full ${outOfStock ? 'bg-destructive/10 text-destructive' : 'bg-green-500/10 text-green-700 dark:text-green-400'}`}>
+                        {outOfStock ? 'Out of stock' : 'Available'}
+                      </span>
                     </div>
                     {outOfStock ? (
                       <Button disabled variant="outline" className="w-full" size="sm">Out of stock</Button>
