@@ -12,6 +12,7 @@ type OrderData = {
   tracking_code: string;
   status: string;
   payment_status: string;
+  payment_method?: string | null;
   customer_name: string;
   total: number;
   subtotal: number;
@@ -27,6 +28,8 @@ type OrderData = {
   tracking_notes: string | null;
   delivery_location: string | null;
   notes: string | null;
+  customer_payment_name: string | null;
+  customer_payment_reference: string | null;
   items: { name: string; quantity: number; unit_price: number; line_total: number }[];
   business: { name: string; logo_url: string | null; phone: string | null; slug: string | null };
 };
