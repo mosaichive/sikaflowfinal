@@ -326,6 +326,36 @@ export default function StorePage() {
                   </div>
                 ) : null}
 
+                {requirePaymentProof ? (
+                  <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
+                    <p className="text-xs font-medium">
+                      After paying, enter the Momo name and reference so the store can confirm your payment.
+                    </p>
+                    <div>
+                      <Label htmlFor="pay-name">Momo name *</Label>
+                      <Input
+                        id="pay-name"
+                        value={form.payment_name}
+                        onChange={(e) => setForm({ ...form, payment_name: e.target.value })}
+                        placeholder="Name on the Momo account you paid from"
+                        maxLength={120}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="pay-ref">Momo reference *</Label>
+                      <Input
+                        id="pay-ref"
+                        value={form.payment_reference}
+                        onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
+                        placeholder="Transaction ID / reference from the Momo SMS"
+                        maxLength={80}
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Totals */}
                 <div className="rounded-xl border border-border p-3 space-y-1 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(cartSubtotal)}</span></div>
@@ -338,7 +368,7 @@ export default function StorePage() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={submitting}>
+                <Button type="submit" className="w-full" disabled={!canSubmit}>
                   {submitting ? 'Placing order…' : `Place order · ${formatCurrency(cartTotal)}`}
                 </Button>
               </form>
