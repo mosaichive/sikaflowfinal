@@ -39,6 +39,15 @@ export function SurveyModal() {
       const active = (surveys?.[0] ?? null) as Survey | null;
       if (!active || cancelled) return;
 
+      // Eligibility: existing users (created before survey enabled) see it immediately.
+      // New users (created after) must wait NEW_USER_DELAY_DAYS since signup.
+      const userCreatedAt = (user as any)?.created_at ? new Date((user as any).created_at).getTime() : null;
+      const surveyEnabledAt = active.enabled_at ? new Date(active.enabled_at).getTime() : null;
+      if (userCreatedAt && surveyEnabledAt && userCreatedAt >= surveyEnabledAt) {
+        const eligibleAt = userCreatedAt + NEW_USER_DELAY_DAYS * 24 * 60 * 60 * 1000;
+        if (Date.now() < eligibleAt) return;
+      }
+
       // Once per session
       if (sessionStorage.getItem(sessionShownKey(active.id))) return;
 
