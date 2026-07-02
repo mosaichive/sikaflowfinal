@@ -164,7 +164,21 @@ export default function OrdersPage() {
     void load();
     const channel = supabase
       .channel('orders-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void load(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        const row = payload.new as any;
+        if (row?.source === 'online') {
+          const momo = row.customer_payment_name || row.customer_payment_reference
+            ? ` · Momo: ${row.customer_payment_name || '—'}${row.customer_payment_reference ? ` / ${row.customer_payment_reference}` : ''}`
+            : '';
+          toast({
+            title: 'New online order received',
+            description: `${row.customer_name || 'Customer'} · ${formatCurrency(Number(row.total || 0))}${momo}`,
+          });
+        }
+        void load();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => { void load(); })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { void load(); })
       .subscribe();
@@ -172,7 +186,7 @@ export default function OrdersPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, toast]);
 
   const visibleOrders = useMemo(() => {
     if (isAdmin || isManager) return orders;
