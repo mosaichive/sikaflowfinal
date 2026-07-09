@@ -64,6 +64,12 @@ export const MARKETING_SEO: Record<string, PageSeo> = {
       'Share feedback with the KudiTrack team and help improve the business dashboard for shops, distributors and growing teams.',
     path: '/feedback',
   },
+  '/refund-policy': {
+    title: 'Refund Policy | KudiTrack',
+    description:
+      'KudiTrack Refund Policy — learn when subscription refunds are eligible, how to request one, and how long processing takes.',
+    path: '/refund-policy',
+  },
 };
 
 export function absoluteUrl(path = '/') {
