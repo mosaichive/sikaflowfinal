@@ -195,6 +195,7 @@ export default function BillingPage() {
         payOpen.method.label,
         payerName ? `Payer: ${payerName}` : null,
         payerPhone ? `Phone: ${payerPhone}` : null,
+        `Refund Policy accepted: ${refundAcceptedAt}`,
         note,
       ].filter(Boolean).join(' — '),
     });
