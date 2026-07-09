@@ -15,7 +15,14 @@ import {
   Mail,
 } from 'lucide-react';
 
-const sections: LegalSection[] = [
+export const termsIntro = (
+  <p>
+    Welcome to <span className="font-semibold text-white">KudiTrack</span>. By accessing or using
+    our website, web application, or mobile application, you agree to these Terms of Service.
+  </p>
+);
+
+export const termsSections: LegalSection[] = [
   {
     id: 'acceptance',
     icon: CheckCircle2,
@@ -175,14 +182,8 @@ export default function TermsOfServicePage() {
       <LegalPageLayout
         eyebrow="Legal"
         title="Terms of Service"
-        intro={
-          <p>
-            Welcome to <span className="font-semibold text-white">KudiTrack</span>. By accessing or
-            using our website, web application, or mobile application, you agree to these Terms of
-            Service.
-          </p>
-        }
-        sections={sections}
+        intro={termsIntro}
+        sections={termsSections}
         footerNote={
           <p>
             By continuing to use KudiTrack you acknowledge that you have read and agreed to these

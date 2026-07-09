@@ -6,6 +6,10 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { LegalDialog } from '@/components/marketing/LegalDialog';
+import { termsIntro, termsSections } from '@/pages/marketing/TermsOfServicePage';
+import { privacyIntro, privacySections } from '@/pages/marketing/PrivacyPolicyPage';
+import { refundIntro, refundSections, refundFooterNote } from '@/pages/marketing/RefundPolicyPage';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
@@ -174,12 +178,15 @@ export function MarketingLayout() {
         <Outlet />
       </main>
 
-      {location.pathname !== '/' && <Footer />}
+      <Footer />
     </div>
   );
 }
 
+type LegalKey = 'terms' | 'privacy' | 'refund' | null;
+
 function Footer() {
+  const [openLegal, setOpenLegal] = useState<LegalKey>(null);
   return (
     <footer className="relative border-t border-white/10 mt-20">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#2C8603]/14 pointer-events-none" />
@@ -210,21 +217,72 @@ function Footer() {
               { label: 'Feedback', href: '/feedback' },
             ]}
           />
-          <FooterCol
-            title="Legal"
-            links={[
-              { label: 'Terms of Service', href: '/terms-of-service' },
-              { label: 'Privacy Policy', href: '/privacy-policy' },
-              { label: 'Refund Policy', href: '/refund-policy' },
-              { label: 'Login', href: '/sign-in' },
-            ]}
-          />
+          <div>
+            <h4 className="text-sm font-semibold mb-4 text-white">Legal</h4>
+            <ul className="space-y-2.5">
+              <li>
+                <button
+                  onClick={() => setOpenLegal('terms')}
+                  className="text-sm text-white/60 hover:text-white transition-colors text-left"
+                >
+                  Terms of Service
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setOpenLegal('privacy')}
+                  className="text-sm text-white/60 hover:text-white transition-colors text-left"
+                >
+                  Privacy Policy
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setOpenLegal('refund')}
+                  className="text-sm text-white/60 hover:text-white transition-colors text-left"
+                >
+                  Refund Policy
+                </button>
+              </li>
+              <li>
+                <Link
+                  to="/sign-in"
+                  className="text-sm text-white/60 hover:text-white transition-colors"
+                >
+                  Login
+                </Link>
+              </li>
+            </ul>
+          </div>
         </div>
         <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/50">
           <p>© {new Date().getFullYear()} KudiTrack. Built for African businesses.</p>
           <p>Made with care in Ghana 🇬🇭</p>
         </div>
       </div>
+
+      <LegalDialog
+        open={openLegal === 'terms'}
+        onOpenChange={(o) => !o && setOpenLegal(null)}
+        title="Terms of Service"
+        intro={termsIntro}
+        sections={termsSections}
+      />
+      <LegalDialog
+        open={openLegal === 'privacy'}
+        onOpenChange={(o) => !o && setOpenLegal(null)}
+        title="Privacy Policy"
+        intro={privacyIntro}
+        sections={privacySections}
+      />
+      <LegalDialog
+        open={openLegal === 'refund'}
+        onOpenChange={(o) => !o && setOpenLegal(null)}
+        title="Refund Policy"
+        intro={refundIntro}
+        sections={refundSections}
+        footerNote={refundFooterNote}
+      />
     </footer>
   );
 }

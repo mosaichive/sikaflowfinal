@@ -11,7 +11,21 @@ import {
   RotateCcw,
 } from 'lucide-react';
 
-const sections: LegalSection[] = [
+export const refundIntro = (
+  <p>
+    Our goal is to ensure customer satisfaction while maintaining a fair refund process. This
+    policy outlines when refunds are available and how to request one.
+  </p>
+);
+
+export const refundFooterNote = (
+  <p>
+    By subscribing to KudiTrack you acknowledge that you have read and understood this Refund
+    Policy. If anything is unclear, please contact support before purchasing.
+  </p>
+);
+
+export const refundSections: LegalSection[] = [
   {
     id: 'subscription-payments',
     icon: CreditCard,
@@ -103,19 +117,9 @@ export default function RefundPolicyPage() {
       <LegalPageLayout
         eyebrow="Legal"
         title="Refund Policy"
-        intro={
-          <p>
-            Our goal is to ensure customer satisfaction while maintaining a fair refund process.
-            This policy outlines when refunds are available and how to request one.
-          </p>
-        }
-        sections={sections}
-        footerNote={
-          <p>
-            By subscribing to KudiTrack you acknowledge that you have read and understood this
-            Refund Policy. If anything is unclear, please contact support before purchasing.
-          </p>
-        }
+        intro={refundIntro}
+        sections={refundSections}
+        footerNote={refundFooterNote}
       />
     </>
   );
