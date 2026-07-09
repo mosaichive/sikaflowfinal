@@ -177,6 +177,10 @@ export default function BillingPage() {
       toast({ title: 'Reference required', description: 'Enter the transaction reference.', variant: 'destructive' });
       return;
     }
+    if (!refundAccepted || !refundAcceptedAt) {
+      toast({ title: 'Refund Policy required', description: 'Please read and agree to the Refund Policy before paying.', variant: 'destructive' });
+      return;
+    }
 
     setBusy(true);
     const amount = PLAN_PRICES[payOpen.plan];
