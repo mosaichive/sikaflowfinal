@@ -215,6 +215,7 @@ function Footer() {
             links={[
               { label: 'Privacy Policy', href: '/#' },
               { label: 'Terms of Service', href: '/#' },
+              { label: 'Refund Policy', href: '/refund-policy' },
               { label: 'Login', href: '/sign-in' },
             ]}
           />
