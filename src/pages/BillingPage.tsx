@@ -374,7 +374,7 @@ export default function BillingPage() {
                         You'll be redirected to Paystack and brought back here once payment completes.
                       </p>
                     </div>
-                    <Button onClick={() => startPaystack(selectedPlan)} disabled={paystackBusy !== null || verifying}>
+                    <Button onClick={() => startPaystack(selectedPlan)} disabled={paystackBusy !== null || verifying || !refundAccepted}>
                       {paystackBusy === selectedPlan
                         ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Redirecting…</>
                         : verifying
