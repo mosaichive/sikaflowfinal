@@ -13,7 +13,14 @@ import {
   Mail,
 } from 'lucide-react';
 
-const sections: LegalSection[] = [
+export const privacyIntro = (
+  <p>
+    At <span className="font-semibold text-white">KudiTrack</span>, we value your privacy. This
+    policy explains what information we collect, how we use it, and the choices you have.
+  </p>
+);
+
+export const privacySections: LegalSection[] = [
   {
     id: 'information',
     icon: Database,
