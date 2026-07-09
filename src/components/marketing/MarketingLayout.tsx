@@ -178,8 +178,7 @@ export function MarketingLayout() {
         <Outlet />
       </main>
 
-      {location.pathname !== '/' && <Footer />}
-      {location.pathname === '/' && <Footer />}
+      <Footer />
     </div>
   );
 }
