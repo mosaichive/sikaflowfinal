@@ -318,6 +318,46 @@ export default function BillingPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
+                <label
+                  htmlFor="refund-policy-accept"
+                  className={cn(
+                    'flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer',
+                    refundAccepted
+                      ? 'border-primary/40 bg-primary/5'
+                      : 'border-border bg-muted/30 hover:border-primary/30',
+                  )}
+                >
+                  <Checkbox
+                    id="refund-policy-accept"
+                    checked={refundAccepted}
+                    onCheckedChange={(checked) => {
+                      const next = checked === true;
+                      setRefundAccepted(next);
+                      setRefundAcceptedAt(next ? new Date().toISOString() : null);
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <p className="font-medium text-foreground">
+                      I have read and agree to the{' '}
+                      <Link
+                        to="/refund-policy"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-primary hover:underline"
+                      >
+                        Refund Policy
+                      </Link>
+                      .
+                    </p>
+                    {refundAccepted && refundAcceptedAt && (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        Accepted {new Date(refundAcceptedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </label>
+
                 <Section
                   icon={Globe}
                   title="Paystack Checkout"
