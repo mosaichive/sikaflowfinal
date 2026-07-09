@@ -1945,6 +1945,10 @@ export type Database = {
         Returns: boolean
       }
       is_business_member: { Args: { _owner_id: string }; Returns: boolean }
+      is_business_member_module: {
+        Args: { _module: string; _owner_id: string }
+        Returns: boolean
+      }
       preview_staff_invite: { Args: { _token: string }; Returns: Json }
       public_confirm_order_receipt: {
         Args: { _code: string; _phone_last4: string }
