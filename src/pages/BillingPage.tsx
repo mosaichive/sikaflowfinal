@@ -70,6 +70,8 @@ export default function BillingPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [paystackBusy, setPaystackBusy] = useState<'monthly' | 'annual' | null>(null);
+  const [refundAccepted, setRefundAccepted] = useState(false);
+  const [refundAcceptedAt, setRefundAcceptedAt] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
 
