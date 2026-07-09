@@ -215,6 +215,7 @@ const App = () => (
                   <Route path="/advertise" element={<MarketingHome />} />
                   <Route path="/contact" element={<MarketingHome />} />
                   <Route path="/feedback" element={<MarketingHome />} />
+                  <Route path="/refund-policy" element={<RefundPolicyPage />} />
                 </Route>
 
                 {/* Tenant app */}
