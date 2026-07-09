@@ -70,6 +70,18 @@ export const MARKETING_SEO: Record<string, PageSeo> = {
       'KudiTrack Refund Policy — learn when subscription refunds are eligible, how to request one, and how long processing takes.',
     path: '/refund-policy',
   },
+  '/terms-of-service': {
+    title: 'Terms of Service | KudiTrack',
+    description:
+      'Read the KudiTrack Terms of Service governing use of our sales, inventory, and business management platform.',
+    path: '/terms-of-service',
+  },
+  '/privacy-policy': {
+    title: 'Privacy Policy | KudiTrack',
+    description:
+      'Learn how KudiTrack collects, uses, and protects your personal and business information.',
+    path: '/privacy-policy',
+  },
 };
 
 export function absoluteUrl(path = '/') {
