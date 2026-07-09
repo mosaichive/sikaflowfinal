@@ -59,6 +59,7 @@ const StorePage = lazy(() => import("./pages/StorePage"));
 const TrackOrderPage = lazy(() => import("./pages/TrackOrderPage"));
 
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
+const RefundPolicyPage = lazy(() => import("./pages/marketing/RefundPolicyPage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
