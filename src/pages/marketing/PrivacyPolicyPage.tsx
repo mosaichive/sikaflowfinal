@@ -147,14 +147,8 @@ export default function PrivacyPolicyPage() {
       <LegalPageLayout
         eyebrow="Legal"
         title="Privacy Policy"
-        intro={
-          <p>
-            At <span className="font-semibold text-white">KudiTrack</span>, we value your privacy.
-            This policy explains what information we collect, how we use it, and the choices you
-            have.
-          </p>
-        }
-        sections={sections}
+        intro={privacyIntro}
+        sections={privacySections}
       />
     </>
   );
