@@ -275,6 +275,11 @@ function SignInPanel() {
           Create Account
         </Link>
       </p>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        <Link to="/refund-policy" className="hover:text-primary hover:underline">
+          Refund Policy
+        </Link>
+      </p>
     </>
   );
 }
@@ -569,6 +574,13 @@ function SignUpPanel() {
       </p>
       <p className="mt-2 text-center text-xs text-muted-foreground">
         New businesses start with a 30-day free trial. No card required.
+      </p>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        By creating an account you agree to our{' '}
+        <Link to="/refund-policy" className="hover:text-primary hover:underline">
+          Refund Policy
+        </Link>
+        .
       </p>
     </>
   );

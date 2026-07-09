@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -69,6 +70,8 @@ export default function BillingPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [paystackBusy, setPaystackBusy] = useState<'monthly' | 'annual' | null>(null);
+  const [refundAccepted, setRefundAccepted] = useState(false);
+  const [refundAcceptedAt, setRefundAcceptedAt] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
 
@@ -174,6 +177,10 @@ export default function BillingPage() {
       toast({ title: 'Reference required', description: 'Enter the transaction reference.', variant: 'destructive' });
       return;
     }
+    if (!refundAccepted || !refundAcceptedAt) {
+      toast({ title: 'Refund Policy required', description: 'Please read and agree to the Refund Policy before paying.', variant: 'destructive' });
+      return;
+    }
 
     setBusy(true);
     const amount = PLAN_PRICES[payOpen.plan];
@@ -188,6 +195,7 @@ export default function BillingPage() {
         payOpen.method.label,
         payerName ? `Payer: ${payerName}` : null,
         payerPhone ? `Phone: ${payerPhone}` : null,
+        `Refund Policy accepted: ${refundAcceptedAt}`,
         note,
       ].filter(Boolean).join(' — '),
     });
@@ -207,6 +215,10 @@ export default function BillingPage() {
   };
 
   const startPaystack = async (plan: 'monthly' | 'annual') => {
+    if (!refundAccepted || !refundAcceptedAt) {
+      toast({ title: 'Refund Policy required', description: 'Please read and agree to the Refund Policy before paying.', variant: 'destructive' });
+      return;
+    }
     setPaystackBusy(plan);
     const callback_url = `${window.location.origin}/billing`;
     const { data, error } = await supabase.functions.invoke('paystack-init', {
@@ -306,6 +318,46 @@ export default function BillingPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
+                <label
+                  htmlFor="refund-policy-accept"
+                  className={cn(
+                    'flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer',
+                    refundAccepted
+                      ? 'border-primary/40 bg-primary/5'
+                      : 'border-border bg-muted/30 hover:border-primary/30',
+                  )}
+                >
+                  <Checkbox
+                    id="refund-policy-accept"
+                    checked={refundAccepted}
+                    onCheckedChange={(checked) => {
+                      const next = checked === true;
+                      setRefundAccepted(next);
+                      setRefundAcceptedAt(next ? new Date().toISOString() : null);
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <p className="font-medium text-foreground">
+                      I have read and agree to the{' '}
+                      <Link
+                        to="/refund-policy"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-primary hover:underline"
+                      >
+                        Refund Policy
+                      </Link>
+                      .
+                    </p>
+                    {refundAccepted && refundAcceptedAt && (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        Accepted {new Date(refundAcceptedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </label>
+
                 <Section
                   icon={Globe}
                   title="Paystack Checkout"
@@ -322,7 +374,7 @@ export default function BillingPage() {
                         You'll be redirected to Paystack and brought back here once payment completes.
                       </p>
                     </div>
-                    <Button onClick={() => startPaystack(selectedPlan)} disabled={paystackBusy !== null || verifying}>
+                    <Button onClick={() => startPaystack(selectedPlan)} disabled={paystackBusy !== null || verifying || !refundAccepted}>
                       {paystackBusy === selectedPlan
                         ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Redirecting…</>
                         : verifying
