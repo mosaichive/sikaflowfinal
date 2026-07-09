@@ -215,6 +215,10 @@ export default function BillingPage() {
   };
 
   const startPaystack = async (plan: 'monthly' | 'annual') => {
+    if (!refundAccepted || !refundAcceptedAt) {
+      toast({ title: 'Refund Policy required', description: 'Please read and agree to the Refund Policy before paying.', variant: 'destructive' });
+      return;
+    }
     setPaystackBusy(plan);
     const callback_url = `${window.location.origin}/billing`;
     const { data, error } = await supabase.functions.invoke('paystack-init', {
