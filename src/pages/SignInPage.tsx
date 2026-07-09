@@ -275,6 +275,11 @@ function SignInPanel() {
           Create Account
         </Link>
       </p>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        <Link to="/refund-policy" className="hover:text-primary hover:underline">
+          Refund Policy
+        </Link>
+      </p>
     </>
   );
 }
