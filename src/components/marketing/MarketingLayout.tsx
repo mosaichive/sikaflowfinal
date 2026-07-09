@@ -6,6 +6,10 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { LegalDialog } from '@/components/marketing/LegalDialog';
+import { termsIntro, termsSections } from '@/pages/marketing/TermsOfServicePage';
+import { privacyIntro, privacySections } from '@/pages/marketing/PrivacyPolicyPage';
+import { refundIntro, refundSections, refundFooterNote } from '@/pages/marketing/RefundPolicyPage';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
