@@ -179,11 +179,15 @@ export function MarketingLayout() {
       </main>
 
       {location.pathname !== '/' && <Footer />}
+      {location.pathname === '/' && <Footer />}
     </div>
   );
 }
 
+type LegalKey = 'terms' | 'privacy' | 'refund' | null;
+
 function Footer() {
+  const [openLegal, setOpenLegal] = useState<LegalKey>(null);
   return (
     <footer className="relative border-t border-white/10 mt-20">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#2C8603]/14 pointer-events-none" />
