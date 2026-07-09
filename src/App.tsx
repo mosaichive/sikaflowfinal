@@ -60,6 +60,8 @@ const TrackOrderPage = lazy(() => import("./pages/TrackOrderPage"));
 
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 const RefundPolicyPage = lazy(() => import("./pages/marketing/RefundPolicyPage"));
+const TermsOfServicePage = lazy(() => import("./pages/marketing/TermsOfServicePage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/marketing/PrivacyPolicyPage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
@@ -215,6 +217,8 @@ const App = () => (
                   <Route path="/advertise" element={<MarketingHome />} />
                   <Route path="/contact" element={<MarketingHome />} />
                   <Route path="/feedback" element={<MarketingHome />} />
+                  <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/refund-policy" element={<RefundPolicyPage />} />
                 </Route>
 

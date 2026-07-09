@@ -213,8 +213,8 @@ function Footer() {
           <FooterCol
             title="Legal"
             links={[
-              { label: 'Privacy Policy', href: '/#' },
-              { label: 'Terms of Service', href: '/#' },
+              { label: 'Terms of Service', href: '/terms-of-service' },
+              { label: 'Privacy Policy', href: '/privacy-policy' },
               { label: 'Refund Policy', href: '/refund-policy' },
               { label: 'Login', href: '/sign-in' },
             ]}
