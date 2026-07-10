@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { planHasFeature, type AnyPlan, type FeatureKey, type PlanTier, isLegacyPlan } from '@/lib/plan-features';
 
-export type PlanKey = 'free_trial' | 'trial' | 'monthly' | 'annual' | 'lifetime';
+export type PlanKey = AnyPlan;
 export type SubStatus = 'trial' | 'active' | 'overdue' | 'expired' | 'suspended' | 'canceled' | 'lifetime';
 
 export interface Subscription {
@@ -24,6 +25,9 @@ interface SubContextType {
   daysRemaining: number | null;
   refresh: () => Promise<void>;
   isSuperAdmin: boolean;
+  hasFeature: (feature: FeatureKey) => boolean;
+  tier: PlanTier | null;
+  isLegacy: boolean;
 }
 
 const SubContext = createContext<SubContextType | undefined>(undefined);
@@ -34,7 +38,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Staff members inherit the business owner's subscription; owners use their own.
   const subscriptionOwnerId = staffMembership?.business_owner_id ?? user?.id ?? null;
 
   const load = useCallback(async () => {
@@ -76,7 +79,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       id: profile.id,
       plan,
       status: statusRaw as SubStatus,
-      price_ghs: plan === 'monthly' ? 50 : plan === 'annual' ? 500 : 0,
+      price_ghs: PLAN_PRICES[plan] ?? 0,
       trial_start_date: profile.trial_start_date,
       trial_end_date: profile.trial_end_date,
       current_period_start: profile.subscription_start_date,
@@ -96,7 +99,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         () => { void load(); },
       )
       .subscribe();
-
     return () => { void supabase.removeChannel(channel); };
   }, [subscriptionOwnerId, load]);
 
@@ -116,10 +118,18 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { hasAccess, daysRemaining } = computeAccess();
   const isReadOnly = !hasAccess && !!subscription;
 
+  const currentPlan = subscription?.plan ?? null;
+  const tier: PlanTier | null =
+    currentPlan === 'starter' || currentPlan === 'business' || currentPlan === 'business_plus'
+      ? currentPlan
+      : null;
+  const isLegacy = isLegacyPlan(currentPlan);
+  const hasFeature = (feature: FeatureKey) => planHasFeature(currentPlan, feature);
+
   return (
     <SubContext.Provider value={{
       subscription, loading, hasAccess, isReadOnly, daysRemaining,
-      refresh: load, isSuperAdmin,
+      refresh: load, isSuperAdmin, hasFeature, tier, isLegacy,
     }}>
       {children}
     </SubContext.Provider>
@@ -135,13 +145,17 @@ export const useSubscription = () => {
 export const PLAN_LABELS: Record<PlanKey, string> = {
   free_trial: '30-Day Free Trial',
   trial: '30-Day Free Trial',
-  monthly: 'Monthly',
-  annual: 'Annual',
+  monthly: 'Monthly (Legacy)',
+  annual: 'Annual (Legacy)',
   lifetime: 'Lifetime',
+  starter: 'Starter',
+  business: 'Business',
+  business_plus: 'Business Plus',
 };
 
 export const PLAN_PRICES: Record<PlanKey, number> = {
   free_trial: 0, trial: 0, monthly: 50, annual: 500, lifetime: 0,
+  starter: 20, business: 50, business_plus: 80,
 };
 
 export const STATUS_LABELS: Record<SubStatus, string> = {
