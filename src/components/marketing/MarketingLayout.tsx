@@ -206,6 +206,7 @@ function Footer() {
             title="Product"
             links={[
               { label: 'Features', href: '/#features' },
+              { label: 'Pricing', href: '/pricing' },
               { label: 'Reviews', href: '/#reviews' },
               { label: 'FAQ', href: '/#faq' },
             ]}
