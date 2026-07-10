@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
         metadata: {
           user_id: user.id,
           plan,
+          cycle,
           payment_id: paymentRow.id,
         },
       }),
