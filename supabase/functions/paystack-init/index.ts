@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         reference,
         paystack_reference: reference,
         status: "pending",
-        note: "Paystack checkout initialized",
+        note: `Paystack checkout initialized (${cycle})`,
       })
       .select("*")
       .single();
