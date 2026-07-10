@@ -193,6 +193,7 @@ const App = () => (
                   <Route index element={<PlatformDashboard />} />
                   <Route path="businesses" element={<BusinessesPage />} />
                   <Route path="subscriptions" element={<SubscriptionsPage />} />
+                  <Route path="pricing" element={<PricingManagementPage />} />
                   <Route path="payments" element={<PaymentsPage />} />
                   <Route path="payment-methods" element={<PaymentMethodsPage />} />
                   <Route path="referrals" element={<ReferralsPage />} />
