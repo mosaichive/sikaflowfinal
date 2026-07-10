@@ -11,7 +11,10 @@ const corsHeaders = {
 
 const PAYSTACK_BASE = "https://api.paystack.co";
 
-const PLAN_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
+// Legacy plans still supported so existing subscribers can renew.
+const LEGACY_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
+// New tiered plans read prices from the pricing_plans table.
+const NEW_TIERS = new Set(['starter', 'business', 'business_plus']);
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
