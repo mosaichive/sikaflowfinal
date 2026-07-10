@@ -14,6 +14,7 @@ const NAV = [
   { to: '/super-admin/businesses', label: 'Businesses', icon: Building2 },
   { to: '/super-admin/user-activity', label: 'User Activity', icon: Activity },
   { to: '/super-admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
+  { to: '/super-admin/pricing', label: 'Pricing Plans', icon: Sparkles },
   { to: '/super-admin/payments', label: 'Payments', icon: Receipt },
   { to: '/super-admin/payment-methods', label: 'Payment Methods', icon: Wallet },
   { to: '/super-admin/referrals', label: 'Referrals', icon: Gift },
