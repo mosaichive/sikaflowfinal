@@ -787,6 +787,54 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_plans: {
+        Row: {
+          created_at: string
+          cta_label: string
+          description: string
+          features: Json
+          id: string
+          is_active: boolean
+          is_popular: boolean
+          name: string
+          price_annual: number
+          price_monthly: number
+          sort_order: number
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cta_label?: string
+          description?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          name: string
+          price_annual?: number
+          price_monthly?: number
+          sort_order?: number
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cta_label?: string
+          description?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          name?: string
+          price_annual?: number
+          price_monthly?: number
+          sort_order?: number
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           available_online: boolean
@@ -1987,7 +2035,14 @@ export type Database = {
         | "salesperson"
         | "distributor"
       savings_type: "bank" | "mobile_money" | "susu"
-      subscription_plan: "trial" | "monthly" | "annual" | "lifetime"
+      subscription_plan:
+        | "trial"
+        | "monthly"
+        | "annual"
+        | "lifetime"
+        | "starter"
+        | "business"
+        | "business_plus"
       subscription_status:
         | "trial"
         | "active"
@@ -2133,7 +2188,15 @@ export const Constants = {
         "distributor",
       ],
       savings_type: ["bank", "mobile_money", "susu"],
-      subscription_plan: ["trial", "monthly", "annual", "lifetime"],
+      subscription_plan: [
+        "trial",
+        "monthly",
+        "annual",
+        "lifetime",
+        "starter",
+        "business",
+        "business_plus",
+      ],
       subscription_status: [
         "trial",
         "active",
