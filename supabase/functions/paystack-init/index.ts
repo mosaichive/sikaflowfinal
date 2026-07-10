@@ -11,7 +11,10 @@ const corsHeaders = {
 
 const PAYSTACK_BASE = "https://api.paystack.co";
 
-const PLAN_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
+// Legacy plans still supported so existing subscribers can renew.
+const LEGACY_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
+// New tiered plans read prices from the pricing_plans table.
+const NEW_TIERS = new Set(['starter', 'business', 'business_plus']);
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -40,13 +43,30 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "unauthorized" }, 401);
 
-    const body = await req.json() as { plan?: string; callback_url?: string };
-    const plan = body.plan ?? "";
-    const amount = PLAN_PRICES[plan];
-    if (!amount) return json({ error: "invalid_plan" }, 400);
+    const body = await req.json() as { plan?: string; cycle?: 'monthly' | 'annual'; callback_url?: string };
+    const plan = (body.plan ?? '').toLowerCase();
+    const cycle = body.cycle === 'annual' ? 'annual' : 'monthly';
 
-    const reference = `SF_${plan.toUpperCase()}_${user.id.slice(0, 8)}_${Date.now()}`;
     const admin = createClient(supabaseUrl, serviceKey);
+
+    let amount = 0;
+    let effectivePlan = plan;
+    if (LEGACY_PRICES[plan] !== undefined) {
+      amount = LEGACY_PRICES[plan];
+    } else if (NEW_TIERS.has(plan)) {
+      const { data: priceRow } = await admin
+        .from('pricing_plans')
+        .select('price_monthly, price_annual, is_active')
+        .eq('tier', plan)
+        .maybeSingle();
+      if (!priceRow || priceRow.is_active === false) return json({ error: 'invalid_plan' }, 400);
+      amount = Number(cycle === 'annual' ? priceRow.price_annual : priceRow.price_monthly) || 0;
+    } else {
+      return json({ error: 'invalid_plan' }, 400);
+    }
+    if (!amount || amount <= 0) return json({ error: 'invalid_amount' }, 400);
+
+    const reference = `SF_${effectivePlan.toUpperCase()}_${cycle.toUpperCase()}_${user.id.slice(0, 8)}_${Date.now()}`;
 
     // Insert pending payment row first so we have the audit trail.
     const { data: paymentRow, error: insertError } = await admin
@@ -59,7 +79,7 @@ Deno.serve(async (req) => {
         reference,
         paystack_reference: reference,
         status: "pending",
-        note: "Paystack checkout initialized",
+        note: `Paystack checkout initialized (${cycle})`,
       })
       .select("*")
       .single();
@@ -80,6 +100,7 @@ Deno.serve(async (req) => {
         metadata: {
           user_id: user.id,
           plan,
+          cycle,
           payment_id: paymentRow.id,
         },
       }),

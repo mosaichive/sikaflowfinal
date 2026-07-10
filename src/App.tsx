@@ -62,6 +62,8 @@ const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 const RefundPolicyPage = lazy(() => import("./pages/marketing/RefundPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/marketing/TermsOfServicePage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/marketing/PrivacyPolicyPage"));
+const PricingPage = lazy(() => import("./pages/marketing/PricingPage"));
+const PricingManagementPage = lazy(() => import("./pages/platform/PricingManagementPage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
@@ -191,6 +193,7 @@ const App = () => (
                   <Route index element={<PlatformDashboard />} />
                   <Route path="businesses" element={<BusinessesPage />} />
                   <Route path="subscriptions" element={<SubscriptionsPage />} />
+                  <Route path="pricing" element={<PricingManagementPage />} />
                   <Route path="payments" element={<PaymentsPage />} />
                   <Route path="payment-methods" element={<PaymentMethodsPage />} />
                   <Route path="referrals" element={<ReferralsPage />} />
@@ -212,7 +215,7 @@ const App = () => (
                 <Route element={<MarketingLayout />}>
                   <Route path="/" element={<MarketingOrDashboard />} />
                   <Route path="/features" element={<MarketingHome />} />
-                  <Route path="/pricing" element={<Navigate to="/" replace />} />
+                  <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/reviews" element={<MarketingHome />} />
                   <Route path="/advertise" element={<MarketingHome />} />
                   <Route path="/contact" element={<MarketingHome />} />
