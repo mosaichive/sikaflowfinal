@@ -110,7 +110,7 @@ export async function activatePayment(
       .maybeSingle();
     const businessName = profile?.business_name || profile?.display_name || profile?.email || "A KudiTrack user";
     const planLabel = PLAN_LABELS[payment.plan] ?? payment.plan;
-    const message = `KudiTrack Payment Alert: ${businessName} completed ${planLabel} payment of GH₵${amountPaid}. Ref: ${reference}.`;
+    const message = `KudiTrack Payment Alert: ${businessName} activated ${planLabel} (${cycle}) — GH₵${amountPaid}. Ref: ${reference}.`;
     await notifySuperAdmin(message, { kind: "payment_success", reference, user_id: payment.user_id });
   } catch (err) {
     console.error("[paystack] super-admin notify error (non-blocking)", err);
