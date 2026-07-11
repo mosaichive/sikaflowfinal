@@ -2,11 +2,38 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 import { notifySuperAdmin } from "./super-admin-sms.ts";
 
-const PLAN_LABELS: Record<string, string> = { monthly: "Monthly", annual: "Annual" };
+const PLAN_LABELS: Record<string, string> = {
+  monthly: "Monthly", annual: "Annual",
+  starter: "Starter", business: "Business", business_plus: "Business Plus",
+};
 
 export const PAYSTACK_BASE = "https://api.paystack.co";
-export const PLAN_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
-export const PLAN_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
+// Legacy plans keep fixed pricing so old subscribers can still renew.
+export const LEGACY_PRICES: Record<string, number> = { monthly: 50, annual: 500 };
+export const LEGACY_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
+const NEW_TIERS = new Set(["starter", "business", "business_plus"]);
+
+async function resolvePlanPricing(
+  admin: SupabaseClient,
+  plan: string,
+  cycle: "monthly" | "annual",
+): Promise<{ amount: number; days: number } | null> {
+  if (LEGACY_PRICES[plan] !== undefined) {
+    return { amount: LEGACY_PRICES[plan], days: LEGACY_DAYS[plan] ?? 30 };
+  }
+  if (NEW_TIERS.has(plan)) {
+    const { data } = await admin
+      .from("pricing_plans")
+      .select("price_monthly, price_annual")
+      .eq("tier", plan)
+      .maybeSingle();
+    if (!data) return null;
+    const amount = Number(cycle === "annual" ? data.price_annual : data.price_monthly) || 0;
+    const days = cycle === "annual" ? 365 : 30;
+    return { amount, days };
+  }
+  return null;
+}
 
 export async function activatePayment(
   admin: SupabaseClient,
