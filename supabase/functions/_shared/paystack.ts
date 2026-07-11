@@ -51,13 +51,20 @@ export async function activatePayment(
   }
 
   const amountPaid = typeof verifyData?.data?.amount === "number" ? verifyData.data.amount / 100 : 0;
-  const expectedAmount = PLAN_PRICES[payment.plan] ?? Number(payment.amount);
   const metadataUserId = verifyData?.data?.metadata?.user_id;
+  const metadataCycle = (verifyData?.data?.metadata?.cycle === "annual" ? "annual" : "monthly") as "monthly" | "annual";
+  // Derive cycle for legacy plans from the plan name itself.
+  const cycle: "monthly" | "annual" =
+    payment.plan === "annual" ? "annual" : payment.plan === "monthly" ? "monthly" : metadataCycle;
+
+  const pricing = await resolvePlanPricing(admin, payment.plan, cycle);
+  const expectedAmount = pricing?.amount ?? Number(payment.amount);
+  const days = pricing?.days ?? 30;
 
   if (Math.abs(amountPaid - expectedAmount) > 0.01) {
     await admin.from("subscription_payments").update({
       status: "review",
-      note: `Amount mismatch: paid GH₵${amountPaid}, expected GH₵${expectedAmount}`,
+      note: `Amount mismatch: paid GH₵${amountPaid}, expected GH₵${expectedAmount} (${payment.plan}/${cycle})`,
       amount_paid: amountPaid,
       provider_response: verifyData,
     }).eq("id", payment.id);
@@ -75,7 +82,6 @@ export async function activatePayment(
   }
 
   const now = new Date();
-  const days = PLAN_DAYS[payment.plan] ?? 30;
   const expires = new Date(now.getTime() + days * 86400000);
 
   await admin.from("subscription_payments").update({
@@ -85,7 +91,7 @@ export async function activatePayment(
     paystack_reference: reference,
     provider_response: verifyData,
     expires_at: expires.toISOString(),
-    note: "Activated automatically by Paystack verification",
+    note: `Activated automatically by Paystack (${payment.plan} · ${cycle})`,
   }).eq("id", payment.id);
 
   await admin.from("profiles").update({
