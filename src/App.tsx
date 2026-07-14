@@ -212,6 +212,7 @@ const App = () => (
                   <Route path="user-activity" element={<PlatformUserActivityPage />} />
                   <Route path="surveys" element={<PlatformSurveysPage />} />
                   <Route path="survey-responses" element={<PlatformSurveyResponsesPage />} />
+                  <Route path="email" element={<EmailCenterPage />} />
                 </Route>
 
                 {/* Public marketing site */}
