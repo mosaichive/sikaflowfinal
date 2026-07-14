@@ -57,6 +57,7 @@ const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TrackOrderPage = lazy(() => import("./pages/TrackOrderPage"));
+const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 
 const MarketingHome = lazy(() => import("./pages/marketing/HomePage"));
 const RefundPolicyPage = lazy(() => import("./pages/marketing/RefundPolicyPage"));
@@ -64,6 +65,7 @@ const TermsOfServicePage = lazy(() => import("./pages/marketing/TermsOfServicePa
 const PrivacyPolicyPage = lazy(() => import("./pages/marketing/PrivacyPolicyPage"));
 const PricingPage = lazy(() => import("./pages/marketing/PricingPage"));
 const PricingManagementPage = lazy(() => import("./pages/platform/PricingManagementPage"));
+const EmailCenterPage = lazy(() => import("./pages/platform/EmailCenterPage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
