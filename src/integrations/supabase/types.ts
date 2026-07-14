@@ -212,6 +212,316 @@ export type Database = {
         }
         Relationships: []
       }
+      email_audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          campaign_id: string | null
+          created_at: string
+          details: Json
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_audit_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaign_recipients: {
+        Row: {
+          bounced_at: string | null
+          campaign_id: string
+          click_count: number
+          created_at: string
+          delivered_at: string | null
+          email: string
+          error_message: string | null
+          first_clicked_at: string | null
+          id: string
+          merge_data: Json
+          open_count: number
+          opened_at: string | null
+          resend_message_id: string | null
+          sent_at: string | null
+          status: string
+          unsubscribed_at: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          bounced_at?: string | null
+          campaign_id: string
+          click_count?: number
+          created_at?: string
+          delivered_at?: string | null
+          email: string
+          error_message?: string | null
+          first_clicked_at?: string | null
+          id?: string
+          merge_data?: Json
+          open_count?: number
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          bounced_at?: string | null
+          campaign_id?: string
+          click_count?: number
+          created_at?: string
+          delivered_at?: string | null
+          email?: string
+          error_message?: string | null
+          first_clicked_at?: string | null
+          id?: string
+          merge_data?: Json
+          open_count?: number
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaigns: {
+        Row: {
+          audience_filter: Json
+          audience_type: string
+          body_html: string
+          bounce_count: number
+          click_count: number
+          created_at: string
+          created_by: string | null
+          delivered_count: number
+          failed_count: number
+          from_email: string
+          from_name: string
+          id: string
+          name: string
+          open_count: number
+          preview_text: string | null
+          recipient_count: number
+          reply_to: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          started_at: string | null
+          status: string
+          subject: string
+          template_id: string | null
+          timezone: string | null
+          unique_click_count: number
+          unique_open_count: number
+          unsubscribe_count: number
+          updated_at: string
+        }
+        Insert: {
+          audience_filter?: Json
+          audience_type?: string
+          body_html?: string
+          bounce_count?: number
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          delivered_count?: number
+          failed_count?: number
+          from_email?: string
+          from_name?: string
+          id?: string
+          name: string
+          open_count?: number
+          preview_text?: string | null
+          recipient_count?: number
+          reply_to?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          started_at?: string | null
+          status?: string
+          subject?: string
+          template_id?: string | null
+          timezone?: string | null
+          unique_click_count?: number
+          unique_open_count?: number
+          unsubscribe_count?: number
+          updated_at?: string
+        }
+        Update: {
+          audience_filter?: Json
+          audience_type?: string
+          body_html?: string
+          bounce_count?: number
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          delivered_count?: number
+          failed_count?: number
+          from_email?: string
+          from_name?: string
+          id?: string
+          name?: string
+          open_count?: number
+          preview_text?: string | null
+          recipient_count?: number
+          reply_to?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          started_at?: string | null
+          status?: string
+          subject?: string
+          template_id?: string | null
+          timezone?: string | null
+          unique_click_count?: number
+          unique_open_count?: number
+          unsubscribe_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_marketing_unsubscribes: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          reason: string | null
+          source: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          reason?: string | null
+          source?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          reason?: string | null
+          source?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      email_media_library: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          mime_type: string | null
+          name: string
+          size_bytes: number | null
+          storage_path: string | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          name: string
+          size_bytes?: number | null
+          storage_path?: string | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          name?: string
+          size_bytes?: number | null
+          storage_path?: string | null
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          body_html: string
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_system: boolean
+          name: string
+          preview_text: string | null
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body_html?: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name: string
+          preview_text?: string | null
+          subject?: string
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name?: string
+          preview_text?: string | null
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -907,6 +1217,7 @@ export type Database = {
           location: string | null
           login_count: number
           logo_url: string | null
+          marketing_emails_opted_out: boolean
           num_employees: string | null
           onboarding_completed: boolean
           online_ordering_enabled: boolean
@@ -959,6 +1270,7 @@ export type Database = {
           location?: string | null
           login_count?: number
           logo_url?: string | null
+          marketing_emails_opted_out?: boolean
           num_employees?: string | null
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean
@@ -1011,6 +1323,7 @@ export type Database = {
           location?: string | null
           login_count?: number
           logo_url?: string | null
+          marketing_emails_opted_out?: boolean
           num_employees?: string | null
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean

@@ -11,3 +11,15 @@ verify_jwt = false
 
 [functions.confirm-order-receipt]
 verify_jwt = false
+
+[functions.email-track-open]
+verify_jwt = false
+
+[functions.email-track-click]
+verify_jwt = false
+
+[functions.email-unsubscribe]
+verify_jwt = false
+
+[functions.admin-email-send-campaign]
+verify_jwt = false
