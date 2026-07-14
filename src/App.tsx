@@ -187,6 +187,7 @@ const App = () => (
                 {/* Public customer-facing store & tracking */}
                 <Route path="/store/:slug" element={<StorePage />} />
                 <Route path="/track/:code" element={<TrackOrderPage />} />
+                <Route path="/unsubscribe" element={<UnsubscribePage />} />
 
                 {/* Platform Super Admin */}
                 <Route path="/platform/*" element={<Navigate to="/super-admin" replace />} />
