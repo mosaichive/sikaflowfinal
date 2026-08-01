@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { getFunctionErrorMessage } from '@/lib/function-errors';
+import MonthlyStatementsPanel from '@/components/platform/MonthlyStatementsPanel';
 import {
   Mail, Send, FileText, Image as ImageIcon, Users, Calendar, MailX,
   BarChart3, Plus, Trash2, Copy, Eye, Play, X,
