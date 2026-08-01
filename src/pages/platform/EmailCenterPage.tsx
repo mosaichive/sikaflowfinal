@@ -372,9 +372,10 @@ export default function EmailCenterPage() {
               onChange={setEditor}
               audienceCount={audienceCount}
               onPreviewAudience={() => previewAudience(editor)}
-              onSaveDraft={async () => { try { await saveCampaign(editor, 'draft'); toast.success('Draft saved'); void refresh(); } catch (e) { toast.error((e as Error).message); } }}
+              onSaveDraft={() => saveDraft(editor)}
               onSend={() => sendCampaign(editor)}
               onTestSend={() => testSend(editor)}
+              busy={busy}
               testEmail={testEmail}
               onTestEmailChange={setTestEmail}
               scheduledMode={scheduledMode}
