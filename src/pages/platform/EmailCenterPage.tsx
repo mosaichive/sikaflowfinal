@@ -144,6 +144,19 @@ export default function EmailCenterPage() {
     setAudienceCount(((data as any)?.count) ?? 0);
   }, [specificEmailsText]);
 
+  const validateCampaign = (c: Partial<Campaign>) => {
+    if (!c.name?.trim()) return 'Give the campaign a name.';
+    if (!c.subject?.trim()) return 'Subject line is required.';
+    if (!c.body_html?.trim()) return 'Email body cannot be empty.';
+    if (!c.from_name?.trim() || !c.from_email?.trim()) return 'Sender name and email are required.';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.from_email)) return 'Sender email is not a valid address.';
+    if (c.reply_to && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to)) return 'Reply-to is not a valid address.';
+    if (c.audience_type === 'specific_emails' && !specificEmailsText.trim()) {
+      return 'Add at least one recipient email address.';
+    }
+    return null;
+  };
+
   const saveCampaign = async (c: Partial<Campaign>, status?: string) => {
     const filter = { ...(c.audience_filter || {}) };
     if (c.audience_type === 'specific_emails') {
@@ -154,23 +167,47 @@ export default function EmailCenterPage() {
       from_name: c.from_name, from_email: c.from_email, reply_to: c.reply_to || null,
       body_html: c.body_html, audience_type: c.audience_type, audience_filter: filter,
       status: status ?? c.status ?? 'draft',
-      scheduled_at: status === 'scheduled' ? scheduledAt : c.scheduled_at ?? null,
+      scheduled_at: status === 'scheduled' ? (scheduledAt ? new Date(scheduledAt).toISOString() : null) : c.scheduled_at ?? null,
       template_id: c.template_id ?? null,
     };
     if (c.id) {
       const { error } = await supabase.from('email_campaigns').update(payload).eq('id', c.id);
-      if (error) throw error;
+      if (error) throw new Error(error.message);
       return c.id;
     }
     const { data: user } = await supabase.auth.getUser();
     payload.created_by = user.user?.id;
     const { data, error } = await supabase.from('email_campaigns').insert(payload).select('id').single();
-    if (error) throw error;
-    return data!.id as string;
+    if (error) throw new Error(error.message);
+    const newId = data!.id as string;
+    // Keep working on the same record so repeated saves don't create duplicates.
+    setEditor((prev) => (prev ? { ...prev, id: newId, status: payload.status } : prev));
+    return newId;
+  };
+
+  const saveDraft = async (c: Partial<Campaign>) => {
+    const problem = validateCampaign(c);
+    if (problem) { toast.error(problem); return; }
+    setBusy('draft');
+    try {
+      await saveCampaign(c, 'draft');
+      toast.success('Draft saved');
+      void refresh();
+    } catch (e) {
+      toast.error(await getFunctionErrorMessage(e, 'Could not save draft'));
+    } finally { setBusy(null); }
   };
 
   const sendCampaign = async (c: Partial<Campaign>) => {
-    if (!c.subject || !c.body_html) { toast.error('Subject and body are required'); return; }
+    const problem = validateCampaign(c);
+    if (problem) { toast.error(problem); return; }
+    if (scheduledMode === 'schedule') {
+      if (!scheduledAt) { toast.error('Pick a date and time to schedule the send.'); return; }
+      if (new Date(scheduledAt).getTime() <= Date.now()) { toast.error('Scheduled time must be in the future.'); return; }
+    } else if (!confirm(`Send "${c.name}" now to the selected audience? This cannot be undone.`)) {
+      return;
+    }
+    setBusy('send');
     try {
       const id = await saveCampaign(c, scheduledMode === 'schedule' ? 'scheduled' : 'draft');
       if (scheduledMode === 'schedule') {
@@ -181,21 +218,30 @@ export default function EmailCenterPage() {
         body: { action: 'send', campaign_id: id },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error(String((data as any).error));
       toast.success(`Sent to ${(data as any)?.sent ?? 0} recipients`);
       setEditor(null); void refresh();
-    } catch (e) { toast.error((e as Error).message); }
+    } catch (e) {
+      toast.error(await getFunctionErrorMessage(e, 'Could not send campaign'));
+    } finally { setBusy(null); }
   };
 
   const testSend = async (c: Partial<Campaign>) => {
-    if (!testEmail) return;
+    if (!testEmail.trim()) { toast.error('Enter a test email address.'); return; }
+    const problem = validateCampaign(c);
+    if (problem) { toast.error(problem); return; }
+    setBusy('test');
     try {
       const id = await saveCampaign(c, 'draft');
-      const { error } = await supabase.functions.invoke('admin-email-send-campaign', {
-        body: { action: 'test', campaign_id: id, to: [testEmail] },
+      const { data, error } = await supabase.functions.invoke('admin-email-send-campaign', {
+        body: { action: 'test', campaign_id: id, to: [testEmail.trim()] },
       });
       if (error) throw error;
+      if ((data as any)?.ok === false) throw new Error(String((data as any)?.body ?? 'Provider rejected the test send'));
       toast.success(`Test sent to ${testEmail}`);
-    } catch (e) { toast.error((e as Error).message); }
+    } catch (e) {
+      toast.error(await getFunctionErrorMessage(e, 'Could not send test email'));
+    } finally { setBusy(null); }
   };
 
   const duplicateCampaign = async (c: Campaign) => {
