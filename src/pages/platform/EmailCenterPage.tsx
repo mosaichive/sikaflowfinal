@@ -497,6 +497,10 @@ export default function EmailCenterPage() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="statements">
+          <MonthlyStatementsPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
