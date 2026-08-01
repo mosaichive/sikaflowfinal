@@ -531,6 +531,7 @@ function ComposeEditor(props: {
   onSaveDraft: () => void;
   onSend: () => void;
   onTestSend: () => void;
+  busy: 'draft' | 'send' | 'test' | null;
   testEmail: string;
   onTestEmailChange: (v: string) => void;
   scheduledMode: 'now' | 'schedule';
