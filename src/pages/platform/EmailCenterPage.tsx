@@ -334,6 +334,7 @@ export default function EmailCenterPage() {
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="media">Media</TabsTrigger>
           <TabsTrigger value="unsubs">Unsubscribes</TabsTrigger>
+          <TabsTrigger value="statements">Statements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
