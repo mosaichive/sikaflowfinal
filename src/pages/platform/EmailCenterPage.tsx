@@ -645,14 +645,20 @@ function ComposeEditor(props: {
         <Card className="p-4 space-y-2">
           <Label>Send test email</Label>
           <Input placeholder="test@you.com" value={props.testEmail} onChange={(e) => props.onTestEmailChange(e.target.value)} />
-          <Button size="sm" variant="outline" onClick={props.onTestSend}>Send test</Button>
+          <Button size="sm" variant="outline" onClick={props.onTestSend} disabled={props.busy !== null}>
+            {props.busy === 'test' ? 'Sending…' : 'Send test'}
+          </Button>
         </Card>
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={props.onSaveDraft}>Save draft</Button>
-          <Button className="flex-1" onClick={props.onSend}>
+          <Button variant="outline" className="flex-1" onClick={props.onSaveDraft} disabled={props.busy !== null}>
+            {props.busy === 'draft' ? 'Saving…' : 'Save draft'}
+          </Button>
+          <Button className="flex-1" onClick={props.onSend} disabled={props.busy !== null}>
             <Send className="h-4 w-4 mr-1" />
-            {props.scheduledMode === 'schedule' ? 'Schedule' : 'Send now'}
+            {props.busy === 'send'
+              ? 'Working…'
+              : props.scheduledMode === 'schedule' ? 'Schedule' : 'Send now'}
           </Button>
         </div>
       </div>
