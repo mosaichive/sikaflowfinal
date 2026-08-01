@@ -1898,6 +1898,99 @@ export type Database = {
         }
         Relationships: []
       }
+      statement_deliveries: {
+        Row: {
+          business_id: string
+          business_name: string | null
+          created_at: string
+          email: string
+          error_message: string | null
+          generated_at: string | null
+          id: string
+          period: string
+          provider_message_id: string | null
+          retry_count: number
+          sent_at: string | null
+          status: string
+          totals: Json
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          business_name?: string | null
+          created_at?: string
+          email: string
+          error_message?: string | null
+          generated_at?: string | null
+          id?: string
+          period: string
+          provider_message_id?: string | null
+          retry_count?: number
+          sent_at?: string | null
+          status?: string
+          totals?: Json
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          business_name?: string | null
+          created_at?: string
+          email?: string
+          error_message?: string | null
+          generated_at?: string | null
+          id?: string
+          period?: string
+          provider_message_id?: string | null
+          retry_count?: number
+          sent_at?: string | null
+          status?: string
+          totals?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      statement_settings: {
+        Row: {
+          automation_enabled: boolean
+          created_at: string
+          from_email: string
+          from_name: string
+          id: string
+          last_run_at: string | null
+          last_run_period: string | null
+          send_day: number
+          singleton_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          automation_enabled?: boolean
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          last_run_at?: string | null
+          last_run_period?: string | null
+          send_day?: number
+          singleton_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          automation_enabled?: boolean
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          last_run_at?: string | null
+          last_run_period?: string | null
+          send_day?: number
+          singleton_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           added_by_name: string | null
