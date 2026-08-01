@@ -98,6 +98,7 @@ export default function EmailCenterPage() {
   const [scheduledMode, setScheduledMode] = useState<'now' | 'schedule'>('now');
   const [scheduledAt, setScheduledAt] = useState('');
   const [specificEmailsText, setSpecificEmailsText] = useState('');
+  const [busy, setBusy] = useState<'draft' | 'send' | 'test' | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
