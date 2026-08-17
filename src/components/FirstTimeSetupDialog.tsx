@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CurrencySelect } from '@/components/CurrencySelect';
+import { useCurrency } from '@/context/CurrencyContext';
 import { CheckCircle2, ImagePlus, Loader2, Package, Store, Warehouse } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -86,6 +88,8 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
   const [businessType, setBusinessType] = useState(BUSINESS_TYPES[0]);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [location, setLocation] = useState('');
+  const { code: activeCurrencyCode, activeCurrencies, setBusinessCurrency } = useCurrency();
+  const [currencyCode, setCurrencyCode] = useState(activeCurrencyCode);
   const [businessLogoFile, setBusinessLogoFile] = useState<File | null>(null);
   const [hasOpeningStock, setHasOpeningStock] = useState<'yes' | 'no'>('yes');
   const [openingStockProducts, setOpeningStockProducts] = useState<OpeningStockProduct[]>([makeProductRow()]);
@@ -101,10 +105,11 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
     setBusinessType(BUSINESS_TYPES[0]);
     setPhoneNumber(business?.phone || '');
     setLocation(business?.location || '');
+    setCurrencyCode(activeCurrencyCode);
     setBusinessLogoFile(null);
     setHasOpeningStock('yes');
     setOpeningStockProducts([makeProductRow()]);
-  }, [business?.location, business?.name, business?.phone, open]);
+  }, [activeCurrencyCode, business?.location, business?.name, business?.phone, open]);
 
   const activeProducts = useMemo(
     () => openingStockProducts.filter((product) => product.name.trim()),
@@ -123,6 +128,10 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
       }
       if (!location.trim()) {
         toast({ title: 'Location required', description: 'Enter the business location to continue.', variant: 'destructive' });
+        return false;
+      }
+      if (!currencyCode) {
+        toast({ title: 'Currency required', description: 'Choose the currency your business trades in.', variant: 'destructive' });
         return false;
       }
     }
@@ -218,6 +227,12 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
           status: 'active',
           email_verified: true,
         });
+
+      try {
+        await setBusinessCurrency(currencyCode);
+      } catch (currencyError) {
+        logSupabaseError('onboarding.setCurrency', currencyError, { currencyCode });
+      }
 
       await updateProfileRecord(user.id, {
           business_id: businessId,
@@ -413,6 +428,13 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
                 <div className="space-y-2">
                   <Label htmlFor="setup-business-location">Location</Label>
                   <Input id="setup-business-location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Accra, Ghana" />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Business Currency</Label>
+                  <CurrencySelect value={currencyCode} onChange={setCurrencyCode} currencies={activeCurrencies} />
+                  <p className="text-xs text-muted-foreground">
+                    All sales, expenses, reports, and receipts will use this currency. You can change it later in Settings.
+                  </p>
                 </div>
               </div>
             </div>
