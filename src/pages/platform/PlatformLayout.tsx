@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, Coins } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
@@ -22,6 +22,7 @@ const NAV = [
   { to: '/super-admin/ad-applications', label: 'Ad Applications', icon: Sparkles },
   { to: '/super-admin/reviews', label: 'Reviews', icon: Star },
   { to: '/super-admin/email', label: 'Email & Newsletter', icon: Mail },
+  { to: '/super-admin/currencies', label: 'Currencies', icon: Coins },
   { to: '/super-admin/sms', label: 'SMS', icon: Send },
   { to: '/super-admin/surveys', label: 'Surveys', icon: ClipboardList },
   { to: '/super-admin/survey-responses', label: 'Survey Responses', icon: MessageSquare },

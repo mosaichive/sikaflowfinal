@@ -26,6 +26,8 @@ import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard';
 import { SmsLogsCard } from '@/components/settings/SmsLogsCard';
 // OnlineStoreCard was moved to Orders → Order Settings dialog.
+import { CurrencyCard } from '@/components/settings/CurrencyCard';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useToast } from '@/hooks/use-toast';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 
@@ -88,6 +90,7 @@ export default function SettingsPage() {
 
   // Team members who aren't admins should land on Profile by default.
   const staffOnlyProfile = isStaffMember && !isAdmin;
+  const { currency: activeCurrency } = useCurrency();
   const settingsCategoryItems = staffOnlyProfile
     ? [{ title: 'Profile', section: 'profile' as const, icon: User, description: 'Manage your photo, name, phone and account details.' }]
     : [
@@ -781,12 +784,14 @@ export default function SettingsPage() {
         {activeSection === 'sales' && (
         <section id="settings-sales" className="space-y-6 scroll-mt-24 animate-fade-in">
 
+        <CurrencyCard canManage={isAdmin} />
+
 
         <Card>
           <CardHeader><CardTitle className="text-base">Store</CardTitle></CardHeader>
           <CardContent className="space-y-5 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Store Name</span><span className="font-medium">{businessName}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Currency</span><span className="font-medium">GH₵ (Ghana Cedi)</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Currency</span><span className="font-medium">{activeCurrency.symbol} ({activeCurrency.name})</span></div>
             <div className="rounded-xl border border-border bg-muted/20 p-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-center gap-4">

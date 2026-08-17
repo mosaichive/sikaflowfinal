@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.admin-monthly-statements]
 verify_jwt = false
+
+[functions.exchange-rates]
+verify_jwt = false

@@ -1,5 +1,12 @@
-export const formatCurrency = (amount: number) =>
-  `GH₵ ${amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+import { formatMoney } from '@/lib/currency';
+
+/**
+ * Formats an amount in the active business currency.
+ * Pass an explicit ISO code to format a historical record in its own currency.
+ */
+export const formatCurrency = (amount: number, currencyCode?: string | null) =>
+  formatMoney(amount, currencyCode);
+
 
 export const EXPENSE_CATEGORIES = [
   'Rent', 'Transport', 'Electricity', 'Packaging', 'Internet',

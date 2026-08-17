@@ -179,6 +179,48 @@ export type Database = {
         }
         Relationships: []
       }
+      currencies: {
+        Row: {
+          active: boolean
+          code: string
+          country: string | null
+          created_at: string
+          decimals: number
+          flag: string | null
+          is_default: boolean
+          name: string
+          sort_order: number
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          country?: string | null
+          created_at?: string
+          decimals?: number
+          flag?: string | null
+          is_default?: boolean
+          name: string
+          sort_order?: number
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          country?: string | null
+          created_at?: string
+          decimals?: number
+          flag?: string | null
+          is_default?: boolean
+          name?: string
+          sort_order?: number
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -518,6 +560,42 @@ export type Database = {
           name?: string
           preview_text?: string | null
           subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      exchange_rates: {
+        Row: {
+          base_currency: string
+          created_at: string
+          expires_at: string
+          fetched_at: string
+          id: string
+          provider: string
+          rate: number
+          target_currency: string
+          updated_at: string
+        }
+        Insert: {
+          base_currency: string
+          created_at?: string
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          provider?: string
+          rate: number
+          target_currency: string
+          updated_at?: string
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          provider?: string
+          rate?: number
+          target_currency?: string
           updated_at?: string
         }
         Relationships: []

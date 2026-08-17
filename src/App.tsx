@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth, type AppRole } from "@/context/AuthContext";
 import { BusinessProvider, useBusiness } from "@/context/BusinessContext";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 import { BusinessFinancialsProvider } from "@/context/BusinessFinancialsContext";
 import { SubscriptionProvider, useSubscription } from "@/context/SubscriptionContext";
 import { BrandLoader } from "./components/BrandLoader";
@@ -66,6 +67,7 @@ const PrivacyPolicyPage = lazy(() => import("./pages/marketing/PrivacyPolicyPage
 const PricingPage = lazy(() => import("./pages/marketing/PricingPage"));
 const PricingManagementPage = lazy(() => import("./pages/platform/PricingManagementPage"));
 const EmailCenterPage = lazy(() => import("./pages/platform/EmailCenterPage"));
+const CurrencyManagementPage = lazy(() => import("./pages/platform/CurrencyManagementPage"));
 
 function MarketingOrDashboard() {
   const { user, loading, staffMembership } = useAuth();
@@ -165,6 +167,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <CurrencyProvider>
         <BusinessProvider>
           <BusinessFinancialsProvider>
             <SubscriptionProvider>
@@ -213,6 +216,7 @@ const App = () => (
                   <Route path="surveys" element={<PlatformSurveysPage />} />
                   <Route path="survey-responses" element={<PlatformSurveyResponsesPage />} />
                   <Route path="email" element={<EmailCenterPage />} />
+                  <Route path="currencies" element={<CurrencyManagementPage />} />
                 </Route>
 
                 {/* Public marketing site */}
@@ -253,6 +257,7 @@ const App = () => (
             </SubscriptionProvider>
           </BusinessFinancialsProvider>
         </BusinessProvider>
+        </CurrencyProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
