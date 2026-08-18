@@ -18,6 +18,7 @@ import {
   renderStatementEmailHtml,
   renderStatementPdf,
   statementFileName,
+  statementSubject,
 } from "../_shared/statement-pdf.ts";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/resend";
@@ -67,6 +68,28 @@ async function loadSettings(admin: ReturnType<typeof serviceClient>) {
   };
 }
 
+async function ownerDisplayName(admin: ReturnType<typeof serviceClient>, businessId: string) {
+  const { data } = await admin
+    .from("profiles").select("display_name, business_name").eq("id", businessId).maybeSingle();
+  return (data?.display_name || data?.business_name || null) as string | null;
+}
+
+/** Statements are sensitive, so the recipient must be the confirmed auth email. */
+async function isEmailVerified(
+  admin: ReturnType<typeof serviceClient>,
+  businessId: string,
+  recipient: string,
+) {
+  try {
+    const { data } = await admin.auth.admin.getUserById(businessId);
+    const authUser = data?.user;
+    if (!authUser?.email_confirmed_at) return false;
+    return (authUser.email ?? "").toLowerCase() === recipient.toLowerCase();
+  } catch (_e) {
+    return false;
+  }
+}
+
 async function generateAndSend(
   admin: ReturnType<typeof serviceClient>,
   businessId: string,
@@ -76,6 +99,7 @@ async function generateAndSend(
   const period = resolvePeriod(periodKey);
   const data = await buildStatementData(admin, businessId, period);
   const recipient = (opts.to ?? data.business.email ?? "").trim();
+  const displayName = await ownerDisplayName(admin, businessId);
 
   const pdf = renderStatementPdf(data);
   const totals = {
@@ -101,11 +125,28 @@ async function generateAndSend(
     return { ok: false, skipped: true, reason: "no_email", period: period.period };
   }
 
+  // Financial statements only ever go to a verified account email.
+  if (!opts.test && !(await isEmailVerified(admin, businessId, recipient))) {
+    if (opts.log) {
+      await admin.from("statement_deliveries").upsert({
+        business_id: businessId,
+        business_name: data.business.name,
+        email: recipient,
+        period: period.period,
+        status: "skipped",
+        generated_at: new Date().toISOString(),
+        error_message: "Email address not verified",
+        totals,
+      }, { onConflict: "business_id,period" });
+    }
+    return { ok: false, skipped: true, reason: "email_unverified", period: period.period };
+  }
+
   const result = await sendEmail({
     from: `${opts.from_name} <${opts.from_email}>`,
     to: [recipient],
-    subject: `${opts.test ? "[TEST] " : ""}Your ${period.label} business statement - ${data.business.name}`,
-    html: renderStatementEmailHtml(data),
+    subject: `${opts.test ? "[TEST] " : ""}${statementSubject(data)}`,
+    html: renderStatementEmailHtml(data, displayName),
     attachments: [{ filename: statementFileName(data), content: pdf }],
   });
 
@@ -152,6 +193,40 @@ Deno.serve(async (req) => {
     // Cron entry point — authenticated with a shared secret header instead of a JWT.
     const cronHeader = req.headers.get("x-cron-secret");
     const isCron = Boolean(CRON_SECRET) && cronHeader === CRON_SECRET;
+
+    // ---- Owner-facing actions (any authenticated business owner, own data only) ----
+    if (action === "my_download" || action === "my_resend") {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      if (!token) return json({ error: "unauthorized" }, 401);
+      const { data: authData } = await admin.auth.getUser(token);
+      const owner = authData?.user;
+      if (!owner) return json({ error: "unauthorized" }, 401);
+
+      const periodKey = ((body as any).period as string | null) ?? null;
+
+      if (action === "my_download") {
+        const period = resolvePeriod(periodKey);
+        const data = await buildStatementData(admin, owner.id, period);
+        return json({
+          ok: true,
+          period: period.period,
+          filename: statementFileName(data),
+          pdf: renderStatementPdf(data),
+        });
+      }
+
+      if (!owner.email_confirmed_at) {
+        return json({ error: "Please verify your email address to receive your monthly financial statement." }, 400);
+      }
+      const res = await generateAndSend(admin, owner.id, periodKey, {
+        to: owner.email ?? null,
+        from_name: settings.from_name,
+        from_email: settings.from_email,
+        log: true,
+      });
+      return json(res, res.ok ? 200 : 502);
+    }
 
     let actorId: string | null = null;
     if (!isCron) {
@@ -209,6 +284,7 @@ Deno.serve(async (req) => {
           .select("id")
           .not("email", "is", null)
           .eq("suspended", false)
+          .eq("monthly_statement_enabled", true)
           .limit(20000);
         ids = (profiles ?? []).map((p: any) => p.id);
       }
