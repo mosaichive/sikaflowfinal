@@ -18,7 +18,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2, User, DollarSign, CreditCard, FileClock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Landmark, RotateCcw, AlertTriangle, Shield, Users, Key, Camera, X, Building2, User, DollarSign, CreditCard, FileClock, Database } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
 import { EmailVerificationCard } from '@/components/settings/EmailVerificationCard';
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
@@ -27,9 +27,11 @@ import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard
 import { SmsLogsCard } from '@/components/settings/SmsLogsCard';
 // OnlineStoreCard was moved to Orders → Order Settings dialog.
 import { CurrencyCard } from '@/components/settings/CurrencyCard';
+import { BackupRestoreCard } from '@/components/settings/BackupRestoreCard';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useToast } from '@/hooks/use-toast';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
+import { buildBackup, downloadBackup } from '@/lib/backup';
 
 interface BankAccount {
   id: string; bank_name: string; account_name: string; account_number: string;
@@ -98,14 +100,15 @@ export default function SettingsPage() {
         { title: 'Sales Settings', section: 'sales' as const, icon: DollarSign, description: 'Control inventory rules, opening cash and sales preferences.' },
         { title: 'Bank', section: 'bank' as const, icon: Landmark, description: 'Add and manage bank or mobile money accounts.' },
         { title: 'Billing', section: 'billing' as const, icon: CreditCard, description: 'Manage your plan, renewals and payment history.', to: '/billing' },
+        { title: 'Backup & Restore', section: 'data' as const, icon: Database, description: 'Download your business data or restore it from a backup file.' },
         { title: 'Audit Log', section: 'audit' as const, icon: FileClock, description: 'Review recent system and team activity.' },
       ];
 
   // Profile state
   const location = useLocation();
-  const rawSection = (new URLSearchParams(location.search).get('s') || (staffOnlyProfile ? 'profile' : 'none')) as 'none' | 'profile' | 'sales' | 'bank' | 'audit';
+  const rawSection = (new URLSearchParams(location.search).get('s') || (staffOnlyProfile ? 'profile' : 'none')) as 'none' | 'profile' | 'sales' | 'bank' | 'data' | 'audit';
   const sectionParam = staffOnlyProfile ? 'profile' : rawSection;
-  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'audit'>(sectionParam);
+  const [activeSection, setActiveSection] = useState<'none' | 'profile' | 'sales' | 'bank' | 'data' | 'audit'>(sectionParam);
   useEffect(() => { setActiveSection(sectionParam); }, [sectionParam]);
   const [profileForm, setProfileForm] = useState({
     display_name: '', title: '', phone: '', bio: '', business_name: '',
@@ -538,25 +541,10 @@ export default function SettingsPage() {
   const handleExportBackup = async () => {
     if (!businessId) return;
     try {
-      // Most tables scope by user_id (= owner id). sales/sale_items also carry business_id.
-      const userScopedTables = ['products', 'customers', 'expenses', 'savings', 'investments', 'investor_funding', 'restocks', 'bank_accounts', 'other_income'] as const;
-      const businessScopedTables = ['sales', 'sale_items'] as const;
-      const backup: Record<string, any[]> = {};
-      for (const table of userScopedTables) {
-        const { data } = await supabase.from(table).select('*').eq('user_id', businessId);
-        backup[table] = data || [];
-      }
-      for (const table of businessScopedTables) {
-        const { data } = await supabase.from(table).select('*').eq('business_id', businessId);
-        backup[table] = data || [];
-      }
-      const slug = (businessName || 'business').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${slug}-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-      URL.revokeObjectURL(url);
+      const backup = await buildBackup(businessId);
+      downloadBackup(backup, businessName);
       toast({ title: 'Backup downloaded' });
+      await logAudit('backup_downloaded', `Backup downloaded for ${businessName}`);
     } catch (err: any) {
       toast({ title: 'Backup failed', description: err?.message || 'Please try again.', variant: 'destructive' });
     }
@@ -984,7 +972,14 @@ export default function SettingsPage() {
         </section>
         )}
 
-        {/* ===== D. Audit Log (audit + system control) ===== */}
+        {/* ===== D. Backup & Restore ===== */}
+        {activeSection === 'data' && isAdmin && (
+        <section id="settings-data" className="space-y-6 scroll-mt-24 animate-fade-in">
+          <BackupRestoreCard ownerId={businessId} businessName={businessName} />
+        </section>
+        )}
+
+        {/* ===== E. Audit Log (audit + system control) ===== */}
         {activeSection === 'audit' && (
         <section id="settings-audit" className="space-y-6 scroll-mt-24 animate-fade-in">
 
@@ -1032,7 +1027,7 @@ export default function SettingsPage() {
                 Reset all transactional data for <span className="font-semibold text-foreground">{businessName}</span> — sales, products, customers, expenses, savings, investments, and restocks. Users, roles, banks, and your business profile are kept.
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportBackup}>Download Backup</Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/settings?s=data')}>Download Backup</Button>
                 <Button variant="destructive" size="sm" onClick={() => setResetOpen(true)}>
                   <RotateCcw className="h-4 w-4 mr-1" />Reset System
                 </Button>
@@ -1052,12 +1047,14 @@ export default function SettingsPage() {
               <AlertDialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-5 w-5" />System Reset Warning</AlertDialogTitle>
               <AlertDialogDescription className="space-y-3">
                 <span className="block font-semibold text-foreground">This will permanently delete all transactional data for {businessName}. This action cannot be undone.</span>
+                <span className="block text-sm">We strongly recommend downloading a backup before resetting — you can restore it later.</span>
                 <span className="block text-sm">Type <span className="font-mono font-bold text-destructive">{resetConfirmText}</span> to confirm:</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <Input value={resetInput} onChange={e => setResetInput(e.target.value)} placeholder={`Type ${resetConfirmText}`} className="font-mono" />
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <Button variant="outline" onClick={handleExportBackup}>Download backup first</Button>
               <Button variant="destructive" disabled={resetInput !== resetConfirmText} onClick={() => { setResetOpen(false); setResetConfirmOpen(true); }}>Continue</Button>
             </AlertDialogFooter>
           </AlertDialogContent>

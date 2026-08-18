@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, CreditCard, FileClock
+  LayoutDashboard, ShoppingCart, Package, Boxes, Users, Receipt, BarChart3, Settings, LogOut, Moon, Sun, ClipboardList, Banknote, Shield, PiggyBank, LifeBuoy, ChevronDown, User, DollarSign, Landmark, CreditCard, Database, FileClock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -36,6 +36,7 @@ const settingsSubItems: { title: string; section: string; icon: any; url?: strin
   { title: 'Sales Settings', section: 'sales', icon: DollarSign },
   { title: 'Bank', section: 'bank', icon: Landmark },
   { title: 'Billing', section: 'billing', icon: CreditCard, url: '/billing' },
+  { title: 'Backup & Restore', section: 'data', icon: Database },
   { title: 'Audit Log', section: 'audit', icon: FileClock },
 ];
 
