@@ -133,13 +133,9 @@ async function processCampaign(campaignId: string, actorId: string | null) {
       };
     });
 
-    const { ok, body: errBody, status: errStatus } = await sendBatch(
+    const { ok, data, body: errBody, status: errStatus } = await sendBatch(
       batchPayload,
     );
-    const { data } = { data: (await Promise.resolve(null)) as unknown };
-    const sendResult = ok
-      ? JSON.parse(errBody || "{}")
-      : null;
     const now = new Date().toISOString();
     if (!ok) {
       totalFailed += pending.length;
@@ -148,12 +144,13 @@ async function processCampaign(campaignId: string, actorId: string | null) {
         const parsed = JSON.parse(errBody || "{}");
         if (parsed?.message) reason = String(parsed.message);
       } catch { /* keep default */ }
+      lastError = reason;
       await admin
         .from("email_campaign_recipients")
         .update({ status: "failed", error_message: reason.slice(0, 500) })
         .in("id", pending.map((r) => r.id));
-
     } else {
+
       const returned = (data as { data?: Array<{ id: string }> })?.data ?? [];
       for (let i = 0; i < pending.length; i++) {
         const rid = pending[i].id;
