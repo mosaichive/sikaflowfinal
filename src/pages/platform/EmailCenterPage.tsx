@@ -153,7 +153,7 @@ export default function EmailCenterPage() {
     if (!c.body_html?.trim()) return 'Email body cannot be empty.';
     if (!c.from_name?.trim() || !c.from_email?.trim()) return 'Sender name and email are required.';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.from_email)) return 'Sender email is not a valid address.';
-    if (c.reply_to && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to)) return 'Reply-to is not a valid address.';
+    if (c.reply_to?.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to.trim())) return 'Reply-to is not a valid address.';
     if (c.audience_type === 'specific_emails' && !specificEmailsText.trim()) {
       return 'Add at least one recipient email address.';
     }
