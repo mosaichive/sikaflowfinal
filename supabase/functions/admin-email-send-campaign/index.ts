@@ -7,6 +7,7 @@
 // Rate-limited batched delivery via Resend through the Lovable connector gateway.
 import {
   corsHeaders,
+  layoutEmail,
   renderTemplate,
   requireSuperAdmin,
   resolveAudience,
@@ -131,7 +132,10 @@ async function processCampaign(campaignId: string, actorId: string | null) {
       const unsubUrl =
         `${PUBLIC_APP_URL}/unsubscribe?e=${encodeURIComponent(r.email)}&c=${campaignId}`;
       const bodyHtml = wrapHtmlForTracking(
-        renderTemplate(campaign.body_html ?? "", merge),
+        layoutEmail(
+          renderTemplate(campaign.body_html ?? "", merge),
+          renderTemplate(campaign.subject ?? "", merge),
+        ),
         campaignId,
         r.id,
         SUPABASE_URL,
@@ -273,7 +277,10 @@ Deno.serve(async (req) => {
         store_link: "https://kuditrack.online/store/example",
       };
       const html = wrapHtmlForTracking(
-        renderTemplate(campaign.body_html ?? "", merge),
+        layoutEmail(
+          renderTemplate(campaign.body_html ?? "", merge),
+          renderTemplate(campaign.subject ?? "", merge),
+        ),
         campaign.id,
         "test",
         SUPABASE_URL,
