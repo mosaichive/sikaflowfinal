@@ -219,41 +219,30 @@ export function renderStatementPdf(data: StatementData): string {
   return btoa(binary);
 }
 
-export function renderStatementEmailHtml(data: StatementData): string {
-  const cur = data.business.currency;
-  const stat = (label: string, value: string) => `
-    <td style="padding:12px 14px;background:#f6f8f6;border-radius:8px;">
-      <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
-      <div style="font-size:16px;font-weight:700;color:#111827;margin-top:4px;">${value}</div>
-    </td>`;
-
+export function renderStatementEmailHtml(data: StatementData, recipientName?: string | null): string {
+  const name = (recipientName || data.business.name || "there").trim();
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f4f6;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
   <div style="max-width:600px;margin:0 auto;background:#ffffff;">
     <div style="background:#166534;padding:28px 32px;color:#ffffff;">
       <div style="font-size:20px;font-weight:700;">KudiTrack</div>
-      <div style="font-size:13px;opacity:.9;margin-top:4px;">Monthly Business Statement</div>
+      <div style="font-size:13px;opacity:.9;margin-top:4px;">Monthly Financial Statement</div>
     </div>
-    <div style="padding:28px 32px;color:#111827;">
-      <p style="margin:0 0 12px;font-size:15px;">Hello ${data.business.name},</p>
-      <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
-        Here is your business statement for <strong>${data.period.label}</strong>. The full breakdown is attached as a PDF.
-      </p>
-      <table width="100%" cellspacing="8" cellpadding="0" style="border-collapse:separate;">
-        <tr>${stat("Total sales", money(data.sales.total, cur))}${stat("Expenses", money(data.money.expenses, cur))}</tr>
-        <tr>${stat("Net profit", money(data.money.profit, cur))}${stat("Available money", money(data.money.availableBusinessMoney, cur))}</tr>
-      </table>
-      <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#374151;">
-        Keep recording your sales and expenses daily so next month's statement stays accurate.
-      </p>
-      <p style="margin:20px 0 0;">
-        <a href="https://kuditrack.online/reports" style="display:inline-block;background:#166534;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;">Open your dashboard</a>
-      </p>
+    <div style="padding:28px 32px;color:#111827;font-size:15px;line-height:1.7;">
+      <p style="margin:0 0 16px;">Hello ${name},</p>
+      <p style="margin:0 0 16px;">Your KudiTrack financial statement for <strong>${data.period.label}</strong> is ready.</p>
+      <p style="margin:0 0 16px;">Your financial statement is attached to this email.</p>
+      <p style="margin:0 0 16px;">You can also access your financial statements anytime from your KudiTrack account.</p>
+      <p style="margin:24px 0 0;">Regards,<br />KudiTrack</p>
     </div>
   </div>
 </body></html>`;
 }
 
 export function statementFileName(data: StatementData) {
-  const safe = data.business.name.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-  return `kuditrack-statement-${safe || "business"}-${data.period.period}.pdf`;
+  // KudiTrack_Financial_Statement_August_2026.pdf
+  return `KudiTrack_Financial_Statement_${data.period.label.replace(/\s+/g, "_")}.pdf`;
+}
+
+export function statementSubject(data: StatementData) {
+  return `Your KudiTrack Financial Statement — ${data.period.label}`;
 }
