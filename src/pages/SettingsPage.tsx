@@ -24,6 +24,7 @@ import { EmailVerificationCard } from '@/components/settings/EmailVerificationCa
 import { PhoneVerificationCard } from '@/components/settings/PhoneVerificationCard';
 import { RecoveryOptionsCard } from '@/components/settings/RecoveryOptionsCard';
 import { SmsNotificationsCard } from '@/components/settings/SmsNotificationsCard';
+import { MonthlyStatementCard } from '@/components/settings/MonthlyStatementCard';
 import { SmsLogsCard } from '@/components/settings/SmsLogsCard';
 // OnlineStoreCard was moved to Orders → Order Settings dialog.
 import { CurrencyCard } from '@/components/settings/CurrencyCard';
@@ -760,6 +761,7 @@ export default function SettingsPage() {
         </Card>
 
         <SmsNotificationsCard />
+        <MonthlyStatementCard />
         <SmsLogsCard />
         {/* Online store settings moved to Orders → Order Settings */}
 
