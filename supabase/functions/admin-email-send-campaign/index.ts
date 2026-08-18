@@ -99,6 +99,8 @@ async function processCampaign(campaignId: string, actorId: string | null) {
   // Fetch pending recipients
   let totalSent = 0;
   let totalFailed = 0;
+  let lastError: string | null = null;
+
   while (true) {
     const { data: pending } = await admin
       .from("email_campaign_recipients")
@@ -184,10 +186,11 @@ async function processCampaign(campaignId: string, actorId: string | null) {
     actor_id: actorId,
     action: "campaign_sent",
     campaign_id: campaignId,
-    details: { sent: totalSent, failed: totalFailed },
+    details: { sent: totalSent, failed: totalFailed, error: lastError },
   });
 
-  return { ok: true, sent: totalSent, failed: totalFailed };
+  return { ok: true, sent: totalSent, failed: totalFailed, error: lastError };
+
 }
 
 Deno.serve(async (req) => {
