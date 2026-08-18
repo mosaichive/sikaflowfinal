@@ -37,26 +37,65 @@ export default function EmailBlockBuilder(props: {
     onChange(next);
   };
 
-  const ImagePicker = ({ value, onPick }: { value: string; onPick: (url: string) => void }) => (
-    <div className="space-y-1">
-      <Input placeholder="Image URL" value={value} onChange={(e) => onPick(e.target.value)} />
-      {media.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
-          {media.filter((m) => m.kind === 'image' || m.url.match(/\.(png|jpe?g|gif|webp)$/i)).slice(0, 12).map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onPick(m.url)}
-              className="h-10 w-14 rounded border overflow-hidden"
-              title={m.name}
-            >
-              <img src={m.url} alt={m.name} className="h-full w-full object-cover" />
-            </button>
-          ))}
+  const ImagePicker = ({ value, onPick }: { value: string; onPick: (url: string) => void }) => {
+    const inputId = `upl-${Math.random().toString(36).slice(2)}`;
+    const handleFile = async (file?: File | null) => {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please choose an image file');
+        return;
+      }
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error } = await supabase.storage.from('email-media').upload(path, file, { upsert: false });
+      if (error) { toast.error(error.message); return; }
+      const { data: signed } = await supabase.storage.from('email-media').createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (!signed?.signedUrl) { toast.error('Could not sign URL'); return; }
+      const { data: user } = await supabase.auth.getUser();
+      await supabase.from('email_media_library').insert({
+        name: file.name, url: signed.signedUrl, storage_path: path,
+        mime_type: file.type, size_bytes: file.size, kind: 'image',
+        created_by: user.user?.id,
+      });
+      onPick(signed.signedUrl);
+      toast.success('Image uploaded');
+    };
+
+    return (
+      <div className="space-y-2">
+        <input id={inputId} type="file" accept="image/*" className="hidden" onChange={(e) => { void handleFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => document.getElementById(inputId)?.click()}>
+            <Upload className="h-3.5 w-3.5 mr-1" /> {value ? 'Replace image' : 'Upload image'}
+          </Button>
+          {value && (
+            <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => onPick('')}>Remove</Button>
+          )}
         </div>
-      )}
-    </div>
-  );
+        {value ? (
+          <img src={value} alt="Selected" className="h-24 w-auto rounded border object-cover" />
+        ) : null}
+        {media.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Or pick from library</Label>
+            <div className="flex gap-1 flex-wrap">
+              {media.filter((m) => m.kind === 'image' || m.url.match(/\.(png|jpe?g|gif|webp)/i)).slice(0, 12).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onPick(m.url)}
+                  className="h-10 w-14 rounded border overflow-hidden"
+                  title={m.name}
+                >
+                  <img src={m.url} alt={m.name} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-2">
