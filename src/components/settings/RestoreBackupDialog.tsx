@@ -169,22 +169,22 @@ export function RestoreBackupDialog({
                   <label className="flex items-start gap-2 rounded-lg border border-border/70 p-3 cursor-pointer">
                     <RadioGroupItem value="fresh" className="mt-0.5" />
                     <span className="text-sm">
-                      <span className="block font-medium">Replace current data</span>
-                      <span className="text-xs text-muted-foreground">Clears this business first, then restores the backup exactly as it was.</span>
+                      <span className="block font-medium">Clean restore</span>
+                      <span className="text-xs text-muted-foreground">Best for an empty account — also restores business details, currency and store settings.</span>
                     </span>
                   </label>
                   <label className="flex items-start gap-2 rounded-lg border border-border/70 p-3 cursor-pointer">
                     <RadioGroupItem value="merge" className="mt-0.5" />
                     <span className="text-sm">
                       <span className="block font-medium">Merge with current data</span>
-                      <span className="text-xs text-muted-foreground">Keeps what you have and skips records already restored before.</span>
+                      <span className="text-xs text-muted-foreground">Keeps what you already have, matches existing products and customers, and skips duplicates.</span>
                     </span>
                   </label>
                 </RadioGroup>
                 {mode === 'fresh' && hasExistingData && (
                   <div className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>Existing sales, products, customers and records in this account will be permanently deleted before the restore. Download a backup first if you need one.</span>
+                    <span>This account already has data. A clean restore adds the backup on top of it and overwrites your business profile settings — choose Merge, or reset the system first, if that is not what you want.</span>
                   </div>
                 )}
               </div>
