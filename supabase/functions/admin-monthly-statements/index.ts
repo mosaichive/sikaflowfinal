@@ -62,7 +62,7 @@ async function loadSettings(admin: ReturnType<typeof serviceClient>) {
   return {
     automation_enabled: data?.automation_enabled ?? false,
     from_name: data?.from_name ?? "KudiTrack",
-    from_email: data?.from_email ?? "statements@kuditrack.online",
+    from_email: data?.from_email ?? "statements@mail.kuditrack.online",
     send_day: data?.send_day ?? 1,
   };
 }
