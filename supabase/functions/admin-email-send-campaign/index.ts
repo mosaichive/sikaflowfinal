@@ -99,6 +99,8 @@ async function processCampaign(campaignId: string, actorId: string | null) {
   // Fetch pending recipients
   let totalSent = 0;
   let totalFailed = 0;
+  let lastError: string | null = null;
+
   while (true) {
     const { data: pending } = await admin
       .from("email_campaign_recipients")
@@ -133,15 +135,24 @@ async function processCampaign(campaignId: string, actorId: string | null) {
       };
     });
 
-    const { ok, data } = await sendBatch(batchPayload);
+    const { ok, data, body: errBody, status: errStatus } = await sendBatch(
+      batchPayload,
+    );
     const now = new Date().toISOString();
     if (!ok) {
       totalFailed += pending.length;
+      let reason = `provider error ${errStatus}`;
+      try {
+        const parsed = JSON.parse(errBody || "{}");
+        if (parsed?.message) reason = String(parsed.message);
+      } catch { /* keep default */ }
+      lastError = reason;
       await admin
         .from("email_campaign_recipients")
-        .update({ status: "failed", error_message: "batch send failed" })
+        .update({ status: "failed", error_message: reason.slice(0, 500) })
         .in("id", pending.map((r) => r.id));
     } else {
+
       const returned = (data as { data?: Array<{ id: string }> })?.data ?? [];
       for (let i = 0; i < pending.length; i++) {
         const rid = pending[i].id;
@@ -175,10 +186,11 @@ async function processCampaign(campaignId: string, actorId: string | null) {
     actor_id: actorId,
     action: "campaign_sent",
     campaign_id: campaignId,
-    details: { sent: totalSent, failed: totalFailed },
+    details: { sent: totalSent, failed: totalFailed, error: lastError },
   });
 
-  return { ok: true, sent: totalSent, failed: totalFailed };
+  return { ok: true, sent: totalSent, failed: totalFailed, error: lastError };
+
 }
 
 Deno.serve(async (req) => {
