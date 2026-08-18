@@ -24,7 +24,8 @@ import {
 const GATEWAY = "https://connector-gateway.lovable.dev/resend";
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const CRON_SECRET = Deno.env.get("STATEMENTS_CRON_SECRET");
+const CRON_SECRETS = [Deno.env.get("STATEMENTS_CRON_SECRET"), Deno.env.get("STATEMENTS_CRON_TOKEN")]
+  .filter((v): v is string => Boolean(v));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -192,7 +193,7 @@ Deno.serve(async (req) => {
 
     // Cron entry point — authenticated with a shared secret header instead of a JWT.
     const cronHeader = req.headers.get("x-cron-secret");
-    const isCron = Boolean(CRON_SECRET) && cronHeader === CRON_SECRET;
+    const isCron = Boolean(cronHeader) && CRON_SECRETS.includes(cronHeader as string);
 
     // ---- Owner-facing actions (any authenticated business owner, own data only) ----
     if (action === "my_download" || action === "my_resend") {
