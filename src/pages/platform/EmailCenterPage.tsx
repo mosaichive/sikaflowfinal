@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { getFunctionErrorMessage } from '@/lib/function-errors';
 import MonthlyStatementsPanel from '@/components/platform/MonthlyStatementsPanel';
+import EmailBlockBuilder from '@/components/platform/EmailBlockBuilder';
+import { EmailBlock, parseBlocks, serializeBlocks, starterBlocks, BLOCKS_MARKER } from '@/lib/email-blocks';
 import {
   Mail, Send, FileText, Image as ImageIcon, Users, Calendar, MailX,
   BarChart3, Plus, Trash2, Copy, Eye, Play, X,
@@ -563,6 +565,19 @@ function ComposeEditor(props: {
 }) {
   const c = props.value;
   const [previewOpen, setPreviewOpen] = useState(false);
+  const initialBlocks = parseBlocks(c.body_html ?? '');
+  const [blocks, setBlocks] = useState<EmailBlock[]>(initialBlocks ?? []);
+  const [mode, setMode] = useState<'builder' | 'html'>(initialBlocks ? 'builder' : 'html');
+
+  const switchToBuilder = () => {
+    if (blocks.length === 0) {
+      const existing = parseBlocks(c.body_html ?? '');
+      const next = existing ?? starterBlocks();
+      setBlocks(next);
+      props.onChange({ ...c, body_html: serializeBlocks(next) });
+    }
+    setMode('builder');
+  };
   return (
     <div className="grid lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-3">
@@ -595,9 +610,28 @@ function ComposeEditor(props: {
           </div>
         </Card>
 
-        <Card className="p-4 space-y-2">
+        <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <Label>Body (HTML)</Label>
+            <Label>Email content</Label>
+            <div className="flex gap-1">
+              <Button size="sm" variant={mode === 'builder' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => switchToBuilder()}>Visual builder</Button>
+              <Button size="sm" variant={mode === 'html' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setMode('html')}>HTML</Button>
+            </div>
+          </div>
+
+          {mode === 'builder' ? (
+            <EmailBlockBuilder
+              blocks={blocks}
+              media={props.media}
+              onChange={(b) => {
+                setBlocks(b);
+                props.onChange({ ...c, body_html: serializeBlocks(b) });
+              }}
+            />
+          ) : (
+          <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Raw HTML</Label>
             <div className="flex gap-1 flex-wrap">
               {PLACEHOLDERS.map((p) => (
                 <Button key={p} size="sm" variant="outline" className="text-[10px] h-7" onClick={() => props.onInsertSnippet(p)}>{p}</Button>
@@ -620,6 +654,8 @@ function ComposeEditor(props: {
             value={c.body_html ?? ''}
             onChange={(e) => props.onChange({ ...c, body_html: e.target.value })}
           />
+          </div>
+          )}
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}><Eye className="h-3.5 w-3.5 mr-1" /> Preview</Button>
         </Card>
       </div>
@@ -691,7 +727,9 @@ function ComposeEditor(props: {
                 Kudi<span style={{ color: '#3B82F6' }}>Track</span>
               </div>
               <div
-                style={{ padding: '32px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 16, lineHeight: 1.65, color: '#1f2937' }}
+                style={(c.body_html ?? '').includes(BLOCKS_MARKER)
+                  ? { padding: '16px', background: '#f4f5f7' }
+                  : { padding: '32px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 16, lineHeight: 1.65, color: '#1f2937' }}
                 dangerouslySetInnerHTML={{ __html: renderPreviewBody(c.body_html ?? '') }}
               />
               <div style={{ padding: '0 28px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 13, color: '#6b7280' }}>
