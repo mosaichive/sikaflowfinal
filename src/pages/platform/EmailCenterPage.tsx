@@ -77,7 +77,7 @@ const emptyCampaign = (): Partial<Campaign> => ({
   subject: '',
   preview_text: '',
   from_name: 'KudiTrack Team',
-  from_email: 'news@kuditrack.online',
+  from_email: 'news@mail.kuditrack.online',
   reply_to: '',
   body_html: '<p>Hi {{first_name}},</p><p>Write your message here.</p><p>— KudiTrack Team</p>',
   audience_type: 'all_users',
