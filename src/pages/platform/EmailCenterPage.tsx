@@ -673,7 +673,20 @@ function ComposeEditor(props: {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-auto">
           <DialogHeader><DialogTitle>{c.subject || 'Preview'}</DialogTitle></DialogHeader>
-          <div className="border rounded p-4 bg-white text-black" dangerouslySetInnerHTML={{ __html: c.body_html ?? '' }} />
+          <div className="rounded-lg p-6" style={{ background: '#f4f5f7' }}>
+            <div className="mx-auto max-w-[600px] overflow-hidden rounded-xl border" style={{ background: '#ffffff' }}>
+              <div style={{ background: '#0f172a', padding: '20px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 20, fontWeight: 700, color: '#ffffff' }}>
+                Kudi<span style={{ color: '#3B82F6' }}>Track</span>
+              </div>
+              <div
+                style={{ padding: '32px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 16, lineHeight: 1.65, color: '#1f2937' }}
+                dangerouslySetInnerHTML={{ __html: renderPreviewBody(c.body_html ?? '') }}
+              />
+              <div style={{ padding: '0 28px 28px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: 13, color: '#6b7280' }}>
+                KudiTrack — Track Every Sale. Know Every Cedi.
+              </div>
+            </div>
+          </div>
           <DialogFooter><Button onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
