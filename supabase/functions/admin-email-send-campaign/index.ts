@@ -20,6 +20,21 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://kuditrack.online";
 
+const SENDER_DOMAIN = Deno.env.get("SENDER_DOMAIN") ?? "mail.kuditrack.online";
+
+// Only the delegated subdomain is verified with the provider. Rewrite root-domain
+// senders (saved before the domain swap) so campaigns don't fail with a 403.
+function normalizeFrom(email: string | null | undefined): string {
+  const addr = (email ?? "").trim();
+  const [local, domain] = addr.split("@");
+  if (!local || !domain) return `news@${SENDER_DOMAIN}`;
+  if (domain.toLowerCase() === SENDER_DOMAIN.toLowerCase()) return addr;
+  if (SENDER_DOMAIN.toLowerCase().endsWith(`.${domain.toLowerCase()}`)) {
+    return `${local}@${SENDER_DOMAIN}`;
+  }
+  return addr;
+}
+
 const BATCH_SIZE = 90; // Resend batch API accepts up to 100
 const BATCH_DELAY_MS = 1100;
 
