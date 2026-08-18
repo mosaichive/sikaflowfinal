@@ -55,6 +55,18 @@ type Template = {
   is_system: boolean;
 };
 
+// Mirrors normalizeBody() in the send function: plain text becomes paragraphs.
+function renderPreviewBody(input: string): string {
+  const body = (input ?? '').trim();
+  if (!body) return '';
+  if (/<(p|div|table|h[1-6]|ul|ol|br|img|a|section)\b/i.test(body)) return body;
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return body
+    .split(/\n{2,}/)
+    .map((block) => `<p style="margin:0 0 16px;">${escape(block.trim()).replace(/\n/g, '<br />')}</p>`)
+    .join('');
+}
+
 const AUDIENCE_OPTIONS = [
   { value: 'all_users', label: 'All registered users' },
   { value: 'active', label: 'Active subscribers' },
