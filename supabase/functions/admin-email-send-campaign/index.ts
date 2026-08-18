@@ -138,7 +138,7 @@ async function processCampaign(campaignId: string, actorId: string | null) {
         unsubUrl,
       );
       return {
-        from: `${campaign.from_name} <${campaign.from_email}>`,
+        from: `${campaign.from_name} <${normalizeFrom(campaign.from_email)}>`,
         to: [r.email],
         subject: renderTemplate(campaign.subject ?? "", merge),
         html: bodyHtml,
@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
         `${PUBLIC_APP_URL}/unsubscribe`,
       );
       const payload = to.map((email) => ({
-        from: `${campaign.from_name} <${campaign.from_email}>`,
+        from: `${campaign.from_name} <${normalizeFrom(campaign.from_email)}>`,
         to: [email],
         subject: `[TEST] ${renderTemplate(campaign.subject ?? "", merge)}`,
         html,
