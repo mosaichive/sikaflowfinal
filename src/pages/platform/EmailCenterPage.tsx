@@ -153,7 +153,7 @@ export default function EmailCenterPage() {
     if (!c.body_html?.trim()) return 'Email body cannot be empty.';
     if (!c.from_name?.trim() || !c.from_email?.trim()) return 'Sender name and email are required.';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.from_email)) return 'Sender email is not a valid address.';
-    if (c.reply_to && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to)) return 'Reply-to is not a valid address.';
+    if (c.reply_to?.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to.trim())) return 'Reply-to is not a valid address.';
     if (c.audience_type === 'specific_emails' && !specificEmailsText.trim()) {
       return 'Add at least one recipient email address.';
     }
@@ -167,7 +167,7 @@ export default function EmailCenterPage() {
     }
     const payload: any = {
       name: c.name, subject: c.subject, preview_text: c.preview_text,
-      from_name: c.from_name, from_email: c.from_email, reply_to: c.reply_to || null,
+      from_name: c.from_name?.trim(), from_email: c.from_email?.trim(), reply_to: c.reply_to?.trim() || null,
       body_html: c.body_html, audience_type: c.audience_type, audience_filter: filter,
       status: status ?? c.status ?? 'draft',
       scheduled_at: status === 'scheduled' ? (scheduledAt ? new Date(scheduledAt).toISOString() : null) : c.scheduled_at ?? null,
