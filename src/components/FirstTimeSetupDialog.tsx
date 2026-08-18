@@ -13,6 +13,7 @@ import { useBusiness } from '@/context/BusinessContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { RestoreBackupDialog } from '@/components/settings/RestoreBackupDialog';
 import { BUSINESS_TYPES, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
 import { uploadProductImage } from '@/lib/product-images';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -95,6 +96,7 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
   const [openingStockProducts, setOpeningStockProducts] = useState<OpeningStockProduct[]>([makeProductRow()]);
 
   const steps: SetupStep[] = ['business', 'opening_stock', 'confirm'];
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const currentStep = steps[stepIndex];
   const isLastStep = stepIndex === steps.length - 1;
 
@@ -394,6 +396,17 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5 pb-28">
           {currentStep === 'business' && (
+            <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Already have a KudiTrack backup?</p>
+                <p className="text-xs text-muted-foreground">Restore your products, sales and records instead of starting from scratch.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setRestoreOpen(true)}>
+                Restore from backup
+              </Button>
+            </div>
+          )}
+          {currentStep === 'business' && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-primary/10 p-3 text-primary">
@@ -606,6 +619,12 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
           )}
         </div>
       </DialogContent>
+      <RestoreBackupDialog
+        open={restoreOpen}
+        onOpenChange={setRestoreOpen}
+        onboarding
+        onRestored={() => { onOpenChange(false); window.setTimeout(() => window.location.reload(), 1200); }}
+      />
     </Dialog>
   );
 }

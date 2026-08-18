@@ -1556,6 +1556,81 @@ export type Database = {
         }
         Relationships: []
       }
+      restore_logs: {
+        Row: {
+          backup_business_name: string | null
+          backup_created_at: string | null
+          backup_version: number | null
+          business_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          restore_mode: string
+          restored_counts: Json
+          skipped_counts: Json
+          status: string
+          user_id: string
+        }
+        Insert: {
+          backup_business_name?: string | null
+          backup_created_at?: string | null
+          backup_version?: number | null
+          business_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          restore_mode: string
+          restored_counts?: Json
+          skipped_counts?: Json
+          status?: string
+          user_id: string
+        }
+        Update: {
+          backup_business_name?: string | null
+          backup_created_at?: string | null
+          backup_version?: number | null
+          business_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          restore_mode?: string
+          restored_counts?: Json
+          skipped_counts?: Json
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      restore_record_map: {
+        Row: {
+          created_at: string
+          entity: string
+          id: string
+          new_id: string
+          restore_id: string | null
+          source_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity: string
+          id?: string
+          new_id: string
+          restore_id?: string | null
+          source_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity?: string
+          id?: string
+          new_id?: string
+          restore_id?: string | null
+          source_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sale_documents: {
         Row: {
           amount_ghs: number
@@ -2500,6 +2575,10 @@ export type Database = {
         }[]
       }
       record_user_login: { Args: never; Returns: undefined }
+      restore_business_backup: {
+        Args: { _mode?: string; _payload: Json }
+        Returns: Json
+      }
       slugify: { Args: { _input: string }; Returns: string }
       sync_product_stock: {
         Args: { _product_id: string; _user_id: string }
