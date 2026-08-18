@@ -3,8 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { EmailBlock, uid } from '@/lib/email-blocks';
+
 
 const ADD_OPTIONS: Array<{ label: string; make: () => EmailBlock }> = [
   { label: 'Section', make: () => ({ id: uid(), type: 'section_start' }) },
