@@ -1296,6 +1296,7 @@ export type Database = {
           login_count: number
           logo_url: string | null
           marketing_emails_opted_out: boolean
+          monthly_statement_enabled: boolean
           num_employees: string | null
           onboarding_completed: boolean
           online_ordering_enabled: boolean
@@ -1349,6 +1350,7 @@ export type Database = {
           login_count?: number
           logo_url?: string | null
           marketing_emails_opted_out?: boolean
+          monthly_statement_enabled?: boolean
           num_employees?: string | null
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean
@@ -1402,6 +1404,7 @@ export type Database = {
           login_count?: number
           logo_url?: string | null
           marketing_emails_opted_out?: boolean
+          monthly_statement_enabled?: boolean
           num_employees?: string | null
           onboarding_completed?: boolean
           online_ordering_enabled?: boolean
