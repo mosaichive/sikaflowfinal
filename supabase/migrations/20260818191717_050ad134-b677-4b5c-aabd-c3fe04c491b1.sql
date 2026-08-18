@@ -1,0 +1,1 @@
+UPDATE public.email_campaigns SET from_email = replace(from_email, '@kuditrack.online', '@mail.kuditrack.online') WHERE from_email LIKE '%@kuditrack.online';
