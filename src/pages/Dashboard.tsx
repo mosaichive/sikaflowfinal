@@ -890,6 +890,238 @@ export default function Dashboard() {
 
   const firstName = (displayName || business?.name || 'there').split(' ')[0];
 
+  const inventoryValue = data.products
+    .filter((product) => !product.is_archived)
+    .reduce((sum, product) => sum + toNumber(product.quantity) * toNumber(product.cost_price ?? 0), 0);
+
+  const outstandingCredit = filtered.sales.reduce(
+    (sum, sale: any) => sum + (toNumber(sale.balance) || Math.max(0, toNumber(sale.total) - toNumber(sale.amount_paid))),
+    0,
+  );
+
+  const handleResetLayout = () => {
+    void (async () => {
+      const ok = await resetLayout();
+      toast({ title: ok ? 'Default layout restored' : 'Could not restore layout' });
+    })();
+    setCustomizeOpen(false);
+  };
+
+  const handleSaveLayout = (next: WidgetLayoutItem[]) => {
+    void (async () => {
+      const ok = await saveLayout(next);
+      toast({
+        title: ok ? 'Dashboard saved' : 'Could not save dashboard',
+        description: ok ? 'Your layout is saved to your account.' : 'Please try again.',
+        variant: ok ? undefined : 'destructive',
+      });
+      if (ok) setCustomizeOpen(false);
+    })();
+  };
+
+  const renderWidget = (id: string) => {
+    switch (id) {
+      case 'daily_sales':
+        return (
+          <KpiCard title="Today's Sales" value={dailySales} icon={ShoppingCart} trend={trends.dailySales}
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)]" glowClassName="bg-[#2C8603]"
+            sparklineColor="#2C8603" sparklineData={sparklineSeries.sales} />
+        );
+      case 'total_sales':
+        return (
+          <KpiCard title="Total Sales" value={filteredFinancials.paidSalesRevenue} icon={ShoppingCart} trend={computeTrend(filteredFinancials.paidSalesRevenue, previousFinancials.paidSalesRevenue)}
+            to={hasModule('sales') ? '/sales' : undefined}
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)]" glowClassName="bg-[#2C8603]"
+            sparklineColor="#2C8603" sparklineData={sparklineSeries.sales} />
+        );
+      case 'total_profit':
+        return (
+          <KpiCard title="Total Profit" value={filteredFinancials.profit} icon={TrendingUp} trend={trends.profit}
+            to={hasModule('reports') ? '/reports' : undefined}
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/25 dark:text-[#38f085]" glowClassName="bg-emerald-500"
+            sparklineColor="#35df74" sparklineData={sparklineSeries.profit} />
+        );
+      case 'total_expenses':
+        return (
+          <KpiCard title="Expenses" value={filteredFinancials.expenses} icon={Receipt} trend={expensesTrendDisplay}
+            to={hasModule('expenses') ? '/expenses' : undefined}
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.18)]" glowClassName="bg-[#2C8603]"
+            sparklineColor="#2C8603" sparklineData={sparklineSeries.expenses} />
+        );
+      case 'business_money':
+        return (
+          <KpiCard title="Available Business Money" value={businessMoneyValue} icon={WalletCards} trend={trends.businessMoney}
+            to={hasModule('reports') ? '/reports' : undefined}
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-blue-500/25 dark:text-[#35c7ff]" glowClassName="bg-blue-500"
+            sparklineColor="#3f8cff" sparklineData={sparklineSeries.businessMoney} />
+        );
+      case 'stock_left':
+        return (
+          <MiniMetric title="Stock Left" value={financials.stockLeft} icon={Boxes} helper="Live inventory units"
+            iconClassName="bg-[rgba(44,134,3,0.12)] text-[#2C8603] dark:bg-[rgba(44,134,3,0.15)]" />
+        );
+      case 'inventory_value':
+        return (
+          <MiniMetric title="Inventory Value" value={inventoryValue} icon={Boxes} isCurrency helper="Cost value of stock on hand"
+            to={hasModule('inventory') ? '/inventory' : undefined}
+            iconClassName="bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300" />
+        );
+      case 'other_income':
+        return (
+          <MiniMetric title="Other Income" value={filteredFinancials.otherIncome} icon={HandCoins} isCurrency helper={`In ${selectedYear}`}
+            to={hasModule('other_income') ? '/other-income' : undefined}
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-[#35df74]" />
+        );
+      case 'low_stock_alerts':
+        return (
+          <MiniMetric title="Low Stock Alerts" value={financials.lowStockCount} icon={AlertTriangle}
+            valueClassName={financials.lowStockCount > 0 ? 'text-amber-500' : undefined}
+            helper={lowStockProducts.length > 0 ? lowStockProducts.map((p) => p.name).join(', ') : 'No low-stock items'}
+            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-[#ff9f1c]" />
+        );
+      case 'savings':
+        return (
+          <MiniMetric title="Savings" value={filteredFinancials.savings} icon={WalletCards} isCurrency helper={`In ${selectedYear}`}
+            to={hasModule('savings') ? '/savings' : undefined}
+            iconClassName="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-[#38bdf8]" />
+        );
+      case 'outstanding_credit':
+        return (
+          <MiniMetric title="Outstanding Credit" value={outstandingCredit} icon={HandCoins} isCurrency helper="Unpaid sales balances"
+            to={hasModule('sales') ? '/sales' : undefined}
+            valueClassName={outstandingCredit > 0 ? 'text-amber-500' : undefined}
+            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-[#ff9f1c]" />
+        );
+      case 'sales_chart':
+        return (
+          <div className="h-full overflow-hidden rounded-[14px] border border-border bg-card">
+            <div className="space-y-5 p-5 sm:p-6">
+              <Tabs value={analyticsMetric} onValueChange={(value) => setAnalyticsMetric(value as AnalyticsMetric)} className="space-y-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Business Analytics</h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedYear}</p>
+                  </div>
+                  <TabsList className="h-11 rounded-[9px] bg-slate-100 p-1 dark:bg-[#0a111b]">
+                    <TabsTrigger value="sales" className="h-9 rounded-[7px] px-5 text-sm data-[state=active]:bg-[#2C8603] data-[state=active]:text-white">Sales</TabsTrigger>
+                    <TabsTrigger value="profit" className="h-9 rounded-[7px] px-5 text-sm data-[state=active]:bg-[#2C8603] data-[state=active]:text-white">Profit</TabsTrigger>
+                    <TabsTrigger value="expenses" className="h-9 rounded-[7px] px-5 text-sm data-[state=active]:bg-[#2C8603] data-[state=active]:text-white">Expenses</TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="sales" className="mt-0">
+                  <AnalyticsChart data={yearlyAnalyticsData} dataKey="sales" gradientId="gradSales" stroke="#2C8603" stop1="#2C8603" stop2="#2C8603" stop1Opacity={0.18} stop2Opacity={0.02} activeDotStroke="#2C8603" emptyText="No paid sales recorded for this year yet." year={year} />
+                </TabsContent>
+                <TabsContent value="profit" className="mt-0">
+                  <AnalyticsChart data={yearlyAnalyticsData} dataKey="profit" gradientId="gradProfit" stroke="#35df74" stop1="#22c55e" stop2="#111827" emptyText="No profit data for this year." year={year} />
+                </TabsContent>
+                <TabsContent value="expenses" className="mt-0">
+                  <AnalyticsChart data={yearlyAnalyticsData} dataKey="expenses" gradientId="gradExpTab" stroke="#fb4960" stop1="#f43f5e" stop2="#111827" emptyText="No expenses recorded for this year." year={year} />
+                </TabsContent>
+              </Tabs>
+
+              <div className="grid overflow-hidden rounded-[10px] border border-slate-200 bg-white/80 shadow-sm dark:border-[#223044] dark:bg-[#0a111b]/75 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="border-b border-slate-200 p-4 dark:border-[#223044] sm:border-r xl:border-b-0">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{analyticsSummary.totalLabel}</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{formatCurrency(analyticsSummary.total)}</p>
+                </div>
+                <div className="border-b border-slate-200 p-4 dark:border-[#223044] xl:border-b-0 xl:border-r">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{analyticsSummary.averageLabel}</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{formatCurrency(analyticsSummary.average)}</p>
+                </div>
+                <div className="border-b border-slate-200 p-4 dark:border-[#223044] sm:border-r sm:border-b-0">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Highest Month</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{analyticsSummary.highest}</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Lowest Month</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950 dark:text-white">{analyticsSummary.lowest}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case 'expense_chart':
+        return (
+          <WidgetCard title="Expense Overview">
+            <AnalyticsChart data={yearlyAnalyticsData} dataKey="expenses" gradientId="gradExpWidget" stroke="#fb4960" stop1="#f43f5e" stop2="#111827" emptyText="No expenses recorded for this year." year={year} />
+          </WidgetCard>
+        );
+      case 'low_stock_panel':
+        return (
+          <div className="flex h-full min-h-[360px] flex-col gap-4 overflow-hidden rounded-[14px] border border-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">Stock Levels</h3>
+              <span className="rounded-[7px] bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">↯ Live</span>
+            </div>
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+              {stockPanelProducts.length > 0 ? stockPanelProducts.map((product) => {
+                const qty = Math.max(0, toNumber(product.quantity));
+                const threshold = Math.max(0, toNumber(product.low_stock_threshold ?? product.reorder_level ?? 0));
+                const targetStock = Math.max(qty, threshold * 3, 1);
+                const stockPercent = Math.min(100, Math.max(qty > 0 ? 8 : 0, Math.round((qty / targetStock) * 100)));
+                const isLow = threshold > 0 && qty <= threshold;
+                const isCritical = threshold > 0 && qty <= Math.max(1, threshold / 2);
+                return (
+                  <div key={product.id} className="rounded-[10px] border border-border bg-muted/30 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{product.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{product.category || 'Uncategorized'}</p>
+                      </div>
+                      <span className={cn('shrink-0 text-sm font-semibold', isCritical ? 'text-rose-500' : isLow ? 'text-amber-600' : 'text-foreground')}>
+                        {qty} {qty === 1 ? 'unit' : 'units'}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className={cn('h-full rounded-full', isCritical ? 'bg-rose-500' : isLow ? 'bg-amber-500' : 'bg-[#2C8603]')} style={{ width: `${stockPercent}%` }} />
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
+                  <Package className="mb-3 h-10 w-10 text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">No products yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Add products to see live stock details here.</p>
+                </div>
+              )}
+            </div>
+            {hasModule('inventory') ? (
+              <Button asChild variant="outline" className="h-11 w-full rounded-[8px] border-[rgba(44,134,3,0.35)] text-[#2C8603] hover:bg-[rgba(44,134,3,0.08)] hover:text-[#2C8603]">
+                <Link to="/inventory" className="flex items-center justify-center gap-2">View Inventory<ChevronRight className="h-4 w-4" /></Link>
+              </Button>
+            ) : null}
+          </div>
+        );
+      case 'recent_sales':
+        return <RecentSalesWidget sales={filtered.sales} />;
+      case 'recent_expenses':
+        return <RecentExpensesWidget expenses={filtered.expenses} />;
+      case 'top_products':
+        return <TopProductsWidget saleItems={filtered.saleItems} />;
+      case 'stock_movements':
+        return <StockMovementsWidget movements={data.stockMovements} />;
+      case 'quick_actions':
+        return <QuickActionsWidget hasModule={hasModule} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderedWidgets = visibleLayout(layout, hasModule as any)
+    .map((item) => {
+      const node = renderWidget(item.id);
+      if (!node) return null;
+      return (
+        <div key={item.id} className={sizeClass(item.size)}>
+          {node}
+        </div>
+      );
+    })
+    .filter(Boolean);
+
+
+
   return (
     <AppLayout title="Dashboard">
       <div className="mx-auto max-w-[1530px] space-y-4">
