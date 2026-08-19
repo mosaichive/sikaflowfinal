@@ -54,7 +54,7 @@ export function ReferralNotifications() {
   }, [toast]);
 
   const loadRecent = useCallback(async () => {
-    if (!user?.id || !businessId) return;
+    if (!user?.id) return;
     const { data } = await supabase
       .from('referrals' as any)
       .select('id,status,updated_at')
@@ -78,7 +78,7 @@ export function ReferralNotifications() {
       .channel(`referral-notices:${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'referrals', filter: `referrer_user_id=eq.${user.id}` }, (payload) => {
         const row = payload.new as ReferralNoticeRow | null;
-        if (!row || (businessId && (payload.new as any)?.referrer_business_id !== businessId)) return;
+        if (!row) return;
         notify(row, true);
       })
       .subscribe();
