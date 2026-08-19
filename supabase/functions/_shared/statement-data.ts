@@ -43,17 +43,37 @@ export function resolvePeriod(period?: string | null): StatementPeriod {
   };
 }
 
+export type StatementLedgerRow = {
+  date: string;
+  reference: string;
+  type: string;
+  description: string;
+  moneyIn: number;
+  moneyOut: number;
+  runningBalance: number;
+};
+
 export type StatementData = {
   business: {
     id: string;
     name: string;
+    ownerName: string;
     email: string | null;
     phone: string | null;
     location: string | null;
     currency: string;
+    currencySymbol: string;
   };
   period: StatementPeriod;
   generatedAt: string;
+  statement: {
+    rows: StatementLedgerRow[];
+    openingBalance: number;
+    closingBalance: number;
+    totalMoneyIn: number;
+    totalMoneyOut: number;
+    openingStockValue: number;
+  };
   sales: {
     total: number;
     count: number;
