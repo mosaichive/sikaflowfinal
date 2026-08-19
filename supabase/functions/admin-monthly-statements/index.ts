@@ -102,7 +102,7 @@ async function generateAndSend(
   const recipient = (opts.to ?? data.business.email ?? "").trim();
   const displayName = await ownerDisplayName(admin, businessId);
 
-  const pdf = renderStatementPdf(data);
+  const pdf = await renderStatementPdf(data);
   const totals = {
     sales: data.sales.total,
     expenses: data.money.expenses,
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
           ok: true,
           period: period.period,
           filename: statementFileName(data),
-          pdf: renderStatementPdf(data),
+          pdf: await renderStatementPdf(data),
         });
       }
 
@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
     if (action === "preview") {
       const period = resolvePeriod((body as any).period ?? null);
       const data = await buildStatementData(admin, String((body as any).business_id), period);
-      return json({ ok: true, period: period.period, filename: statementFileName(data), pdf: renderStatementPdf(data) });
+      return json({ ok: true, period: period.period, filename: statementFileName(data), pdf: await renderStatementPdf(data) });
     }
 
     if (action === "test") {
