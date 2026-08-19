@@ -37,6 +37,19 @@ import { calculateBusinessFinancials } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
 import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
+import { LayoutGrid } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { CustomizeDashboardPanel } from '@/components/dashboard/CustomizeDashboardPanel';
+import {
+  RecentSalesWidget,
+  RecentExpensesWidget,
+  TopProductsWidget,
+  StockMovementsWidget,
+  QuickActionsWidget,
+  WidgetCard,
+} from '@/components/dashboard/ListWidgets';
+import { allowedWidgets, sizeClass, visibleLayout, type WidgetLayoutItem } from '@/lib/dashboard-widgets';
 
 type SaleRow = {
   id: string;
