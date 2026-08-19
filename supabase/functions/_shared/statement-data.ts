@@ -3,7 +3,15 @@
 // Financial figures come from the same calculation engine the Reports page uses
 // (`finance.ts` is a byte-identical copy of src/lib/sales-inventory.ts).
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { calculateFinancialSnapshot, normalizeText, toNumber } from "./finance.ts";
+import {
+  calculateFinancialSnapshot,
+  getPaidAmount,
+  isCancelledStatus,
+  isRecognizedSale,
+  isRestockExpenseRow,
+  normalizeText,
+  toNumber,
+} from "./finance.ts";
 
 export type StatementPeriod = { period: string; start: string; end: string; label: string };
 
