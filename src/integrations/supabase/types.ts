@@ -1494,8 +1494,11 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          referred_email: string | null
           referred_user_id: string
+          referrer_business_id: string | null
           referrer_user_id: string
+          reward_months: number
           reward_payment_id: string | null
           rewarded_at: string | null
           status: string
@@ -1504,8 +1507,11 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          referred_email?: string | null
           referred_user_id: string
+          referrer_business_id?: string | null
           referrer_user_id: string
+          reward_months?: number
           reward_payment_id?: string | null
           rewarded_at?: string | null
           status?: string
@@ -1514,8 +1520,11 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          referred_email?: string | null
           referred_user_id?: string
+          referrer_business_id?: string | null
           referrer_user_id?: string
+          reward_months?: number
           reward_payment_id?: string | null
           rewarded_at?: string | null
           status?: string
@@ -2562,6 +2571,7 @@ export type Database = {
         }[]
       }
       ensure_referral_code: { Args: { _user_id: string }; Returns: string }
+      ensure_referrals_columns: { Args: never; Returns: Json }
       ensure_unique_store_slug: {
         Args: { _base: string; _owner: string }
         Returns: string
