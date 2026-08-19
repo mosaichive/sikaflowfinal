@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 512 512" width="512" height="512">
+  <title>KudiTrack</title>
+  <rect x="0" y="0" width="512" height="512" fill="#0B0B0B"/>
+  <g>
+    <rect x="96" y="300" width="52" height="112" rx="8" fill="#1E7BE8"/>
+    <rect x="164" y="252" width="52" height="160" rx="8" fill="#2A97E8"/>
+    <rect x="232" y="196" width="52" height="216" rx="8" fill="#3FB3F0"/>
+    <rect x="300" y="140" width="52" height="272" rx="8" fill="#59C6F5"/>
+  </g>
+  <path d="M104 344 L216 232 L296 300 L410 152 L410 96 L438 128 L410 160 L410 116 L300 258 L218 190 L104 300 Z" fill="#22B04A"/>
+  <path d="M372 84 L452 84 L452 164 L420 132 L420 116 L404 116 Z" fill="#22B04A"/>
+  <circle cx="256" cy="272" r="104" fill="#C8880F"/>
+  <circle cx="256" cy="272" r="90" fill="#F2C42E"/>
+  <circle cx="256" cy="272" r="72" fill="#FFDA55"/>
+  <path d="M300 226 C282 212 254 210 236 224 C212 242 210 300 234 320 C252 336 282 334 300 320 L300 288 C288 302 268 304 258 294 C246 282 246 264 258 252 C268 242 288 244 300 258 Z" fill="#8A5A08"/>
+  <rect x="246" y="192" width="16" height="160" rx="8" fill="#8A5A08"/>
+</svg>
