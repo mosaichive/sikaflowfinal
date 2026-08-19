@@ -7,9 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 type ReferralNoticeRow = {
   id: string;
   status: string;
-  referred_email: string | null;
   updated_at: string;
-  reward_months: number;
 };
 
 const SEEN_PREFIX = 'sikaflow.referral.notice';

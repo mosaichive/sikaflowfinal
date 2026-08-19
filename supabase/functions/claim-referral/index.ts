@@ -2,7 +2,7 @@
 // Reads the referral code from request body or the user's auth metadata,
 // looks up the referrer via referral_codes, and inserts a pending referrals row.
 // The annual subscription approval trigger handles rewarding later.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
