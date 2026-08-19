@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.exchange-rates]
 verify_jwt = false
+
+[functions.referrals-schema-check]
+verify_jwt = true
