@@ -155,6 +155,21 @@ export async function buildStatementData(
     }
   }
 
+  const [movementsRes, currencyRes, priorSalesRes, priorExpensesRes, priorIncomeRes, priorSavingsRes, priorInvestRes, priorFundingRes, priorRestockRes] =
+    await Promise.all([
+      admin.from("stock_movements").select("*").eq("user_id", businessId)
+        .gte("movement_date", start).lt("movement_date", end),
+      admin.from("currencies").select("code, symbol")
+        .eq("code", (profile as any).currency || "GHS").maybeSingle(),
+      admin.from("sales").select("*").eq("user_id", businessId).lt("sale_date", start),
+      admin.from("expenses").select("*").eq("user_id", businessId).lt("expense_date", start),
+      admin.from("other_income").select("amount").eq("user_id", businessId).lt("income_date", start),
+      admin.from("savings").select("amount").eq("user_id", businessId).lt("savings_date", start),
+      admin.from("investments").select("amount").eq("user_id", businessId).lt("investment_date", start),
+      admin.from("investor_funding").select("amount").eq("user_id", businessId).lt("date_received", start),
+      admin.from("restocks").select("total_cost, status, is_opening_stock").eq("user_id", businessId).lt("restock_date", start),
+    ]);
+
   const products = (productsRes.data ?? []).map((p: any) => ({
     ...p,
     quantity: p.stock,
@@ -168,6 +183,9 @@ export async function buildStatementData(
   const investorFunds = fundingRes.data ?? [];
   const restocks = restockRes.data ?? [];
   const orders = ordersRes.data ?? [];
+  const openingStockMovements = (movementsRes.data ?? []).filter(
+    (m: any) => normalizeText(m.movement_type) === "opening_stock",
+  );
 
   const snapshot = calculateFinancialSnapshot({
     sales: sales as any,
