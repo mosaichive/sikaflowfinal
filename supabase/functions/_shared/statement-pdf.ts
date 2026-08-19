@@ -239,10 +239,10 @@ export async function renderStatementPdf(data: StatementData): Promise<string> {
     },
     alternateRowStyles: { fillColor: [250, 250, 252] },
     columnStyles: {
-      0: { cellWidth: 52 },
+      0: { cellWidth: 60 },
       1: { cellWidth: 72 },
       2: { cellWidth: 68 },
-      3: { cellWidth: 106 },
+      3: { cellWidth: 98 },
       4: { cellWidth: 70, halign: "right" },
       5: { cellWidth: 70, halign: "right" },
       6: { cellWidth: 77, halign: "right" },
@@ -290,10 +290,10 @@ export async function renderStatementPdf(data: StatementData): Promise<string> {
       textColor: COLORS.ink,
     },
     columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 120 },
-      1: { halign: "right", cellWidth: 110 },
-      2: { fontStyle: "bold", cellWidth: 120 },
-      3: { halign: "right", cellWidth: 125 },
+      0: { fontStyle: "bold", cellWidth: 118 },
+      1: { halign: "right", cellWidth: 138 },
+      2: { fontStyle: "bold", cellWidth: 122 },
+      3: { halign: "right", cellWidth: 137 },
     },
   });
 
