@@ -1,222 +1,321 @@
 // Monthly statement PDF + email HTML rendering.
+// The PDF layout is a 1:1 port of the in-app Report Slip (src/lib/report-slip.ts)
+// so emailed statements look exactly like the ones downloaded from Reports.
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
+import autoTable from "https://esm.sh/jspdf-autotable@3.8.4?deps=jspdf@2.5.2";
 import type { StatementData } from "./statement-data.ts";
 
-const BRAND = { r: 22, g: 101, b: 52 }; // KudiTrack green
-const MUTED = { r: 107, g: 114, b: 128 };
+const COLORS = {
+  ink: [15, 23, 42] as [number, number, number],
+  muted: [100, 116, 139] as [number, number, number],
+  line: [226, 232, 240] as [number, number, number],
+  surface: [248, 250, 252] as [number, number, number],
+  success: [5, 150, 105] as [number, number, number],
+  danger: [220, 38, 38] as [number, number, number],
+};
 
-function money(value: number, currency: string) {
-  const amount = (Number.isFinite(value) ? value : 0).toLocaleString("en-GB", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${currency} ${amount}`;
-}
+const FONT_URL = "https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans.ttf";
+const FONT_BOLD_URL = "https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans-Bold.ttf";
+const LOGO_URL = "https://kuditrack.online/icon-192.png";
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+let fontCache: { normal: string; bold: string } | null = null;
+let logoCache: string | null | undefined;
 
-/** Returns the statement PDF as a base64 string. */
-export function renderStatementPdf(data: StatementData): string {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 48;
-  const cur = data.business.currency;
-  let y = 0;
-
-  const ensureSpace = (needed: number) => {
-    if (y + needed > pageHeight - 70) {
-      footer();
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  const footer = () => {
-    doc.setDrawColor(229, 231, 235);
-    doc.line(margin, pageHeight - 52, pageWidth - margin, pageHeight - 52);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-    doc.text(
-      "Generated automatically by KudiTrack - kuditrack.online",
-      margin,
-      pageHeight - 36,
-    );
-    doc.text(
-      `Generated ${fmtDate(data.generatedAt)}`,
-      pageWidth - margin,
-      pageHeight - 36,
-      { align: "right" },
-    );
-    doc.setTextColor(0, 0, 0);
-  };
-
-  // ---- Header band
-  doc.setFillColor(BRAND.r, BRAND.g, BRAND.b);
-  doc.rect(0, 0, pageWidth, 96, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text("KudiTrack", margin, 42);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.text("Monthly Business Statement", margin, 62);
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  doc.text(data.period.label, pageWidth - margin, 50, { align: "right" });
-  doc.setTextColor(0, 0, 0);
-  y = 130;
-
-  // ---- Business block
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(data.business.name, margin, y);
-  y += 16;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-  const meta = [data.business.email, data.business.phone, data.business.location]
-    .filter(Boolean)
-    .join("  |  ");
-  if (meta) {
-    doc.text(meta, margin, y);
-    y += 14;
-  }
-  doc.text(
-    `Statement period: ${fmtDate(data.period.start)} - ${fmtDate(
-      new Date(new Date(data.period.end).getTime() - 86400000).toISOString(),
-    )}`,
-    margin,
-    y,
-  );
-  doc.setTextColor(0, 0, 0);
-  y += 26;
-
-  // ---- Highlight cards
-  const cards = [
-    { label: "Total sales", value: money(data.sales.total, cur) },
-    { label: "Total expenses", value: money(data.money.expenses, cur) },
-    { label: "Net profit", value: money(data.money.profit, cur) },
-    { label: "Available money", value: money(data.money.availableBusinessMoney, cur) },
-  ];
-  const cardW = (pageWidth - margin * 2 - 12 * 3) / 4;
-  cards.forEach((card, i) => {
-    const x = margin + i * (cardW + 12);
-    doc.setFillColor(246, 248, 246);
-    doc.roundedRect(x, y, cardW, 56, 6, 6, "F");
-    doc.setFontSize(8);
-    doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-    doc.text(card.label.toUpperCase(), x + 10, y + 20);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(17, 24, 39);
-    doc.text(card.value, x + 10, y + 40);
-    doc.setFont("helvetica", "normal");
-  });
-  doc.setTextColor(0, 0, 0);
-  y += 84;
-
-  const section = (title: string) => {
-    ensureSpace(60);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(BRAND.r, BRAND.g, BRAND.b);
-    doc.text(title, margin, y);
-    doc.setTextColor(0, 0, 0);
-    y += 8;
-    doc.setDrawColor(229, 231, 235);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 16;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-  };
-
-  const row = (label: string, value: string, bold = false) => {
-    ensureSpace(20);
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(10);
-    doc.text(label, margin, y);
-    doc.text(value, pageWidth - margin, y, { align: "right" });
-    y += 17;
-    doc.setFont("helvetica", "normal");
-  };
-
-  section("Sales summary");
-  row("Number of sales", String(data.sales.count));
-  row("Total sales value", money(data.sales.total, cur));
-  row("Amount received", money(data.sales.paid, cur));
-  row("Outstanding / credit", money(data.sales.unpaid, cur));
-  if (data.sales.byMethod.length) {
-    y += 4;
-    doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-    doc.setFontSize(9);
-    doc.text("By payment method", margin, y);
-    doc.setTextColor(0, 0, 0);
-    y += 15;
-    for (const m of data.sales.byMethod) {
-      row(`  ${m.method} (${m.count})`, money(m.amount, cur));
-    }
-  }
-  y += 10;
-
-  section("Inventory movement");
-  row("Restocks recorded", String(data.inventory.restockCount));
-  row("Units restocked", String(data.inventory.unitsRestocked));
-  row("Units sold", String(data.inventory.unitsSold));
-  row("Restock spending", money(data.inventory.restockValue, cur));
-  row("Closing stock (units)", String(data.inventory.closingStockUnits));
-  row("Closing stock value (cost)", money(data.inventory.closingStockValue, cur));
-  row("Products low on stock", String(data.inventory.lowStockCount));
-  y += 10;
-
-  section("Money in and out");
-  row("Sales revenue received", money(data.money.paidSalesRevenue, cur));
-  row("Other income", money(data.money.otherIncome, cur));
-  row("Investor funding", money(data.money.investorFunds, cur));
-  row("Total money in", money(data.money.totalIncome, cur), true);
-  y += 6;
-  row("Cost of goods sold", money(data.money.cogs, cur));
-  row("Operating expenses", money(data.money.expenses, cur));
-  row("Restock spending", money(data.money.restockSpending, cur));
-  row("Savings set aside", money(data.money.savings, cur));
-  row("Investments made", money(data.money.investments, cur));
-  y += 6;
-  row("Net profit", money(data.money.profit, cur), true);
-  row("Available business money", money(data.money.availableBusinessMoney, cur), true);
-  y += 10;
-
-  if (data.money.expensesByCategory.length) {
-    section("Expenses by category");
-    for (const c of data.money.expensesByCategory.slice(0, 12)) {
-      row(c.category, money(c.amount, cur));
-    }
-    y += 10;
-  }
-
-  section("Orders");
-  row("Total orders", String(data.orders.total));
-  row("Delivered / completed", String(data.orders.delivered));
-  row("Still in progress", String(data.orders.pending));
-  row("Cancelled", String(data.orders.cancelled));
-  row("Order value", money(data.orders.revenue, cur));
-
-  footer();
-
-  const raw = doc.output("arraybuffer") as ArrayBuffer;
-  const bytes = new Uint8Array(raw);
+function toBinary(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  return btoa(binary);
+  return binary;
+}
+
+async function loadFonts() {
+  if (!fontCache) {
+    const [normal, bold] = await Promise.all([
+      fetch(FONT_URL).then((r) => r.arrayBuffer()),
+      fetch(FONT_BOLD_URL).then((r) => r.arrayBuffer()),
+    ]);
+    fontCache = { normal: toBinary(normal), bold: toBinary(bold) };
+  }
+  return fontCache;
+}
+
+async function loadLogo(): Promise<string | null> {
+  if (logoCache === undefined) {
+    try {
+      const res = await fetch(LOGO_URL);
+      logoCache = res.ok ? `data:image/png;base64,${btoa(toBinary(await res.arrayBuffer()))}` : null;
+    } catch {
+      logoCache = null;
+    }
+  }
+  return logoCache ?? null;
+}
+
+function makeMoney(symbol: string) {
+  const space = /[A-Za-z]$/.test(symbol) ? " " : "";
+  return (value: number) => {
+    const amount = Math.abs(Number.isFinite(value) ? value : 0).toLocaleString("en-GB", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const sign = (value ?? 0) < 0 ? "-" : "";
+    return `${sign}${symbol}${space}${amount}`;
+  };
+}
+
+function formatShortDate(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatGeneratedDate(value: string) {
+  return new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function rangeDates(data: StatementData) {
+  const from = data.period.start;
+  const to = new Date(new Date(data.period.end).getTime() - 86400000).toISOString();
+  return { from, to };
+}
+
+/** Returns the statement PDF as a base64 string. */
+export async function renderStatementPdf(data: StatementData): Promise<string> {
+  const fonts = await loadFonts();
+  const logo = await loadLogo();
+  const money = makeMoney(data.business.currencySymbol || data.business.currency);
+  const { from, to } = rangeDates(data);
+  const businessName = data.business.name;
+  const generatedFor = data.business.ownerName;
+  const st = data.statement;
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  doc.addFileToVFS("DejaVuSans.ttf", fonts.normal);
+  doc.addFont("DejaVuSans.ttf", "NotoSans", "normal");
+  doc.addFileToVFS("DejaVuSans-Bold.ttf", fonts.bold);
+  doc.addFont("DejaVuSans-Bold.ttf", "NotoSans", "bold");
+  doc.setFont("NotoSans", "normal");
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const drawHeader = () => {
+    doc.setFillColor(...COLORS.surface);
+    doc.rect(0, 0, pageWidth, 60, "F");
+    doc.setDrawColor(...COLORS.line);
+    doc.line(0, 60, pageWidth, 60);
+    if (logo) doc.addImage(logo, "PNG", 40, 15, 28, 28);
+    const brandX = logo ? 78 : 40;
+    doc.setFont("NotoSans", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...COLORS.ink);
+    doc.text("KudiTrack", brandX, 28);
+    doc.setFont("NotoSans", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.muted);
+    doc.text("Financial Statement", brandX, 42);
+    doc.setFont("NotoSans", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...COLORS.ink);
+    doc.text(businessName, pageWidth - 40, 25, { align: "right" });
+    doc.setFont("NotoSans", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.muted);
+    doc.text(`${formatShortDate(from)} - ${formatShortDate(to)}`, pageWidth - 40, 40, { align: "right" });
+  };
+
+  const drawFooter = (pageNumber: number, totalPages: number) => {
+    doc.setDrawColor(...COLORS.line);
+    doc.line(40, pageHeight - 34, pageWidth - 40, pageHeight - 34);
+    doc.setFont("NotoSans", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.muted);
+    doc.text("Generated by KudiTrack", 40, pageHeight - 18);
+    doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - 40, pageHeight - 18, { align: "right" });
+  };
+
+  const drawValueCard = (
+    x: number,
+    y: number,
+    width: number,
+    label: string,
+    value: string,
+    tone?: readonly [number, number, number],
+  ) => {
+    doc.setDrawColor(...COLORS.line);
+    doc.roundedRect(x, y, width, 56, 10, 10);
+    doc.setFont("NotoSans", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.muted);
+    doc.text(label, x + 12, y + 18);
+    doc.setFont("NotoSans", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...(tone ?? COLORS.ink));
+    doc.text(value, x + 12, y + 39);
+  };
+
+  drawHeader();
+
+  doc.setFont("NotoSans", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...COLORS.ink);
+  doc.text("Financial Statement", 40, 94);
+
+  doc.setFont("NotoSans", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.muted);
+  doc.text(`Business / User: ${businessName} • ${generatedFor}`, 40, 114);
+  doc.text(`Statement range: ${formatShortDate(from)} to ${formatShortDate(to)}`, 40, 129);
+  doc.text(`Generated: ${formatGeneratedDate(data.generatedAt)}`, 40, 144);
+
+  const detailBoxX = pageWidth - 220;
+  doc.setDrawColor(...COLORS.line);
+  doc.roundedRect(detailBoxX, 84, 180, 70, 12, 12);
+  doc.setFont("NotoSans", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.ink);
+  doc.text("Statement Details", detailBoxX + 12, 102);
+  doc.setFont("NotoSans", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.muted);
+  doc.text("Money In", detailBoxX + 12, 122);
+  doc.text(money(st.totalMoneyIn), detailBoxX + 168, 122, { align: "right" });
+  doc.text("Money Out", detailBoxX + 12, 136);
+  doc.text(money(st.totalMoneyOut), detailBoxX + 168, 136, { align: "right" });
+  doc.text("Closing Balance", detailBoxX + 12, 150);
+  doc.text(money(st.closingBalance), detailBoxX + 168, 150, { align: "right" });
+
+  const metricGap = 10;
+  const metricWidth = (pageWidth - 80 - metricGap * 3) / 4;
+  const metricsTop = 176;
+  drawValueCard(40, metricsTop, metricWidth, "Opening Balance", money(st.openingBalance));
+  drawValueCard(40 + metricWidth + metricGap, metricsTop, metricWidth, "Total Money In", money(st.totalMoneyIn), COLORS.success);
+  drawValueCard(40 + (metricWidth + metricGap) * 2, metricsTop, metricWidth, "Total Money Out", money(st.totalMoneyOut), COLORS.danger);
+  drawValueCard(40 + (metricWidth + metricGap) * 3, metricsTop, metricWidth, "Closing Balance", money(st.closingBalance));
+
+  doc.setFont("NotoSans", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...COLORS.ink);
+  doc.text("Transaction Statement", 40, 260);
+
+  const rows = st.rows;
+  autoTable(doc, {
+    startY: 272,
+    margin: { top: 72, right: 40, bottom: 56, left: 40 },
+    head: [["Date", "Reference ID", "Transaction Type", "Description", "Money In", "Money Out", "Balance"]],
+    body: rows.length
+      ? rows.map((row) => [
+        new Date(row.date).toLocaleDateString("en-GB"),
+        row.reference,
+        row.type,
+        row.description,
+        row.moneyIn > 0 ? money(row.moneyIn) : "—",
+        row.moneyOut > 0 ? money(row.moneyOut) : "—",
+        money(row.runningBalance),
+      ])
+      : [["—", "—", "—", "No transactions recorded in this period", "—", "—", money(st.closingBalance)]],
+    styles: {
+      font: "NotoSans",
+      fontSize: 8.5,
+      cellPadding: { top: 6, right: 5, bottom: 6, left: 5 },
+      textColor: COLORS.ink,
+      lineColor: COLORS.line,
+      lineWidth: 0.3,
+      overflow: "linebreak",
+      valign: "top",
+    },
+    headStyles: {
+      fillColor: COLORS.ink,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      lineColor: COLORS.ink,
+    },
+    alternateRowStyles: { fillColor: [250, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 58 },
+      1: { cellWidth: 82 },
+      2: { cellWidth: 76 },
+      3: { cellWidth: 140 },
+      4: { cellWidth: 55, halign: "right" },
+      5: { cellWidth: 55, halign: "right" },
+      6: { cellWidth: 59, halign: "right" },
+    },
+    didParseCell: (hookData: any) => {
+      if (hookData.section !== "body") return;
+      const sourceRow = rows[hookData.row.index];
+      if (!sourceRow) return;
+      if (hookData.column.index === 4 && sourceRow.moneyIn > 0) hookData.cell.styles.textColor = COLORS.success;
+      if (hookData.column.index === 5 && sourceRow.moneyOut > 0) hookData.cell.styles.textColor = COLORS.danger;
+      if (hookData.column.index === 6) hookData.cell.styles.fontStyle = "bold";
+    },
+  });
+
+  let summaryStartY = ((doc as any).lastAutoTable?.finalY ?? 300) + 26;
+  if (summaryStartY + 160 > pageHeight - 56) {
+    doc.addPage();
+    summaryStartY = 92;
+  }
+
+  doc.setFont("NotoSans", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...COLORS.ink);
+  doc.text("Statement Summary", 40, summaryStartY);
+
+  autoTable(doc, {
+    startY: summaryStartY + 10,
+    margin: { left: 40, right: 40 },
+    theme: "grid",
+    body: [
+      ["Total Sales", money(data.money.paidSalesRevenue), "Other Income", money(data.money.otherIncome)],
+      ["COGS", money(data.money.cogs), "Total Expenses", money(data.money.expenses)],
+      ["Opening Stock", money(st.openingStockValue), "Total Restocks", money(data.money.restockSpending)],
+      ["Total Savings", money(data.money.savings), "Total Investments", money(data.money.investments)],
+      ["Total Investor Funds", money(data.money.investorFunds), "Stock Value (Cost)", money(data.inventory.closingStockValue)],
+      ["Profit", money(data.money.profit), "Available Business Money", money(data.money.availableBusinessMoney)],
+      ["Closing Balance", money(st.closingBalance), "", ""],
+    ],
+    styles: {
+      font: "NotoSans",
+      fontSize: 9,
+      cellPadding: { top: 6, right: 6, bottom: 6, left: 6 },
+      lineColor: COLORS.line,
+      lineWidth: 0.3,
+      textColor: COLORS.ink,
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 120 },
+      1: { halign: "right", cellWidth: 110 },
+      2: { fontStyle: "bold", cellWidth: 120 },
+      3: { halign: "right", cellWidth: 125 },
+    },
+  });
+
+  const noteY = (((doc as any).lastAutoTable?.finalY ?? summaryStartY + 60) + 16);
+  doc.setFont("NotoSans", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...COLORS.muted);
+  doc.text(
+    "Cash movement reflects paid sales, other income, investor funds, savings, investments, and all restocks. Opening Stock is shown separately and does not reduce available business money. Profit uses paid sales revenue minus COGS and operating expenses.",
+    40,
+    noteY,
+    { maxWidth: pageWidth - 80 },
+  );
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawHeader();
+    drawFooter(page, totalPages);
+  }
+
+  return btoa(toBinary(doc.output("arraybuffer") as ArrayBuffer));
 }
 
 export function renderStatementEmailHtml(data: StatementData, recipientName?: string | null): string {
@@ -239,7 +338,6 @@ export function renderStatementEmailHtml(data: StatementData, recipientName?: st
 }
 
 export function statementFileName(data: StatementData) {
-  // KudiTrack_Financial_Statement_August_2026.pdf
   return `KudiTrack_Financial_Statement_${data.period.label.replace(/\s+/g, "_")}.pdf`;
 }
 
