@@ -223,8 +223,8 @@ export async function renderStatementPdf(data: StatementData): Promise<string> {
       : [["—", "—", "—", "No transactions recorded in this period", "—", "—", money(st.closingBalance)]],
     styles: {
       font: "NotoSans",
-      fontSize: 8.5,
-      cellPadding: { top: 6, right: 5, bottom: 6, left: 5 },
+      fontSize: 8,
+      cellPadding: { top: 6, right: 4, bottom: 6, left: 4 },
       textColor: COLORS.ink,
       lineColor: COLORS.line,
       lineWidth: 0.3,
@@ -239,13 +239,13 @@ export async function renderStatementPdf(data: StatementData): Promise<string> {
     },
     alternateRowStyles: { fillColor: [250, 250, 252] },
     columnStyles: {
-      0: { cellWidth: 58 },
-      1: { cellWidth: 82 },
-      2: { cellWidth: 76 },
-      3: { cellWidth: 140 },
-      4: { cellWidth: 55, halign: "right" },
-      5: { cellWidth: 55, halign: "right" },
-      6: { cellWidth: 59, halign: "right" },
+      0: { cellWidth: 52 },
+      1: { cellWidth: 72 },
+      2: { cellWidth: 68 },
+      3: { cellWidth: 106 },
+      4: { cellWidth: 70, halign: "right" },
+      5: { cellWidth: 70, halign: "right" },
+      6: { cellWidth: 77, halign: "right" },
     },
     didParseCell: (hookData: any) => {
       if (hookData.section !== "body") return;
