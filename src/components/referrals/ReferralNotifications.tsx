@@ -47,8 +47,8 @@ export function ReferralNotifications() {
     toast({
       title: row.status === 'rewarded' ? 'Referral reward applied' : 'Referral successful',
       description: row.status === 'rewarded'
-        ? `A paid referral${row.referred_email ? ` from ${row.referred_email}` : ''} added ${row.reward_months || 1} free month to your annual plan.`
-        : `${row.referred_email || 'A referred signup'} completed a paid subscription.`,
+        ? 'A paid referral added a free month to your annual plan.'
+        : 'A referred signup completed a paid subscription.',
     });
     window.localStorage.setItem(key, row.updated_at);
   }, [toast]);
@@ -57,9 +57,8 @@ export function ReferralNotifications() {
     if (!user?.id || !businessId) return;
     const { data } = await supabase
       .from('referrals' as any)
-      .select('id,status,referred_email,updated_at,reward_months')
+      .select('id,status,updated_at')
       .eq('referrer_user_id', user.id)
-      .eq('referrer_business_id', businessId)
       .in('status', ['successful', 'rewarded'])
       .order('updated_at', { ascending: false })
       .limit(8);
