@@ -1150,6 +1150,16 @@ export default function Dashboard() {
                   </Button>
                 ) : null}
 
+                <Button
+                  variant="outline"
+                  className="h-12 rounded-[8px] px-4"
+                  onClick={() => setCustomizeOpen(true)}
+                >
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  Customize
+                </Button>
+
+
                 <Select
                   value={selectedDay ?? 'all'}
                   onValueChange={(value) => setSelectedDay(value === 'all' ? null : value)}
