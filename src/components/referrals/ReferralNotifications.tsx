@@ -7,9 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 type ReferralNoticeRow = {
   id: string;
   status: string;
-  referred_email: string | null;
   updated_at: string;
-  reward_months: number;
 };
 
 const SEEN_PREFIX = 'sikaflow.referral.notice';
@@ -49,19 +47,18 @@ export function ReferralNotifications() {
     toast({
       title: row.status === 'rewarded' ? 'Referral reward applied' : 'Referral successful',
       description: row.status === 'rewarded'
-        ? `A paid referral${row.referred_email ? ` from ${row.referred_email}` : ''} added ${row.reward_months || 1} free month to your annual plan.`
-        : `${row.referred_email || 'A referred signup'} completed a paid subscription.`,
+        ? 'A paid referral added a free month to your annual plan.'
+        : 'A referred signup completed a paid subscription.',
     });
     window.localStorage.setItem(key, row.updated_at);
   }, [toast]);
 
   const loadRecent = useCallback(async () => {
-    if (!user?.id || !businessId) return;
+    if (!user?.id) return;
     const { data } = await supabase
       .from('referrals' as any)
-      .select('id,status,referred_email,updated_at,reward_months')
+      .select('id,status,updated_at')
       .eq('referrer_user_id', user.id)
-      .eq('referrer_business_id', businessId)
       .in('status', ['successful', 'rewarded'])
       .order('updated_at', { ascending: false })
       .limit(8);
@@ -81,7 +78,7 @@ export function ReferralNotifications() {
       .channel(`referral-notices:${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'referrals', filter: `referrer_user_id=eq.${user.id}` }, (payload) => {
         const row = payload.new as ReferralNoticeRow | null;
-        if (!row || (businessId && (payload.new as any)?.referrer_business_id !== businessId)) return;
+        if (!row) return;
         notify(row, true);
       })
       .subscribe();
