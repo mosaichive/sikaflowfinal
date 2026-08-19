@@ -285,9 +285,11 @@ export function layoutEmail(bodyHtml: string, subject = ""): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-        <tr><td align="center" style="padding:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
-          Kudi<span style="color:#0f766e;">Track</span>
+        <tr><td align="center" style="padding:0 0 18px;font-family:Helvetica,Arial,sans-serif;">
+          <img src="https://kuditrack.online/icon-192.png" width="56" height="56" alt="KudiTrack" style="display:block;border:0;outline:none;border-radius:12px;margin:0 auto 10px;" />
+          <div style="font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">Kudi<span style="color:#0f766e;">Track</span></div>
         </td></tr>
+
         <tr><td>${inner}</td></tr>
         <tr><td align="center" style="padding:16px 12px 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#6b7280;line-height:1.6;">
           KudiTrack — Track Every Sale. Know Every Cedi.
