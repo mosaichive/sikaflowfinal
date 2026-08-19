@@ -1119,7 +1119,14 @@ export default function Dashboard() {
       case 'top_products':
         return <TopProductsWidget saleItems={filtered.saleItems} />;
       case 'stock_movements':
-        return <StockMovementsWidget movements={data.stockMovements} />;
+        return (
+          <StockMovementsWidget
+            movements={data.stockMovements.map((movement: any) => ({
+              ...movement,
+              product_name: data.products.find((product) => product.id === movement.product_id)?.name ?? 'Product',
+            }))}
+          />
+        );
       case 'quick_actions':
         return <QuickActionsWidget hasModule={hasModule} />;
       default:
