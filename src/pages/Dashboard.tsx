@@ -124,6 +124,7 @@ type DashboardData = {
   investments: InvestmentRow[];
   investorFunds: FundingRow[];
   restocks: RestockRow[];
+  stockMovements: any[];
 };
 
 function startOfYear(year: number) {
@@ -515,6 +516,7 @@ export default function Dashboard() {
     investments: [],
     investorFunds: [],
     restocks: [],
+    stockMovements: [],
   });
   const [loading, setLoading] = useState(true);
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
@@ -524,6 +526,8 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [analyticsMetric, setAnalyticsMetric] = useState<AnalyticsMetric>('sales');
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const { layout, saving: savingLayout, save: saveLayout, resetToDefault: resetLayout } = useDashboardLayout();
 
   const year = Number(selectedYear);
   const month = selectedMonth === null ? null : Number(selectedMonth);
@@ -561,7 +565,7 @@ export default function Dashboard() {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [salesRes, saleItemsRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes] = await Promise.allSettled([
+      const [salesRes, saleItemsRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes, stockMovementsRes] = await Promise.allSettled([
         supabase.from('sales').select('*').order('sale_date', { ascending: false }),
         supabase.from('sale_items').select('*'),
         loadProductsCompat(false, businessId),
@@ -571,6 +575,7 @@ export default function Dashboard() {
         supabase.from('investments').select('amount,investment_date'),
         supabase.from('investor_funding').select('amount,date_received,investor_name,reference').order('date_received', { ascending: false }),
         supabase.from('restocks').select('total_cost,status,restock_date,is_opening_stock').order('restock_date', { ascending: false }),
+        supabase.from('stock_movements').select('id,product_id,change,reason,note,created_at').order('created_at', { ascending: false }).limit(20),
       ]);
 
       if (salesRes.status === 'rejected') logSupabaseError('dashboard.load.sales', salesRes.reason);
@@ -602,6 +607,7 @@ export default function Dashboard() {
         investments: investmentsRes.status === 'fulfilled' ? ((investmentsRes.value.data || []) as InvestmentRow[]) : [],
         investorFunds: investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value.data || []) as FundingRow[]) : [],
         restocks: restocksRes.status === 'fulfilled' ? ((restocksRes.value.data || []) as RestockRow[]) : [],
+        stockMovements: stockMovementsRes.status === 'fulfilled' ? ((stockMovementsRes.value.data || []) as any[]) : [],
       });
     } finally {
       setLoading(false);
@@ -1266,6 +1272,16 @@ export default function Dashboard() {
 
           </div>
         </div>
+
+        <CustomizeDashboardPanel
+          open={customizeOpen}
+          onOpenChange={setCustomizeOpen}
+          layout={layout}
+          allowed={allowedWidgets(hasModule as any)}
+          saving={savingLayout}
+          onSave={handleSaveLayout}
+          onReset={handleResetLayout}
+        />
 
         <FirstTimeSetupDialog
           open={setupDialogOpen}
