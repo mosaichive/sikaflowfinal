@@ -142,7 +142,7 @@ export function useAIAssistant() {
         }
 
         setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, actionState: 'done' } : m)).concat({
+          prev.map((m) => (m.id === messageId ? { ...m, actionState: 'done' as const } : m)).concat({
             id: uid(),
             role: 'assistant',
             content: `${result.message} Anything else?`,
@@ -160,7 +160,7 @@ export function useAIAssistant() {
 
   const cancelAction = useCallback((messageId: string) => {
     setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, actionState: 'cancelled' } : m)).concat({
+      prev.map((m) => (m.id === messageId ? { ...m, actionState: 'cancelled' as const } : m)).concat({
         id: uid(),
         role: 'assistant',
         content: 'No problem, nothing was saved.',
