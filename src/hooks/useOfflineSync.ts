@@ -16,8 +16,12 @@ export function useOfflineSync() {
 
   useEffect(() => {
     startOfflineSync();
-    return subscribeToSync(setState);
+    const unsubscribe = subscribeToSync(setState);
+    return () => {
+      unsubscribe();
+    };
   }, []);
+
 
   return {
     ...state,
