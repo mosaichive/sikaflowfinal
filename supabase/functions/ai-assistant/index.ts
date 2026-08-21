@@ -1,8 +1,8 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const MODEL = 'google/gemini-3-flash';
+const GATEWAY = 'https://ai.gateway.lovable.dev/v1/responses';
+const MODEL = 'openai/gpt-5.6-sol';
 
 const ACTION_SCHEMA = {
   type: 'object',
@@ -111,16 +111,24 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: 'system', content: systemPrompt(body?.context ?? {}) }, ...trimmed],
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'assistant_turn', strict: true, schema: ACTION_SCHEMA },
+        // Reasoning models can run long: always stream and accumulate server-side.
+        stream: true,
+        reasoning: { effort: 'low', summary: 'auto' },
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: systemPrompt(body?.context ?? {}) }] },
+          ...trimmed.map((m: any) => ({
+            role: m.role,
+            content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }],
+          })),
+        ],
+        text: {
+          format: { type: 'json_schema', name: 'assistant_turn', strict: true, schema: ACTION_SCHEMA },
         },
       }),
     });
 
-    if (!res.ok) {
-      const detail = await res.text();
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => '');
       console.error('[ai-assistant] gateway error', res.status, detail);
       if (res.status === 429) {
         return json({ error: 'The assistant is busy right now. Please try again in a moment.' }, 429);
@@ -131,8 +139,7 @@ Deno.serve(async (req) => {
       return json({ error: 'The assistant could not respond right now.' }, 502);
     }
 
-    const data = await res.json();
-    const raw = data?.choices?.[0]?.message?.content ?? '';
+    const raw = await readOutputText(res.body);
     let parsed: any = null;
     try {
       parsed = JSON.parse(raw);
@@ -155,4 +162,41 @@ function json(payload: unknown, status: number) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+/** Accumulates `response.output_text` deltas from the SSE stream. */
+async function readOutputText(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const event = JSON.parse(payload);
+        if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+          text += event.delta;
+        } else if (event.type === 'response.completed' && !text) {
+          const output = event.response?.output ?? [];
+          for (const item of output) {
+            for (const part of item?.content ?? []) {
+              if (part?.type === 'output_text' && typeof part.text === 'string') text += part.text;
+            }
+          }
+        }
+      } catch {
+        // Ignore malformed SSE frames.
+      }
+    }
+  }
+  return text;
 }
