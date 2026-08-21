@@ -223,7 +223,9 @@ export type Database = {
       }
       customers: {
         Row: {
+          client_txn_id: string | null
           created_at: string
+          created_offline: boolean
           email: string | null
           id: string
           name: string
@@ -233,7 +235,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           email?: string | null
           id?: string
           name: string
@@ -243,7 +247,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           email?: string | null
           id?: string
           name?: string
@@ -633,7 +639,9 @@ export type Database = {
           attachment_name: string | null
           attachment_path: string | null
           category: string
+          client_txn_id: string | null
           created_at: string
+          created_offline: boolean
           description: string | null
           expense_date: string
           id: string
@@ -649,7 +657,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           category?: string
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           description?: string | null
           expense_date?: string
           id?: string
@@ -665,7 +675,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           category?: string
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           description?: string | null
           expense_date?: string
           id?: string
@@ -1028,7 +1040,9 @@ export type Database = {
           attachment_name: string | null
           attachment_path: string | null
           category: string | null
+          client_txn_id: string | null
           created_at: string
+          created_offline: boolean
           description: string | null
           id: string
           income_date: string
@@ -1045,7 +1059,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           category?: string | null
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           description?: string | null
           id?: string
           income_date?: string
@@ -1062,7 +1078,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           category?: string | null
+          client_txn_id?: string | null
           created_at?: string
+          created_offline?: boolean
           description?: string | null
           id?: string
           income_date?: string
@@ -1801,8 +1819,11 @@ export type Database = {
           amount_paid: number
           balance: number
           business_id: string | null
+          client_device_id: string | null
+          client_txn_id: string | null
           cost_total: number
           created_at: string
+          created_offline: boolean
           customer_id: string | null
           customer_name: string | null
           customer_phone: string | null
@@ -1821,6 +1842,7 @@ export type Database = {
           staff_name: string | null
           status: string
           subtotal: number
+          synced_at: string | null
           total: number
           updated_at: string
           user_id: string
@@ -1829,8 +1851,11 @@ export type Database = {
           amount_paid?: number
           balance?: number
           business_id?: string | null
+          client_device_id?: string | null
+          client_txn_id?: string | null
           cost_total?: number
           created_at?: string
+          created_offline?: boolean
           customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
@@ -1849,6 +1874,7 @@ export type Database = {
           staff_name?: string | null
           status?: string
           subtotal?: number
+          synced_at?: string | null
           total?: number
           updated_at?: string
           user_id: string
@@ -1857,8 +1883,11 @@ export type Database = {
           amount_paid?: number
           balance?: number
           business_id?: string | null
+          client_device_id?: string | null
+          client_txn_id?: string | null
           cost_total?: number
           created_at?: string
+          created_offline?: boolean
           customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
@@ -1877,6 +1906,7 @@ export type Database = {
           staff_name?: string | null
           status?: string
           subtotal?: number
+          synced_at?: string | null
           total?: number
           updated_at?: string
           user_id?: string
@@ -2596,6 +2626,10 @@ export type Database = {
         Args: { _module: string; _owner_id: string }
         Returns: boolean
       }
+      offline_can_write: {
+        Args: { _module: string; _owner: string }
+        Returns: boolean
+      }
       preview_staff_invite: { Args: { _token: string }; Returns: Json }
       public_confirm_order_receipt: {
         Args: { _code: string; _phone_last4: string }
@@ -2620,6 +2654,10 @@ export type Database = {
         Returns: Json
       }
       slugify: { Args: { _input: string }; Returns: string }
+      sync_offline_customer: { Args: { _payload: Json }; Returns: Json }
+      sync_offline_expense: { Args: { _payload: Json }; Returns: Json }
+      sync_offline_income: { Args: { _payload: Json }; Returns: Json }
+      sync_offline_sale: { Args: { _payload: Json }; Returns: Json }
       sync_product_stock: {
         Args: { _product_id: string; _user_id: string }
         Returns: number
