@@ -1,0 +1,158 @@
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const MODEL = 'google/gemini-3-flash';
+
+const ACTION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['reply', 'action'],
+  properties: {
+    reply: {
+      type: 'string',
+      description: 'Short, friendly reply to show the business owner. Never invent numbers.',
+    },
+    action: {
+      type: ['object', 'null'],
+      additionalProperties: false,
+      required: [
+        'type', 'summary', 'product_name', 'quantity', 'unit_price',
+        'customer_name', 'customer_phone', 'amount', 'category',
+        'payment_method', 'note', 'date',
+      ],
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['record_sale', 'record_expense', 'record_income', 'add_customer', 'restock', 'add_product'],
+        },
+        summary: { type: 'string', description: 'One-line human summary of what will be saved.' },
+        product_name: { type: ['string', 'null'] },
+        quantity: { type: ['number', 'null'] },
+        unit_price: { type: ['number', 'null'] },
+        customer_name: { type: ['string', 'null'] },
+        customer_phone: { type: ['string', 'null'] },
+        amount: { type: ['number', 'null'] },
+        category: { type: ['string', 'null'] },
+        payment_method: { type: ['string', 'null'], description: 'cash | momo | card | bank_transfer' },
+        note: { type: ['string', 'null'] },
+        date: { type: ['string', 'null'], description: 'ISO date (YYYY-MM-DD) if the user named a day.' },
+      },
+    },
+  },
+} as const;
+
+function systemPrompt(ctx: any) {
+  const products = Array.isArray(ctx?.products) ? ctx.products : [];
+  const productLines = products
+    .slice(0, 200)
+    .map((p: any) => `- ${p.name}${p.sku ? ` (${p.sku})` : ''}: price ${p.price}, cost ${p.cost}, stock ${p.stock}`)
+    .join('\n');
+
+  return `You are the KudiTrack AI Business Assistant for a small business in ${ctx?.country || 'Ghana'}.
+You help the owner record transactions and answer questions about their own business data, in plain conversational language.
+Today is ${ctx?.today}. The business currency is ${ctx?.currency}. Business name: ${ctx?.businessName || 'this business'}.
+
+RULES
+- Only ever discuss this business's data given below. Never invent numbers, products or customers.
+- If the user asks a question (sales, profit, stock, customers, expenses), answer from the snapshot and set "action" to null.
+- If the user wants to RECORD something, return the matching action with every field you can infer, and a clear "summary".
+  The app will show a confirmation card; never claim something is saved.
+- If key details are missing or ambiguous (product not in the catalogue, no amount, unclear quantity), set action to null and ask ONE short clarifying question.
+- Match product names to the catalogue below (case-insensitive, tolerate typos and plurals). If a sale price is not stated, use the catalogue price.
+- Amounts are plain numbers, no currency symbols. payment_method must be one of: cash, momo, card, bank_transfer (default cash).
+- Expense category should be one of: ${(ctx?.expenseCategories || []).join(', ')}.
+- Income category should be one of: ${(ctx?.incomeCategories || []).join(', ')}.
+- The user may only use these modules: ${(ctx?.modules || []).join(', ')}. Politely refuse actions outside them.
+- Keep replies under 60 words. Be warm, direct and practical, like a helpful shop manager.
+
+PRODUCT CATALOGUE
+${productLines || '(no products yet)'}
+
+BUSINESS SNAPSHOT
+${JSON.stringify(ctx?.snapshot ?? {}, null, 1)}`;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return json({ error: 'Unauthorized' }, 401);
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return json({ error: 'Unauthorized' }, 401);
+
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!apiKey) return json({ error: 'AI is not configured on this workspace.' }, 500);
+
+    const body = await req.json().catch(() => null);
+    const messages = Array.isArray(body?.messages) ? body.messages : null;
+    if (!messages || messages.length === 0) return json({ error: 'messages is required' }, 400);
+
+    const trimmed = messages
+      .filter((m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
+      .slice(-12)
+      .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
+
+    const res = await fetch(GATEWAY, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Lovable-API-Key': apiKey,
+        'X-Lovable-AIG-SDK': 'fetch',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'system', content: systemPrompt(body?.context ?? {}) }, ...trimmed],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'assistant_turn', strict: true, schema: ACTION_SCHEMA },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text();
+      console.error('[ai-assistant] gateway error', res.status, detail);
+      if (res.status === 429) {
+        return json({ error: 'The assistant is busy right now. Please try again in a moment.' }, 429);
+      }
+      if (res.status === 402) {
+        return json({ error: 'AI credits are exhausted. Please top up to keep using the assistant.' }, 402);
+      }
+      return json({ error: 'The assistant could not respond right now.' }, 502);
+    }
+
+    const data = await res.json();
+    const raw = data?.choices?.[0]?.message?.content ?? '';
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { reply: String(raw || 'Sorry, I did not catch that.'), action: null };
+    }
+
+    return json({
+      reply: typeof parsed?.reply === 'string' ? parsed.reply : 'Sorry, I did not catch that.',
+      action: parsed?.action ?? null,
+    }, 200);
+  } catch (error) {
+    console.error('[ai-assistant] unexpected', error);
+    return json({ error: 'Unexpected assistant error.' }, 500);
+  }
+});
+
+function json(payload: unknown, status: number) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
