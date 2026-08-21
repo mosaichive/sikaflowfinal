@@ -50,7 +50,19 @@ export function useAIAssistant() {
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || thinking || !user || !ownerId || !businessId) return;
+      if (!trimmed || thinking) return;
+      if (!user || !ownerId || !businessId) {
+        setMessages((prev) => [
+          ...prev,
+          { id: uid(), role: 'user', content: trimmed },
+          {
+            id: uid(),
+            role: 'assistant',
+            content: 'Finish setting up your business first — then I can record and answer questions for you.',
+          },
+        ]);
+        return;
+      }
 
       const userMessage: AssistantMessage = { id: uid(), role: 'user', content: trimmed };
       const history = [...messages, userMessage].filter((m) => m.id !== 'greeting');
