@@ -13,6 +13,7 @@ import { HeaderAdsTicker } from '@/components/HeaderAdsTicker';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { ReferralNotifications } from '@/components/referrals/ReferralNotifications';
 import { SurveyModal } from '@/components/survey/SurveyModal';
+import { AIAssistant } from '@/components/ai/AIAssistant';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -180,6 +181,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
           </main>
         </div>
         <MobileBottomNav />
+        <AIAssistant />
       </div>
     </SidebarProvider>
   );
