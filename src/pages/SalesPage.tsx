@@ -1149,7 +1149,7 @@ export default function SalesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            <Button variant="ghost" size="icon" onClick={() => { setDetailSaleId(sale.id); fetchSaleItems(sale.id); }} title="View details">
+                            <Button variant="ghost" size="icon" disabled={!!sale.offline_pending} onClick={() => { setDetailSaleId(sale.id); fetchSaleItems(sale.id); }} title={sale.offline_pending ? 'Available after this sale syncs' : 'View details'}>
                               <Eye className="h-4 w-4" />
                             </Button>
                             <TooltipProvider>
