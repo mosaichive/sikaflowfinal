@@ -21,7 +21,7 @@ export function OfflineSyncIndicator() {
   const [open, setOpen] = useState(false);
   const { online, syncing, pending, failed, conflicts, items, lastSyncedAt, syncNow, retryItem, retryAll, discardItem } =
     useOfflineSync();
-  const { formatCurrency } = useCurrency();
+
 
   const needsAttention = failed + conflicts;
   const queued = pending + needsAttention;
