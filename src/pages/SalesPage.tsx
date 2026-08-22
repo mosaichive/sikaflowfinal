@@ -166,17 +166,52 @@ export default function SalesPage() {
   };
 
   const fetchSales = async () => {
-    const { data } = await supabase.from('sales').select('*').order('sale_date', { ascending: false }).limit(50);
+    let serverRows: any[] = [];
+    try {
+      const { data } = await supabase.from('sales').select('*').order('sale_date', { ascending: false }).limit(50);
+      serverRows = data || [];
+    } catch {
+      serverRows = [];
+    }
     // Derive payment_status + balance for schemas that don't store them.
-    const enriched = (data || []).map((s: any) => {
+    const enriched = serverRows.map((s: any) => {
       const total = Number(s.total ?? 0);
       const paid = Number(s.amount_paid ?? 0);
       const balance = s.balance !== undefined && s.balance !== null ? Number(s.balance) : Math.max(0, total - paid);
       const payment_status = s.payment_status || (balance <= 0 && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid');
       return { ...s, balance, payment_status };
     });
-    setSales(enriched);
+    // Offline-first: unsynced on-device sales stay visible in history so the
+    // till never looks empty just because the connection dropped.
+    let offlineRows: any[] = [];
+    try {
+      const local = await readLocalSales();
+      offlineRows = local
+        .filter((record) => !record.serverId)
+        .map((record) => {
+          const snap = record.snapshot as any;
+          const total = Number(snap.total ?? 0);
+          const paid = Number(snap.amount_paid ?? 0);
+          const balance = snap.balance !== undefined ? Number(snap.balance) : Math.max(0, total - paid);
+          return {
+            id: record.id,
+            sale_date: snap.sale_date,
+            customer_name: snap.customer_name,
+            staff_name: snap.staff_name,
+            total,
+            amount_paid: paid,
+            balance,
+            payment_method: snap.payment_method,
+            payment_status: snap.payment_status || (balance <= 0 && total > 0 ? 'paid' : 'unpaid'),
+            offline_pending: true,
+          };
+        });
+    } catch {
+      offlineRows = [];
+    }
+    setSales([...offlineRows, ...enriched]);
   };
+
 
   const fetchSaleItems = async (saleId: string) => {
     const { data } = await supabase.from('sale_items').select('*').eq('sale_id', saleId);
