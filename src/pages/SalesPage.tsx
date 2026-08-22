@@ -1121,9 +1121,10 @@ export default function SalesPage() {
                       <TableRow key={sale.id}>
                         {isAdmin && (
                           <TableCell>
-                            <Checkbox checked={selectedIds.has(sale.id)} onCheckedChange={() => toggleSelect(sale.id)} />
+                            <Checkbox checked={selectedIds.has(sale.id)} onCheckedChange={() => toggleSelect(sale.id)} disabled={!!sale.offline_pending} />
                           </TableCell>
                         )}
+
                         <TableCell className="text-xs">{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
                         <TableCell>{sale.customer_name || 'Walk-in'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{sale.staff_name || '—'}</TableCell>
