@@ -138,8 +138,10 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
             </div>
             <HeaderAdsTicker />
             <div className="flex shrink-0 items-center gap-2 md:gap-3">
+              <OfflineSyncIndicator />
               <button
                 onClick={() => navigate('/announcements')}
+
                 aria-label={announcementBadge > 0 ? `${announcementBadge} unread announcement${announcementBadge === 1 ? '' : 's'}` : 'Open announcements'}
                 title={announcementBadge > 0 ? `${announcementBadge} unread announcement${announcementBadge === 1 ? '' : 's'}` : 'Announcements'}
                 className={cn(
