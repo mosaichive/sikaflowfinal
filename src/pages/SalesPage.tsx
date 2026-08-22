@@ -334,7 +334,46 @@ export default function SalesPage() {
     return total;
   };
 
+  const recordOfflineSaleFromForm = async () => {
+    if (!user) return;
+    const ownerId = effectiveBusinessOwnerId ?? user.id;
+    await recordSaleOffline({
+      ownerId,
+      businessId: businessId ?? null,
+      customerName: customerName || 'Walk-in',
+      customerPhone: customerPhone || null,
+      staffName: displayName,
+      saleDate: new Date(saleDate).toISOString(),
+      dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
+      subtotal, discount, total,
+      costTotal,
+      amountPaid: paidNumber,
+      balance,
+      paymentMethod,
+      paymentStatus,
+      notes: saleNotes || null,
+      items: validLines.map((row) => ({
+        product_id: row.product!.id,
+        product_name: row.product!.name,
+        sku: row.product!.sku ?? null,
+        quantity: row.qty,
+        unit_price: row.unitPrice,
+        unit_cost: row.costPrice,
+        line_total: row.amount,
+      })),
+    });
+    toast({
+      title: 'Sale saved on this device',
+      description: 'You are offline. It will sync to the cloud automatically when you reconnect.',
+    });
+    setPendingStockOverrideAction(null);
+    resetForm();
+    setOpen(false);
+    fetchData();
+  };
+
   const handleNewSale = async (overrideStockCheck = false) => {
+
     if (!user || !businessId) return;
     const stockShortfall = computeStockShortfall(validLines);
 
