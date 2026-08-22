@@ -1134,11 +1134,17 @@ export default function SalesPage() {
                         <TableCell>
                           <div className="flex flex-col items-start gap-1">
                             <StatusBadge status={sale.payment_status} />
+                            {sale.offline_pending ? (
+                              <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600">
+                                Offline — pending sync
+                              </Badge>
+                            ) : null}
                             {isNegativeStockSale(sale) ? (
                               <Badge variant="destructive" className="text-[10px]">
                                 Negative Stock Sale
                               </Badge>
                             ) : null}
+
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
