@@ -34,6 +34,8 @@ import {
   logSupabaseError,
   updateSaleRecord,
 } from '@/lib/workspace';
+import { recordSaleOffline } from '@/lib/offline-sale';
+
 
 type SaleLine = {
   key: string;
