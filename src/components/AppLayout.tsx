@@ -14,6 +14,8 @@ import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { ReferralNotifications } from '@/components/referrals/ReferralNotifications';
 import { SurveyModal } from '@/components/survey/SurveyModal';
 import { AIAssistant } from '@/components/ai/AIAssistant';
+import { OfflineSyncIndicator } from '@/components/offline/OfflineSyncIndicator';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
