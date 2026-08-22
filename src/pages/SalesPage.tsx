@@ -35,6 +35,8 @@ import {
   updateSaleRecord,
 } from '@/lib/workspace';
 import { recordSaleOffline } from '@/lib/offline-sale';
+import { readLocalSales } from '@/lib/offline-db';
+
 
 
 type SaleLine = {
