@@ -475,10 +475,22 @@ export default function SalesPage() {
       setOpen(false);
       fetchData();
     } catch (err: any) {
+      // A dropped connection mid-save must not lose the sale: fall back to the
+      // durable offline queue instead of showing an error.
+      const message = String(err?.message ?? '');
+      if (/failed to fetch|network|load failed|fetcherror/i.test(message)) {
+        try {
+          await recordOfflineSaleFromForm();
+          return;
+        } catch {
+          /* fall through to the generic error */
+        }
+      }
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
+
   };
 
   const handleSaveEdit = async (overrideStockCheck = false) => {
