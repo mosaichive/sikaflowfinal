@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
-import { useCurrency } from '@/context/CurrencyContext';
+import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 function relativeTime(ts: number | null) {
@@ -21,7 +21,7 @@ export function OfflineSyncIndicator() {
   const [open, setOpen] = useState(false);
   const { online, syncing, pending, failed, conflicts, items, lastSyncedAt, syncNow, retryItem, retryAll, discardItem } =
     useOfflineSync();
-  const { formatCurrency } = useCurrency();
+
 
   const needsAttention = failed + conflicts;
   const queued = pending + needsAttention;

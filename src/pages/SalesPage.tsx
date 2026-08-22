@@ -34,6 +34,10 @@ import {
   logSupabaseError,
   updateSaleRecord,
 } from '@/lib/workspace';
+import { recordSaleOffline } from '@/lib/offline-sale';
+import { readLocalSales } from '@/lib/offline-db';
+
+
 
 type SaleLine = {
   key: string;
@@ -164,17 +168,52 @@ export default function SalesPage() {
   };
 
   const fetchSales = async () => {
-    const { data } = await supabase.from('sales').select('*').order('sale_date', { ascending: false }).limit(50);
+    let serverRows: any[] = [];
+    try {
+      const { data } = await supabase.from('sales').select('*').order('sale_date', { ascending: false }).limit(50);
+      serverRows = data || [];
+    } catch {
+      serverRows = [];
+    }
     // Derive payment_status + balance for schemas that don't store them.
-    const enriched = (data || []).map((s: any) => {
+    const enriched = serverRows.map((s: any) => {
       const total = Number(s.total ?? 0);
       const paid = Number(s.amount_paid ?? 0);
       const balance = s.balance !== undefined && s.balance !== null ? Number(s.balance) : Math.max(0, total - paid);
       const payment_status = s.payment_status || (balance <= 0 && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid');
       return { ...s, balance, payment_status };
     });
-    setSales(enriched);
+    // Offline-first: unsynced on-device sales stay visible in history so the
+    // till never looks empty just because the connection dropped.
+    let offlineRows: any[] = [];
+    try {
+      const local = await readLocalSales();
+      offlineRows = local
+        .filter((record) => !record.serverId)
+        .map((record) => {
+          const snap = record.snapshot as any;
+          const total = Number(snap.total ?? 0);
+          const paid = Number(snap.amount_paid ?? 0);
+          const balance = snap.balance !== undefined ? Number(snap.balance) : Math.max(0, total - paid);
+          return {
+            id: record.id,
+            sale_date: snap.sale_date,
+            customer_name: snap.customer_name,
+            staff_name: snap.staff_name,
+            total,
+            amount_paid: paid,
+            balance,
+            payment_method: snap.payment_method,
+            payment_status: snap.payment_status || (balance <= 0 && total > 0 ? 'paid' : 'unpaid'),
+            offline_pending: true,
+          };
+        });
+    } catch {
+      offlineRows = [];
+    }
+    setSales([...offlineRows, ...enriched]);
   };
+
 
   const fetchSaleItems = async (saleId: string) => {
     const { data } = await supabase.from('sale_items').select('*').eq('sale_id', saleId);
@@ -332,7 +371,46 @@ export default function SalesPage() {
     return total;
   };
 
+  const recordOfflineSaleFromForm = async () => {
+    if (!user) return;
+    const ownerId = effectiveBusinessOwnerId ?? user.id;
+    await recordSaleOffline({
+      ownerId,
+      businessId: businessId ?? null,
+      customerName: customerName || 'Walk-in',
+      customerPhone: customerPhone || null,
+      staffName: displayName,
+      saleDate: new Date(saleDate).toISOString(),
+      dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
+      subtotal, discount, total,
+      costTotal,
+      amountPaid: paidNumber,
+      balance,
+      paymentMethod,
+      paymentStatus,
+      notes: saleNotes || null,
+      items: validLines.map((row) => ({
+        product_id: row.product!.id,
+        product_name: row.product!.name,
+        sku: row.product!.sku ?? null,
+        quantity: row.qty,
+        unit_price: row.unitPrice,
+        unit_cost: row.costPrice,
+        line_total: row.amount,
+      })),
+    });
+    toast({
+      title: 'Sale saved on this device',
+      description: 'You are offline. It will sync to the cloud automatically when you reconnect.',
+    });
+    setPendingStockOverrideAction(null);
+    resetForm();
+    setOpen(false);
+    fetchData();
+  };
+
   const handleNewSale = async (overrideStockCheck = false) => {
+
     if (!user || !businessId) return;
     const stockShortfall = computeStockShortfall(validLines);
 
@@ -351,7 +429,14 @@ export default function SalesPage() {
 
     setLoading(true);
     try {
+      // Offline-first: with no connection the sale is recorded on this device
+      // and queued for the idempotent cloud sync. Nothing is lost.
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await recordOfflineSaleFromForm();
+        return;
+      }
       const sale = await insertSaleRecord({
+
         user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
         sale_date: new Date(saleDate).toISOString(),
@@ -427,10 +512,22 @@ export default function SalesPage() {
       setOpen(false);
       fetchData();
     } catch (err: any) {
+      // A dropped connection mid-save must not lose the sale: fall back to the
+      // durable offline queue instead of showing an error.
+      const message = String(err?.message ?? '');
+      if (/failed to fetch|network|load failed|fetcherror/i.test(message)) {
+        try {
+          await recordOfflineSaleFromForm();
+          return;
+        } catch {
+          /* fall through to the generic error */
+        }
+      }
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
+
   };
 
   const handleSaveEdit = async (overrideStockCheck = false) => {
@@ -1024,9 +1121,10 @@ export default function SalesPage() {
                       <TableRow key={sale.id}>
                         {isAdmin && (
                           <TableCell>
-                            <Checkbox checked={selectedIds.has(sale.id)} onCheckedChange={() => toggleSelect(sale.id)} />
+                            <Checkbox checked={selectedIds.has(sale.id)} onCheckedChange={() => toggleSelect(sale.id)} disabled={!!sale.offline_pending} />
                           </TableCell>
                         )}
+
                         <TableCell className="text-xs">{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
                         <TableCell>{sale.customer_name || 'Walk-in'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{sale.staff_name || '—'}</TableCell>
@@ -1037,16 +1135,22 @@ export default function SalesPage() {
                         <TableCell>
                           <div className="flex flex-col items-start gap-1">
                             <StatusBadge status={sale.payment_status} />
+                            {sale.offline_pending ? (
+                              <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600">
+                                Offline — pending sync
+                              </Badge>
+                            ) : null}
                             {isNegativeStockSale(sale) ? (
                               <Badge variant="destructive" className="text-[10px]">
                                 Negative Stock Sale
                               </Badge>
                             ) : null}
+
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            <Button variant="ghost" size="icon" onClick={() => { setDetailSaleId(sale.id); fetchSaleItems(sale.id); }} title="View details">
+                            <Button variant="ghost" size="icon" disabled={!!sale.offline_pending} onClick={() => { setDetailSaleId(sale.id); fetchSaleItems(sale.id); }} title={sale.offline_pending ? 'Available after this sale syncs' : 'View details'}>
                               <Eye className="h-4 w-4" />
                             </Button>
                             <TooltipProvider>
