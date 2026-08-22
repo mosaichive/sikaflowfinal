@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
-import { useCurrency } from '@/context/CurrencyContext';
+import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 function relativeTime(ts: number | null) {
