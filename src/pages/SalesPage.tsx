@@ -353,7 +353,14 @@ export default function SalesPage() {
 
     setLoading(true);
     try {
+      // Offline-first: with no connection the sale is recorded on this device
+      // and queued for the idempotent cloud sync. Nothing is lost.
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await recordOfflineSaleFromForm();
+        return;
+      }
       const sale = await insertSaleRecord({
+
         user_id: effectiveBusinessOwnerId ?? user.id,
         business_id: businessId,
         sale_date: new Date(saleDate).toISOString(),
