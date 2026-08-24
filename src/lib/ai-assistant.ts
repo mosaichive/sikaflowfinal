@@ -9,7 +9,12 @@ import {
 import { recomputeProductStock } from '@/lib/sale-items-schema';
 import { notifyLowStock, notifySaleThanks } from '@/lib/sms-notifications';
 import { EXPENSE_CATEGORIES, OTHER_INCOME_CATEGORIES, PAYMENT_METHODS } from '@/lib/constants';
+import { enqueueOperation } from '@/lib/offline-sync';
+import { recordSaleOffline } from '@/lib/offline-sale';
+import { matchProduct, matchProductCandidates } from '@/lib/product-match';
 import type { ModuleKey } from '@/lib/permissions';
+
+export { matchProduct, matchProductCandidates };
 
 export type AssistantActionType =
   | 'record_sale'
@@ -19,9 +24,18 @@ export type AssistantActionType =
   | 'restock'
   | 'add_product';
 
+export interface AssistantSaleItem {
+  product_name?: string | null;
+  quantity?: number | null;
+  /** Null means "use the catalogue price" — totals are always computed in app code. */
+  unit_price?: number | null;
+}
+
 export interface AssistantAction {
   type: AssistantActionType;
   summary: string;
+  /** Multi-item support: one entry per product in a sale. Falls back to the single fields. */
+  items?: AssistantSaleItem[] | null;
   product_name?: string | null;
   quantity?: number | null;
   unit_price?: number | null;
@@ -32,6 +46,8 @@ export interface AssistantAction {
   payment_method?: string | null;
   note?: string | null;
   date?: string | null;
+  /** True when the customer has not paid yet (credit sale). */
+  on_credit?: boolean | null;
 }
 
 export interface AssistantMessage {
@@ -67,6 +83,10 @@ function num(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function normalizePaymentMethod(value?: string | null) {
   const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
   if (VALID_PAYMENT_METHODS.includes(raw)) return raw;
@@ -90,20 +110,6 @@ function resolveDate(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
-/** Loose product matcher: exact, then case-insensitive, then contains, then singular/plural. */
-export function matchProduct(products: any[], name?: string | null) {
-  const query = String(name || '').trim().toLowerCase();
-  if (!query) return null;
-  const singular = query.replace(/s$/, '');
-  return (
-    products.find((p) => String(p.name || '').toLowerCase() === query) ||
-    products.find((p) => String(p.sku || '').toLowerCase() === query) ||
-    products.find((p) => String(p.name || '').toLowerCase().includes(query)) ||
-    products.find((p) => String(p.name || '').toLowerCase().replace(/s$/, '') === singular) ||
-    null
-  );
-}
-
 export interface AssistantExecutionContext {
   userId: string;
   ownerId: string;
@@ -111,6 +117,8 @@ export interface AssistantExecutionContext {
   displayName: string;
   products: any[];
   allowSalesWithoutStock: boolean;
+  /** When true, actions are queued on-device and sync later via the offline engine. */
+  offline?: boolean;
 }
 
 export interface ExecutionResult {
@@ -140,39 +148,142 @@ export async function executeAssistantAction(
   }
 }
 
+/* ------------------------------------------------------------------ sales */
+
+interface ResolvedLine {
+  product: any;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number;
+  lineTotal: number;
+  shortfall: number;
+}
+
+/**
+ * Resolves every requested line against the catalogue. Each item is matched
+ * independently, prices default to the catalogue price, and totals are always
+ * computed here — never taken from the AI.
+ */
+function resolveSaleLines(
+  action: AssistantAction,
+  ctx: AssistantExecutionContext,
+): { lines: ResolvedLine[] } | { error: string } {
+  const rawItems = (
+    Array.isArray(action.items) && action.items.length > 0
+      ? action.items
+      : [{ product_name: action.product_name, quantity: action.quantity, unit_price: action.unit_price }]
+  ).filter((item) => String(item?.product_name || '').trim());
+
+  if (rawItems.length === 0) return { error: 'I need at least one product to record a sale.' };
+
+  const lines: ResolvedLine[] = [];
+  const unmatched: string[] = [];
+
+  for (const item of rawItems) {
+    const product = matchProduct(ctx.products, item.product_name);
+    if (!product) {
+      unmatched.push(String(item.product_name));
+      continue;
+    }
+    const quantity = Math.max(1, num(item.quantity, 1));
+    const unitPrice = item.unit_price != null ? num(item.unit_price) : num(product.selling_price ?? product.price);
+    if (unitPrice <= 0) {
+      return { error: `"${product.name}" has no selling price yet. Set a price on the product first.` };
+    }
+    const unitCost = num(product.cost_price ?? product.cost);
+    const available = num(product.quantity ?? product.stock);
+    const shortfall = Math.max(0, quantity - Math.max(0, available));
+    lines.push({ product, quantity, unitPrice, unitCost, lineTotal: round2(unitPrice * quantity), shortfall });
+  }
+
+  if (unmatched.length > 0) {
+    const details = unmatched.map((name) => {
+      const suggestions = matchProductCandidates(ctx.products, name)
+        .slice(0, 3)
+        .map((c) => c.product?.name)
+        .filter(Boolean);
+      return suggestions.length ? `"${name}" (did you mean ${suggestions.join(' or ')}?)` : `"${name}"`;
+    });
+    return { error: `I could not find ${details.join(', ')} in your products. Nothing was saved — adjust the items and try again.` };
+  }
+
+  if (!ctx.allowSalesWithoutStock) {
+    const blocked = lines.filter((line) => line.shortfall > 0);
+    if (blocked.length > 0) {
+      const detail = blocked
+        .map((line) => `only ${num(line.product.quantity ?? line.product.stock)} of ${line.product.name} left`)
+        .join('; ');
+      return { error: `Not enough stock: ${detail}. Restock before saving this sale.` };
+    }
+  }
+
+  return { lines };
+}
+
 async function recordSale(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
-  const product = matchProduct(ctx.products, action.product_name);
-  if (!product) return { ok: false, message: `I could not find "${action.product_name}" in your products.` };
+  const resolved = resolveSaleLines(action, ctx);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const { lines } = resolved;
 
-  const quantity = Math.max(1, num(action.quantity, 1));
-  const unitPrice = action.unit_price != null ? num(action.unit_price) : num(product.selling_price ?? product.price);
-  if (unitPrice <= 0) return { ok: false, message: 'That product has no selling price yet. Set a price first.' };
+  const total = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+  const costTotal = round2(lines.reduce((sum, line) => sum + line.unitCost * line.quantity, 0));
+  const onCredit = Boolean(action.on_credit);
+  const amountPaid = onCredit ? 0 : total;
+  const balance = round2(Math.max(0, total - amountPaid));
+  const paymentStatus = onCredit ? 'unpaid' : 'paid';
+  const customerName = String(action.customer_name || '').trim() || 'Walk-in';
+  const shortfall = lines.reduce((sum, line) => sum + line.shortfall, 0);
+  const label = lines.map((line) => `${line.product.name} × ${line.quantity}`).join(', ');
 
-  const unitCost = num(product.cost_price ?? product.cost);
-  const total = unitPrice * quantity;
-  const costTotal = unitCost * quantity;
-  const available = num(product.quantity ?? product.stock);
-  const shortfall = Math.max(0, quantity - Math.max(0, available));
-
-  if (shortfall > 0 && !ctx.allowSalesWithoutStock) {
-    return { ok: false, message: `Only ${available} of ${product.name} left in stock. Restock before selling ${quantity}.` };
+  if (ctx.offline) {
+    await recordSaleOffline({
+      ownerId: ctx.ownerId,
+      businessId: ctx.businessId,
+      customerName,
+      customerPhone: action.customer_phone || null,
+      staffName: ctx.displayName,
+      saleDate: resolveDate(action.date),
+      dueDate: null,
+      subtotal: total,
+      discount: 0,
+      total,
+      costTotal,
+      amountPaid,
+      balance,
+      paymentMethod: normalizePaymentMethod(action.payment_method),
+      paymentStatus,
+      notes: action.note || 'Recorded with AI Assistant (offline)',
+      items: lines.map((line) => ({
+        product_id: line.product.id,
+        product_name: line.product.name,
+        sku: line.product.sku ?? null,
+        quantity: line.quantity,
+        unit_price: line.unitPrice,
+        unit_cost: line.unitCost,
+        line_total: line.lineTotal,
+      })),
+    });
+    return {
+      ok: true,
+      message: `Sale saved on this device (${label}) — it will sync automatically when you're back online.`,
+    };
   }
 
   const sale: any = await insertSaleRecord({
     user_id: ctx.ownerId,
     business_id: ctx.businessId,
     sale_date: resolveDate(action.date),
-    customer_name: action.customer_name || 'Walk-in',
+    customer_name: customerName,
     customer_phone: action.customer_phone || '',
     staff_id: ctx.userId,
     staff_name: ctx.displayName,
     subtotal: total,
     discount: 0,
     total,
-    amount_paid: total,
-    balance: 0,
+    amount_paid: amountPaid,
+    balance,
     payment_method: normalizePaymentMethod(action.payment_method),
-    payment_status: 'paid',
+    payment_status: paymentStatus,
     due_date: null,
     status: 'completed',
     sale_channel: 'pos',
@@ -182,49 +293,79 @@ async function recordSale(action: AssistantAction, ctx: AssistantExecutionContex
     cost_total: costTotal,
   });
 
-  await insertSaleItemRecord({
-    user_id: ctx.ownerId,
-    business_id: ctx.businessId,
-    sale_id: sale.id,
-    product_id: product.id,
-    product_name: product.name,
-    sku: product.sku,
-    quantity,
-    unit_price: unitPrice,
-    unit_cost: unitCost,
-    cost_price: unitCost,
-    line_total: total,
-  });
+  for (const line of lines) {
+    await insertSaleItemRecord({
+      user_id: ctx.ownerId,
+      business_id: ctx.businessId,
+      sale_id: sale.id,
+      product_id: line.product.id,
+      product_name: line.product.name,
+      sku: line.product.sku,
+      quantity: line.quantity,
+      unit_price: line.unitPrice,
+      unit_cost: line.unitCost,
+      cost_price: line.unitCost,
+      line_total: line.lineTotal,
+    });
+  }
 
-  if (action.customer_name && action.customer_name !== 'Walk-in') {
+  if (customerName !== 'Walk-in') {
     const { data: existing } = await supabase
       .from('customers')
       .select('id')
       .eq('user_id', ctx.ownerId)
-      .ilike('name', action.customer_name)
+      .ilike('name', customerName)
       .maybeSingle();
     if (!existing) {
       await supabase
         .from('customers')
-        .insert({ user_id: ctx.ownerId, name: action.customer_name, phone: action.customer_phone || null });
+        .insert({ user_id: ctx.ownerId, name: customerName, phone: action.customer_phone || null });
     }
   }
 
   void notifySaleThanks(sale.id);
-  void notifyLowStock([product.id]);
+  void notifyLowStock(lines.map((line) => line.product.id));
 
-  return { ok: true, message: `Sale recorded: ${product.name} × ${quantity}.` };
+  return {
+    ok: true,
+    message: `Sale recorded: ${label}${onCredit ? ' (on credit — unpaid)' : ''}.`,
+  };
 }
+
+/* ---------------------------------------------------------------- expense */
 
 async function recordExpense(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
   const amount = num(action.amount);
   if (amount <= 0) return { ok: false, message: 'I need a valid expense amount.' };
 
+  const category = normalizeCategory(action.category, EXPENSE_CATEGORIES);
+  const description = action.note || action.category || 'Recorded with AI Assistant';
+
+  if (ctx.offline) {
+    await enqueueOperation({
+      kind: 'expense',
+      ownerId: ctx.ownerId,
+      businessId: ctx.businessId,
+      amount,
+      label: `Expense — ${category}`,
+      payload: {
+        amount,
+        category,
+        description,
+        note: action.note || description,
+        payment_method: normalizePaymentMethod(action.payment_method),
+        expense_date: resolveDate(action.date),
+        recorded_by_name: ctx.displayName,
+      },
+    });
+    return { ok: true, message: 'Expense saved on this device — it will sync when you reconnect.' };
+  }
+
   await insertExpenseRecord({
     user_id: ctx.ownerId,
     business_id: ctx.businessId,
-    category: normalizeCategory(action.category, EXPENSE_CATEGORIES),
-    description: action.note || action.category || 'Recorded with AI Assistant',
+    category,
+    description,
     amount,
     expense_date: resolveDate(action.date),
     payment_method: normalizePaymentMethod(action.payment_method),
@@ -237,11 +378,35 @@ async function recordExpense(action: AssistantAction, ctx: AssistantExecutionCon
   return { ok: true, message: 'Expense recorded.' };
 }
 
+/* ----------------------------------------------------------------- income */
+
 async function recordIncome(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
   const amount = num(action.amount);
   if (amount <= 0) return { ok: false, message: 'I need a valid income amount.' };
 
   const category = normalizeCategory(action.category, OTHER_INCOME_CATEGORIES);
+
+  if (ctx.offline) {
+    await enqueueOperation({
+      kind: 'income',
+      ownerId: ctx.ownerId,
+      businessId: ctx.businessId,
+      amount,
+      label: `Income — ${category}`,
+      payload: {
+        amount,
+        source: category,
+        category,
+        description: action.note || category,
+        note: action.note || category,
+        payment_method: normalizePaymentMethod(action.payment_method),
+        income_date: resolveDate(action.date),
+        recorded_by_name: ctx.displayName,
+      },
+    });
+    return { ok: true, message: 'Income saved on this device — it will sync when you reconnect.' };
+  }
+
   const { error } = await supabase.from('other_income' as any).insert({
     user_id: ctx.ownerId,
     source: category,
@@ -259,9 +424,22 @@ async function recordIncome(action: AssistantAction, ctx: AssistantExecutionCont
   return { ok: true, message: 'Other income recorded.' };
 }
 
+/* -------------------------------------------------------------- customers */
+
 async function addCustomer(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
   const name = String(action.customer_name || '').trim();
   if (!name) return { ok: false, message: 'I need the customer name.' };
+
+  if (ctx.offline) {
+    await enqueueOperation({
+      kind: 'customer',
+      ownerId: ctx.ownerId,
+      businessId: ctx.businessId,
+      label: `New customer: ${name}`,
+      payload: { name, phone: action.customer_phone || null, note: action.note || null },
+    });
+    return { ok: true, message: `${name} saved on this device — the customer will sync when you reconnect.` };
+  }
 
   const { error } = await supabase.from('customers').insert({
     user_id: ctx.ownerId,
@@ -274,7 +452,16 @@ async function addCustomer(action: AssistantAction, ctx: AssistantExecutionConte
   return { ok: true, message: `${name} added to customers.` };
 }
 
+/* ----------------------------------------------------------------- restock */
+
 async function restockProduct(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
+  if (ctx.offline) {
+    return {
+      ok: false,
+      message: 'Restocking needs an internet connection — stock levels have to be checked against the server. Please reconnect and try again.',
+    };
+  }
+
   const product = matchProduct(ctx.products, action.product_name);
   if (!product) return { ok: false, message: `I could not find "${action.product_name}" in your products.` };
 
@@ -306,7 +493,16 @@ async function restockProduct(action: AssistantAction, ctx: AssistantExecutionCo
   return { ok: true, message: `Restocked ${product.name} by ${quantity}.` };
 }
 
+/* ---------------------------------------------------------------- products */
+
 async function addProduct(action: AssistantAction, ctx: AssistantExecutionContext): Promise<ExecutionResult> {
+  if (ctx.offline) {
+    return {
+      ok: false,
+      message: 'Adding a new product needs an internet connection. Please reconnect and try again.',
+    };
+  }
+
   const name = String(action.product_name || '').trim();
   if (!name) return { ok: false, message: 'I need a product name.' };
   const price = num(action.unit_price ?? action.amount);
@@ -324,6 +520,8 @@ async function addProduct(action: AssistantAction, ctx: AssistantExecutionContex
 
   return { ok: true, message: `${name} added to your products.` };
 }
+
+/* ----------------------------------------------------------------- context */
 
 /** Builds the read-only business snapshot the assistant reasons over. */
 export async function buildAssistantContext(params: {
