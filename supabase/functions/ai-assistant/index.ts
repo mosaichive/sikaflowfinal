@@ -17,9 +17,9 @@ const ACTION_SCHEMA = {
       type: ['object', 'null'],
       additionalProperties: false,
       required: [
-        'type', 'summary', 'product_name', 'quantity', 'unit_price',
+        'type', 'summary', 'items', 'product_name', 'quantity', 'unit_price',
         'customer_name', 'customer_phone', 'amount', 'category',
-        'payment_method', 'note', 'date',
+        'payment_method', 'note', 'date', 'on_credit',
       ],
       properties: {
         type: {
@@ -27,7 +27,22 @@ const ACTION_SCHEMA = {
           enum: ['record_sale', 'record_expense', 'record_income', 'add_customer', 'restock', 'add_product'],
         },
         summary: { type: 'string', description: 'One-line human summary of what will be saved.' },
-        product_name: { type: ['string', 'null'] },
+        items: {
+          type: ['array', 'null'],
+          description:
+            'For record_sale only: one entry per product mentioned, in the order spoken. Null for every other action type.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['product_name', 'quantity', 'unit_price'],
+            properties: {
+              product_name: { type: 'string', description: 'Best catalogue match for this line.' },
+              quantity: { type: ['number', 'null'], description: 'Defaults to 1 when not stated.' },
+              unit_price: { type: ['number', 'null'], description: 'Null = apply the catalogue price.' },
+            },
+          },
+        },
+        product_name: { type: ['string', 'null'], description: 'First sale item, or the product for restock/add_product.' },
         quantity: { type: ['number', 'null'] },
         unit_price: { type: ['number', 'null'] },
         customer_name: { type: ['string', 'null'] },
@@ -37,6 +52,11 @@ const ACTION_SCHEMA = {
         payment_method: { type: ['string', 'null'], description: 'cash | momo | card | bank_transfer' },
         note: { type: ['string', 'null'] },
         date: { type: ['string', 'null'], description: 'ISO date (YYYY-MM-DD) if the user named a day.' },
+        on_credit: {
+          type: ['boolean', 'null'],
+          description:
+            'record_sale only: true when the customer has not paid yet ("on credit", "will pay later", "owes me"); false when paid.',
+        },
       },
     },
   },
@@ -58,8 +78,15 @@ RULES
 - If the user asks a question (sales, profit, stock, customers, expenses), answer from the snapshot and set "action" to null.
 - If the user wants to RECORD something, return the matching action with every field you can infer, and a clear "summary".
   The app will show a confirmation card; never claim something is saved.
+- MULTI-ITEM SALES: "sold 3 shirts at 50 each and 2 bags for 100, plus 1 sandal" is ONE record_sale with one "items" entry
+  per product, in the order spoken. Split on "and", "plus", "also", "then", commas and semicolons. Always fill "items" for
+  record_sale (even for a single item), and mirror the first item into product_name/quantity/unit_price.
+- Prices: "at X", "for X", "X each" or "@X" set that item's unit_price. If no price is stated for an item, set its
+  unit_price to null — the app applies the catalogue price. Never compute or invent totals.
+- CREDIT: "on credit", "hasn't paid", "not paid", "will pay later" or "owes me" set on_credit to true; a paid sale is
+  false; other action types use null.
 - If key details are missing or ambiguous (product not in the catalogue, no amount, unclear quantity), set action to null and ask ONE short clarifying question.
-- Match product names to the catalogue below (case-insensitive, tolerate typos and plurals). If a sale price is not stated, use the catalogue price.
+- Match product names to the catalogue below (case-insensitive, tolerate typos, plurals and missing spaces like "tshirt").
 - Amounts are plain numbers, no currency symbols. payment_method must be one of: cash, momo, card, bank_transfer (default cash).
 - Expense category should be one of: ${(ctx?.expenseCategories || []).join(', ')}.
 - Income category should be one of: ${(ctx?.incomeCategories || []).join(', ')}.

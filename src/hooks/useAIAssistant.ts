@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getActiveCurrencyCode } from '@/lib/currency';
 import { ALL_MODULES } from '@/lib/permissions';
 import { loadProductsCompat } from '@/lib/workspace';
+import { offlineStorageAvailable, readCachedRecords, readLocalSales, STORE_CUSTOMERS } from '@/lib/offline-db';
+import { parseOfflineCommand } from '@/lib/offline-assistant';
 import {
   ACTION_LABEL,
   ACTION_MODULE,
@@ -21,8 +23,17 @@ const GREETING: AssistantMessage = {
   id: 'greeting',
   role: 'assistant',
   content:
-    'Hi! I can record sales, expenses, income, restocks and customers for you — or answer questions about your business. Try "I sold 3 shirts at 50 each" or "How much did I make today?"',
+    'Hi! I can record sales, expenses, income, restocks and customers for you — or answer questions about your business. Try "I sold 3 shirts at 50 each and 2 bags for 100" or "How much did I make today?"',
 };
+
+/** True when the edge-function call failed at the network layer (not a real API error). */
+function isNetworkInvokeError(error: any) {
+  const message = String(error?.message || '');
+  return (
+    error?.name === 'FunctionsFetchError' ||
+    /failed to (send|fetch)|network\s?error|load failed/i.test(message)
+  );
+}
 
 export function useAIAssistant() {
   const { user, displayName, effectiveBusinessOwnerId, hasModule, staffMembership } = useAuth();
@@ -33,7 +44,21 @@ export function useAIAssistant() {
   const [thinking, setThinking] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const recognitionRef = useRef<any>(null);
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
 
   const allowedModules = useMemo(
     () => ALL_MODULES.map((m) => m.key).filter((key) => hasModule(key)),
@@ -46,6 +71,49 @@ export function useAIAssistant() {
   }, []);
 
   const ownerId = effectiveBusinessOwnerId ?? user?.id ?? null;
+
+  /**
+   * On-device fallback: parse the command against the cached catalogue and
+   * return the same structured action the cloud assistant would. Used when
+   * offline, or when the edge function is unreachable.
+   */
+  const runOffline = useCallback(
+    async (text: string) => {
+      const [products, customers, localSales] = await Promise.all([
+        loadProductsCompat(false, businessId).catch(() => [] as any[]),
+        readCachedRecords(STORE_CUSTOMERS).catch(() => [] as any[]),
+        readLocalSales().catch(() => []),
+      ]);
+
+      const result = parseOfflineCommand(text, {
+        products: products as any[],
+        customers: customers as any[],
+        localSales,
+        currency: getActiveCurrencyCode(),
+      });
+
+      if (result.kind === 'reply') {
+        setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: result.reply }]);
+        return;
+      }
+
+      const action = result.action;
+      const blocked = !hasModule(ACTION_MODULE[action.type]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: 'assistant',
+          content: blocked
+            ? `You do not have access to ${ACTION_LABEL[action.type].toLowerCase()}. Ask your business owner for permission.`
+            : result.reply,
+          action: blocked ? null : action,
+          actionState: blocked ? undefined : 'pending',
+        },
+      ]);
+    },
+    [businessId, hasModule],
+  );
 
   const send = useCallback(
     async (text: string) => {
@@ -70,6 +138,11 @@ export function useAIAssistant() {
       setThinking(true);
 
       try {
+        if (!onlineRef.current) {
+          await runOffline(trimmed);
+          return;
+        }
+
         const context = await buildAssistantContext({
           ownerId,
           businessId,
@@ -104,6 +177,15 @@ export function useAIAssistant() {
           },
         ]);
       } catch (err: any) {
+        // Network-level failures fall back to the on-device parser so the user can keep working.
+        if (isNetworkInvokeError(err) && offlineStorageAvailable()) {
+          try {
+            await runOffline(trimmed);
+            return;
+          } catch {
+            /* fall through to the error message */
+          }
+        }
         setMessages((prev) => [
           ...prev,
           {
@@ -118,7 +200,7 @@ export function useAIAssistant() {
         setThinking(false);
       }
     },
-    [allowedModules, business?.name, businessId, hasModule, messages, ownerId, thinking, user],
+    [allowedModules, business?.name, businessId, hasModule, messages, ownerId, runOffline, thinking, user],
   );
 
   const confirmAction = useCallback(
@@ -131,12 +213,20 @@ export function useAIAssistant() {
 
       setExecutingId(messageId);
       try {
+        const offline = !onlineRef.current;
         const products = await loadProductsCompat(false, businessId);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('allow_sales_without_stock')
-          .eq('id', ownerId)
-          .maybeSingle();
+
+        // Offline there is no way to read the stock policy — queue the sale and
+        // let the server-side sync enforce it.
+        let allowSalesWithoutStock = true;
+        if (!offline) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('allow_sales_without_stock')
+            .eq('id', ownerId)
+            .maybeSingle();
+          allowSalesWithoutStock = Boolean((profile as any)?.allow_sales_without_stock);
+        }
 
         const result = await executeAssistantAction(action, {
           userId: user.id,
@@ -144,7 +234,8 @@ export function useAIAssistant() {
           businessId,
           displayName: displayName || user.email || 'Team member',
           products: products as any[],
-          allowSalesWithoutStock: Boolean((profile as any)?.allow_sales_without_stock),
+          allowSalesWithoutStock,
+          offline,
         });
 
         if (!result.ok) {
@@ -160,7 +251,7 @@ export function useAIAssistant() {
             content: `${result.message} Anything else?`,
           }),
         );
-        toast({ title: 'Saved', description: result.message });
+        toast({ title: offline ? 'Saved on device' : 'Saved', description: result.message });
       } catch (err: any) {
         toast({ title: 'Could not save', description: err?.message || 'Please try again.', variant: 'destructive' });
       } finally {
@@ -169,6 +260,11 @@ export function useAIAssistant() {
     },
     [businessId, displayName, hasModule, ownerId, toast, user],
   );
+
+  /** Applies the user's edits (quantity, price, removed lines) to a pending action card. */
+  const updateAction = useCallback((messageId: string, action: AssistantAction) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, action } : m)));
+  }, []);
 
   const cancelAction = useCallback((messageId: string) => {
     setMessages((prev) =>
@@ -189,8 +285,12 @@ export function useAIAssistant() {
     setListening(false);
   }, []);
 
+  /**
+   * Continuous dictation: the transcript streams into the input box and is
+   * NEVER auto-sent — the user reviews it and taps Send.
+   */
   const startListening = useCallback(
-    (onResult: (text: string) => void) => {
+    (onTranscript: (text: string) => void) => {
       if (!voiceSupported) {
         toast({
           title: 'Voice not supported',
@@ -202,11 +302,22 @@ export function useAIAssistant() {
       const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new Ctor();
       recognition.lang = 'en-GH';
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
+
+      let finalTranscript = '';
       recognition.onresult = (event: any) => {
-        const transcript = event?.results?.[0]?.[0]?.transcript;
-        if (transcript) onResult(String(transcript));
+        let interim = '';
+        const results = event?.results;
+        for (let i = event?.resultIndex ?? 0; i < (results?.length ?? 0); i++) {
+          const result = results[i];
+          const transcript = result?.[0]?.transcript ?? '';
+          if (result?.isFinal) finalTranscript = `${finalTranscript} ${transcript}`.trim();
+          else interim += transcript;
+        }
+        const combined = [finalTranscript, interim.trim()].filter(Boolean).join(' ').trim();
+        if (combined) onTranscript(combined);
       };
       recognition.onerror = () => {
         setListening(false);
@@ -215,7 +326,11 @@ export function useAIAssistant() {
       recognition.onend = () => setListening(false);
       recognitionRef.current = recognition;
       setListening(true);
-      recognition.start();
+      try {
+        recognition.start();
+      } catch {
+        setListening(false);
+      }
     },
     [toast, voiceSupported],
   );
@@ -230,9 +345,11 @@ export function useAIAssistant() {
     executingId,
     listening,
     voiceSupported,
+    online,
     send,
     confirmAction,
     cancelAction,
+    updateAction,
     startListening,
     stopListening,
     reset,
