@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Mic, MicOff, Send, X, Loader2, Check, RotateCcw } from 'lucide-react';
+import { Sparkles, Mic, MicOff, Send, X, Loader2, Check, RotateCcw, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/constants';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
-import { ACTION_LABEL, type AssistantAction, type AssistantMessage } from '@/lib/ai-assistant';
+import {
+  ACTION_LABEL,
+  type AssistantAction,
+  type AssistantMessage,
+  type AssistantSaleItem,
+} from '@/lib/ai-assistant';
 
 const QUICK_PROMPTS = [
   'How much did I make today?',
+  'Sold 2 shirts at 50 and 1 bag at 100',
   'Which products are low on stock?',
   'Record 5,000 rent expense',
 ];
@@ -23,20 +29,137 @@ function ActionDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function saleItemsOf(action: AssistantAction): AssistantSaleItem[] {
+  if (Array.isArray(action.items) && action.items.length > 0) return action.items;
+  return [{ product_name: action.product_name, quantity: action.quantity, unit_price: action.unit_price }];
+}
+
+/** Editable multi-item table shown on a pending sale card. */
+function SaleItemsEditor({
+  action,
+  disabled,
+  onChange,
+}: {
+  action: AssistantAction;
+  disabled: boolean;
+  onChange: (next: AssistantAction) => void;
+}) {
+  const items = saleItemsOf(action);
+
+  const update = (index: number, patch: Partial<AssistantSaleItem>) => {
+    onChange({ ...action, items: items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
+  };
+  const remove = (index: number) => {
+    onChange({ ...action, items: items.filter((_, i) => i !== index) });
+  };
+
+  const pricedTotal = items.reduce(
+    (sum, item) => (item.unit_price != null ? sum + Number(item.unit_price) * (Number(item.quantity) || 1) : sum),
+    0,
+  );
+  const hasUnpriced = items.some((item) => item.unit_price == null);
+
+  return (
+    <div className="space-y-1.5 rounded-xl bg-background/70 p-2">
+      {items.map((item, index) => (
+        <div key={index} className="flex items-center gap-1.5">
+          <span
+            className="min-w-0 flex-1 truncate text-xs font-medium text-foreground"
+            title={String(item.product_name ?? '')}
+          >
+            {item.product_name || 'Product'}
+          </span>
+          <Input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            value={item.quantity ?? ''}
+            disabled={disabled}
+            onChange={(event) =>
+              update(index, { quantity: event.target.value === '' ? null : Math.max(1, Number(event.target.value) || 1) })
+            }
+            className="h-7 w-14 px-1.5 text-center text-xs"
+            aria-label={`Quantity for ${item.product_name}`}
+          />
+          <span className="text-[10px] text-muted-foreground">×</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            value={item.unit_price ?? ''}
+            placeholder="Catalogue"
+            disabled={disabled}
+            onChange={(event) =>
+              update(index, { unit_price: event.target.value === '' ? null : Number(event.target.value) })
+            }
+            className="h-7 w-20 px-1.5 text-right text-xs"
+            aria-label={`Unit price for ${item.product_name}`}
+          />
+          {items.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => remove(index)}
+              disabled={disabled}
+              aria-label={`Remove ${item.product_name}`}
+              className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ))}
+      <div className="flex items-baseline justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
+        <span className="text-muted-foreground">Total</span>
+        <span className="font-semibold text-foreground">
+          {formatCurrency(pricedTotal)}
+          {hasUnpriced ? ' + catalogue-priced items' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Read-only item list shown once a sale card is settled. */
+function SaleItemsSummary({ action }: { action: AssistantAction }) {
+  const items = saleItemsOf(action);
+  return (
+    <div className="space-y-1 rounded-xl bg-background/70 p-2">
+      {items.map((item, index) => (
+        <div key={index} className="flex items-baseline justify-between gap-3 text-xs">
+          <span className="truncate text-muted-foreground">
+            {item.product_name} × {item.quantity ?? 1}
+          </span>
+          <span className="shrink-0 font-medium text-foreground">
+            {item.unit_price != null
+              ? formatCurrency(Number(item.unit_price) * (Number(item.quantity) || 1))
+              : 'catalogue price'}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActionCard({
   message,
   action,
   busy,
+  online,
+  onUpdate,
   onConfirm,
   onCancel,
 }: {
   message: AssistantMessage;
   action: AssistantAction;
   busy: boolean;
+  online: boolean;
+  onUpdate: (next: AssistantAction) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const settled = message.actionState === 'done' || message.actionState === 'cancelled';
+  const isSale = action.type === 'record_sale';
 
   return (
     <div className="mt-2 rounded-2xl border border-primary/30 bg-primary/5 p-3 space-y-2">
@@ -56,17 +179,28 @@ function ActionCard({
 
       <p className="text-sm font-medium text-foreground">{action.summary}</p>
 
+      {isSale ? (
+        settled ? (
+          <SaleItemsSummary action={action} />
+        ) : (
+          <SaleItemsEditor action={action} disabled={busy} onChange={onUpdate} />
+        )
+      ) : null}
+
       <div className="space-y-1 rounded-xl bg-background/70 p-2">
-        {action.product_name ? <ActionDetail label="Product" value={action.product_name} /> : null}
-        {action.quantity != null ? <ActionDetail label="Quantity" value={String(action.quantity)} /> : null}
-        {action.unit_price != null ? <ActionDetail label="Unit price" value={formatCurrency(Number(action.unit_price))} /> : null}
-        {action.amount != null ? <ActionDetail label="Amount" value={formatCurrency(Number(action.amount))} /> : null}
-        {action.quantity != null && action.unit_price != null ? (
-          <ActionDetail label="Total" value={formatCurrency(Number(action.quantity) * Number(action.unit_price))} />
+        {!isSale && action.product_name ? <ActionDetail label="Product" value={action.product_name} /> : null}
+        {!isSale && action.quantity != null ? <ActionDetail label="Quantity" value={String(action.quantity)} /> : null}
+        {!isSale && action.unit_price != null ? (
+          <ActionDetail label="Unit price" value={formatCurrency(Number(action.unit_price))} />
         ) : null}
+        {!isSale && action.amount != null ? <ActionDetail label="Amount" value={formatCurrency(Number(action.amount))} /> : null}
         {action.category ? <ActionDetail label="Category" value={action.category} /> : null}
         {action.customer_name ? <ActionDetail label="Customer" value={action.customer_name} /> : null}
-        {action.payment_method ? <ActionDetail label="Payment" value={action.payment_method.replace('_', ' ')} /> : null}
+        {action.on_credit ? (
+          <ActionDetail label="Payment" value="On credit — unpaid" />
+        ) : action.payment_method ? (
+          <ActionDetail label="Payment" value={action.payment_method.replace('_', ' ')} />
+        ) : null}
         {action.date ? <ActionDetail label="Date" value={action.date} /> : null}
         {action.note ? <ActionDetail label="Note" value={action.note} /> : null}
       </div>
@@ -75,7 +209,7 @@ function ActionCard({
         <div className="flex gap-2 pt-0.5">
           <Button size="sm" className="flex-1" onClick={onConfirm} disabled={busy}>
             {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
-            Confirm &amp; save
+            {online ? 'Confirm & save' : 'Save on this device'}
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
             Cancel
@@ -90,6 +224,7 @@ export function AIAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const voiceBaseRef = useRef('');
   const assistant = useAIAssistant();
 
   useEffect(() => {
@@ -102,6 +237,18 @@ export function AIAssistant() {
     if (!value) return;
     setInput('');
     void assistant.send(value);
+  };
+
+  const toggleListening = () => {
+    if (assistant.listening) {
+      assistant.stopListening();
+      return;
+    }
+    // Dictation appends to whatever is already typed; sending stays manual.
+    voiceBaseRef.current = input.trim();
+    assistant.startListening((text) => {
+      setInput([voiceBaseRef.current, text].filter(Boolean).join(' '));
+    });
   };
 
   return (
@@ -139,9 +286,29 @@ export function AIAssistant() {
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Powered by AI</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={assistant.reset} aria-label="Start new conversation">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Badge
+                variant={assistant.online ? 'secondary' : 'destructive'}
+                className="gap-1 text-[10px]"
+                title={
+                  assistant.online
+                    ? 'Connected — the full AI assistant is available'
+                    : 'Offline — on-device mode. Records save locally and sync when you reconnect.'
+                }
+              >
+                {assistant.online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                {assistant.online ? 'Online' : 'Offline'}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={assistant.reset}
+                aria-label="Start new conversation"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </header>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
@@ -161,6 +328,8 @@ export function AIAssistant() {
                       message={message}
                       action={message.action}
                       busy={assistant.executingId === message.id}
+                      online={assistant.online}
+                      onUpdate={(next) => assistant.updateAction(message.id, next)}
                       onConfirm={() => assistant.confirmAction(message.id, message.action!)}
                       onCancel={() => assistant.cancelAction(message.id)}
                     />
@@ -206,18 +375,14 @@ export function AIAssistant() {
               size="icon"
               className="h-10 w-10 shrink-0 rounded-full"
               aria-label={assistant.listening ? 'Stop listening' : 'Speak your request'}
-              onClick={() =>
-                assistant.listening
-                  ? assistant.stopListening()
-                  : assistant.startListening((text) => submit(text))
-              }
+              onClick={toggleListening}
             >
               {assistant.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </Button>
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={assistant.listening ? 'Listening…' : 'Ask or tell me what happened…'}
+              placeholder={assistant.listening ? 'Listening… tap Send when done' : 'Ask or tell me what happened…'}
               className="h-10 rounded-full"
               disabled={assistant.thinking}
             />
