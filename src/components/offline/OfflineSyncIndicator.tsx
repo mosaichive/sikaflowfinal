@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, CloudOff, RefreshCw, Trash2, Wifi } from 'lucide-react';
+import { AlertTriangle, Check, CloudOff, CloudUpload, Clock, RefreshCw, Trash2, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
@@ -19,8 +20,25 @@ function relativeTime(ts: number | null) {
 
 export function OfflineSyncIndicator() {
   const [open, setOpen] = useState(false);
-  const { online, syncing, pending, failed, conflicts, items, lastSyncedAt, syncNow, retryItem, retryAll, discardItem } =
-    useOfflineSync();
+  const {
+    online,
+    syncing,
+    pending,
+    failed,
+    conflicts,
+    items,
+    lastSyncedAt,
+    progress,
+    recentlySynced,
+    syncNow,
+    retryItem,
+    retryAll,
+    discardItem,
+  } = useOfflineSync();
+
+  const uploaded = progress ? progress.done : 0;
+  const uploadTotal = progress ? progress.total : 0;
+  const percent = uploadTotal > 0 ? Math.round((uploaded / uploadTotal) * 100) : 0;
 
 
   const needsAttention = failed + conflicts;
@@ -38,12 +56,16 @@ export function OfflineSyncIndicator() {
   const Icon = !online ? CloudOff : needsAttention > 0 ? AlertTriangle : pending > 0 ? RefreshCw : Wifi;
 
   const statusLabel = !online
-    ? 'Offline — work is saved on this device'
+    ? queued > 0
+      ? `Offline — ${queued} change${queued === 1 ? '' : 's'} waiting on this device`
+      : 'Offline — work is saved on this device'
     : needsAttention > 0
       ? `${needsAttention} item${needsAttention === 1 ? '' : 's'} need attention`
-      : pending > 0
-        ? `Syncing ${pending} item${pending === 1 ? '' : 's'}`
-        : 'All changes synced';
+      : progress
+        ? `Uploading ${Math.min(uploaded + 1, uploadTotal)} of ${uploadTotal}`
+        : pending > 0
+          ? `${pending} item${pending === 1 ? '' : 's'} waiting to upload`
+          : 'All changes synced';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -83,6 +105,22 @@ export function OfflineSyncIndicator() {
           </Button>
         </div>
 
+        {progress ? (
+          <div className="space-y-1.5 border-b border-border px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                <CloudUpload className="h-3.5 w-3.5 text-primary" />
+                Uploading {Math.min(uploaded + 1, uploadTotal)} of {uploadTotal}
+              </span>
+              <span className="text-muted-foreground">{percent}%</span>
+            </div>
+            <Progress value={percent} className="h-1.5" />
+            {progress.currentLabel ? (
+              <p className="truncate text-[11px] text-muted-foreground">{progress.currentLabel}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 p-6 text-center">
             <Check className="h-6 w-6 text-primary" />
@@ -107,11 +145,23 @@ export function OfflineSyncIndicator() {
                       </div>
                       <Badge
                         variant={
-                          item.status === 'failed' || item.status === 'conflict' ? 'destructive' : 'secondary'
+                          item.status === 'failed' || item.status === 'conflict'
+                            ? 'destructive'
+                            : item.status === 'syncing'
+                              ? 'default'
+                              : 'secondary'
                         }
-                        className="shrink-0 capitalize"
+                        className="shrink-0"
                       >
-                        {item.status}
+                        {item.status === 'syncing'
+                          ? 'Uploading'
+                          : item.status === 'pending'
+                            ? online
+                              ? 'Waiting'
+                              : 'Saved offline'
+                            : item.status === 'conflict'
+                              ? 'Conflict'
+                              : 'Failed'}
                       </Badge>
                     </div>
                     {item.lastError ? (
@@ -141,6 +191,27 @@ export function OfflineSyncIndicator() {
             ) : null}
           </>
         )}
+        {recentlySynced.length > 0 ? (
+          <div className="border-t border-border p-3">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Just uploaded
+            </p>
+            <ul className="space-y-1">
+              {recentlySynced.map((entry) => (
+                <li key={`${entry.id}-${entry.at}`} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="truncate text-foreground">{entry.label}</span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {relativeTime(entry.at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );
