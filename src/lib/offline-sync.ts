@@ -31,6 +31,23 @@ const MAX_ATTEMPTS = 8;
 const BASE_BACKOFF_MS = 4_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
 
+export type SyncProgress = {
+  /** Items in the current upload pass. */
+  total: number;
+  /** Items finished (successfully or not) in the current pass. */
+  done: number;
+  /** Label of the item currently uploading. */
+  currentLabel: string | null;
+  currentId: string | null;
+};
+
+export type SyncedRecently = {
+  id: string;
+  label: string;
+  amount: number;
+  at: number;
+};
+
 export type SyncState = {
   online: boolean;
   syncing: boolean;
@@ -40,6 +57,10 @@ export type SyncState = {
   items: QueueItem[];
   lastSyncedAt: number | null;
   supported: boolean;
+  /** Live per-pass upload progress, or null when idle. */
+  progress: SyncProgress | null;
+  /** Items that finished uploading in the last few minutes (newest first). */
+  recentlySynced: SyncedRecently[];
 };
 
 type Listener = (state: SyncState) => void;
@@ -53,7 +74,19 @@ let state: SyncState = {
   items: [],
   lastSyncedAt: null,
   supported: offlineStorageAvailable(),
+  progress: null,
+  recentlySynced: [],
 };
+
+const RECENT_KEEP = 6;
+const RECENT_TTL_MS = 5 * 60_000;
+
+function rememberSynced(entry: SyncedRecently) {
+  const now = Date.now();
+  setState({
+    recentlySynced: [entry, ...state.recentlySynced.filter((r) => now - r.at < RECENT_TTL_MS)].slice(0, RECENT_KEEP),
+  });
+}
 
 const listeners = new Set<Listener>();
 let started = false;
@@ -179,6 +212,7 @@ async function processItem(item: QueueItem) {
   }
   await deleteQueueItem(item.id);
   await setMeta('last_synced_at', Date.now());
+  rememberSynced({ id: item.id, label: item.label, amount: Number(item.amount ?? 0), at: Date.now() });
 }
 
 /** Drain the queue. Concurrent calls share one in-flight pass. */
@@ -201,7 +235,13 @@ export async function syncNow(): Promise<void> {
       );
       // Sequential on purpose: sales depend on customers created just before
       // them, and ordering keeps stock reconciliation deterministic.
+      setState({
+        progress: { total: due.length, done: 0, currentLabel: due[0]?.label ?? null, currentId: due[0]?.id ?? null },
+      });
+
+      let done = 0;
       for (const item of due) {
+        setState({ progress: { total: due.length, done, currentLabel: item.label, currentId: item.id } });
         try {
           await processItem(item);
         } catch (err: any) {
@@ -214,11 +254,13 @@ export async function syncNow(): Promise<void> {
             nextAttemptAt: Date.now() + backoffFor(attempts),
           });
         }
+        done += 1;
+        setState({ progress: { total: due.length, done, currentLabel: null, currentId: null } });
         await refreshFromStore();
       }
       setState({ lastSyncedAt: (await getMeta<number>('last_synced_at')) ?? state.lastSyncedAt });
     } finally {
-      setState({ syncing: false });
+      setState({ syncing: false, progress: null });
       await refreshFromStore();
       runningPass = null;
     }
