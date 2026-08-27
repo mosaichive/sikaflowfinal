@@ -11,7 +11,12 @@ import { notifyLowStock, notifySaleThanks } from '@/lib/sms-notifications';
 import { EXPENSE_CATEGORIES, OTHER_INCOME_CATEGORIES, PAYMENT_METHODS } from '@/lib/constants';
 import { enqueueOperation } from '@/lib/offline-sync';
 import { recordSaleOffline } from '@/lib/offline-sale';
-import { matchProduct, matchProductCandidates } from '@/lib/product-match';
+import {
+  matchProduct,
+  matchProductCandidates,
+  isAmbiguousMatch,
+  MATCH_THRESHOLD,
+} from '@/lib/product-match';
 import type { ModuleKey } from '@/lib/permissions';
 
 export { matchProduct, matchProductCandidates };
