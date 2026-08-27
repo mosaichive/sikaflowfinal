@@ -55,12 +55,71 @@ export interface AssistantAction {
   on_credit?: boolean | null;
 }
 
+/** A product name the assistant could not confidently match to the catalogue. */
+export interface ProductClarification {
+  /** Index in the sale items array; 0 for single-product actions (restock, add stock). */
+  index: number;
+  /** What the user actually said. */
+  query: string;
+  /** Closest catalogue names to choose from (best first). */
+  options: string[];
+  /** True when several catalogue items scored almost the same. */
+  ambiguous: boolean;
+}
+
 export interface AssistantMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   action?: AssistantAction | null;
   actionState?: 'pending' | 'done' | 'cancelled';
+  /** Pending "did you mean…?" prompts for unmatched product names. */
+  clarifications?: ProductClarification[];
+}
+
+/** Item list of an action, normalised so single-product actions look the same. */
+export function actionItems(action: AssistantAction): AssistantSaleItem[] {
+  if (Array.isArray(action.items) && action.items.length > 0) return action.items;
+  return [{ product_name: action.product_name, quantity: action.quantity, unit_price: action.unit_price }];
+}
+
+/**
+ * Finds product names in an action that either match nothing in the catalogue
+ * or match two items almost equally, so the UI can ask the user to pick.
+ */
+export function buildProductClarifications(
+  action: AssistantAction | null | undefined,
+  products: any[],
+): ProductClarification[] {
+  if (!action) return [];
+  if (action.type !== 'record_sale' && action.type !== 'restock') return [];
+  if (!Array.isArray(products) || products.length === 0) return [];
+
+  const out: ProductClarification[] = [];
+  actionItems(action).forEach((item, index) => {
+    const query = String(item.product_name || '').trim();
+    if (!query) return;
+    const candidates = matchProductCandidates(products, query);
+    const best = candidates[0];
+    const confident = best && best.score >= MATCH_THRESHOLD && !isAmbiguousMatch(candidates);
+    if (confident) return;
+    const options = candidates
+      .slice(0, 3)
+      .map((c) => String(c.product?.name || ''))
+      .filter(Boolean);
+    if (options.length === 0) return;
+    out.push({ index, query, options, ambiguous: Boolean(best && best.score >= MATCH_THRESHOLD) });
+  });
+  return out;
+}
+
+/** Applies a user's chosen catalogue name back onto the action. */
+export function applyProductChoice(action: AssistantAction, index: number, productName: string): AssistantAction {
+  if (action.type === 'record_sale') {
+    const items = actionItems(action).map((item, i) => (i === index ? { ...item, product_name: productName } : item));
+    return { ...action, items };
+  }
+  return { ...action, product_name: productName };
 }
 
 export const ACTION_MODULE: Record<AssistantActionType, ModuleKey> = {
