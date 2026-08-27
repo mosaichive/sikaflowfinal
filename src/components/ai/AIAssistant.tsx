@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Mic, MicOff, Send, X, Loader2, Check, RotateCcw, Trash2, Wifi, WifiOff } from 'lucide-react';
+import {
+  Sparkles,
+  Mic,
+  MicOff,
+  Send,
+  X,
+  Loader2,
+  Check,
+  RotateCcw,
+  Trash2,
+  Wifi,
+  WifiOff,
+  HelpCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +24,7 @@ import {
   type AssistantAction,
   type AssistantMessage,
   type AssistantSaleItem,
+  type ProductClarification,
 } from '@/lib/ai-assistant';
 
 const QUICK_PROMPTS = [
@@ -141,12 +155,55 @@ function SaleItemsSummary({ action }: { action: AssistantAction }) {
   );
 }
 
+/** "Did you mean…?" chips for product names the assistant could not match. */
+function ClarificationPrompts({
+  clarifications,
+  disabled,
+  onPick,
+}: {
+  clarifications: ProductClarification[];
+  disabled: boolean;
+  onPick: (index: number, productName: string) => void;
+}) {
+  if (clarifications.length === 0) return null;
+  return (
+    <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 p-2">
+      {clarifications.map((clarification) => (
+        <div key={`${clarification.index}-${clarification.query}`} className="space-y-1.5">
+          <p className="flex items-start gap-1.5 text-[11px] text-foreground">
+            <HelpCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+            <span>
+              {clarification.ambiguous ? 'Which one did you mean by ' : 'I could not find '}
+              <span className="font-semibold">“{clarification.query}”</span>
+              {clarification.ambiguous ? '?' : ' — did you mean:'}
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {clarification.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                disabled={disabled}
+                onClick={() => onPick(clarification.index, option)}
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActionCard({
   message,
   action,
   busy,
   online,
   onUpdate,
+  onPickProduct,
   onConfirm,
   onCancel,
 }: {
@@ -155,11 +212,13 @@ function ActionCard({
   busy: boolean;
   online: boolean;
   onUpdate: (next: AssistantAction) => void;
+  onPickProduct: (index: number, productName: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const settled = message.actionState === 'done' || message.actionState === 'cancelled';
   const isSale = action.type === 'record_sale';
+  const clarifications = settled ? [] : message.clarifications ?? [];
 
   return (
     <div className="mt-2 rounded-2xl border border-primary/30 bg-primary/5 p-3 space-y-2">
@@ -187,6 +246,8 @@ function ActionCard({
         )
       ) : null}
 
+      <ClarificationPrompts clarifications={clarifications} disabled={busy} onPick={onPickProduct} />
+
       <div className="space-y-1 rounded-xl bg-background/70 p-2">
         {!isSale && action.product_name ? <ActionDetail label="Product" value={action.product_name} /> : null}
         {!isSale && action.quantity != null ? <ActionDetail label="Quantity" value={String(action.quantity)} /> : null}
@@ -207,7 +268,7 @@ function ActionCard({
 
       {!settled ? (
         <div className="flex gap-2 pt-0.5">
-          <Button size="sm" className="flex-1" onClick={onConfirm} disabled={busy}>
+          <Button size="sm" className="flex-1" onClick={onConfirm} disabled={busy || clarifications.length > 0}>
             {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
             {online ? 'Confirm & save' : 'Save on this device'}
           </Button>
@@ -330,6 +391,7 @@ export function AIAssistant() {
                       busy={assistant.executingId === message.id}
                       online={assistant.online}
                       onUpdate={(next) => assistant.updateAction(message.id, next)}
+                      onPickProduct={(index, name) => assistant.resolveClarification(message.id, index, name)}
                       onConfirm={() => assistant.confirmAction(message.id, message.action!)}
                       onCancel={() => assistant.cancelAction(message.id)}
                     />
