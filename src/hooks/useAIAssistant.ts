@@ -12,6 +12,8 @@ import {
   ACTION_LABEL,
   ACTION_MODULE,
   buildAssistantContext,
+  buildProductClarifications,
+  applyProductChoice,
   executeAssistantAction,
   type AssistantAction,
   type AssistantMessage,
@@ -109,6 +111,7 @@ export function useAIAssistant() {
             : result.reply,
           action: blocked ? null : action,
           actionState: blocked ? undefined : 'pending',
+          clarifications: blocked ? undefined : buildProductClarifications(action, products as any[]),
         },
       ]);
     },
@@ -163,6 +166,8 @@ export function useAIAssistant() {
 
         const action: AssistantAction | null = data?.action ?? null;
         const blocked = action && !hasModule(ACTION_MODULE[action.type]);
+        const catalogue =
+          action && !blocked ? await loadProductsCompat(false, businessId).catch(() => [] as any[]) : [];
 
         setMessages((prev) => [
           ...prev,
@@ -174,6 +179,8 @@ export function useAIAssistant() {
               : String(data?.reply || 'Sorry, I did not catch that.'),
             action: blocked ? null : action,
             actionState: blocked || !action ? undefined : 'pending',
+            clarifications:
+              blocked || !action ? undefined : buildProductClarifications(action, catalogue as any[]),
           },
         ]);
       } catch (err: any) {
@@ -266,6 +273,21 @@ export function useAIAssistant() {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, action } : m)));
   }, []);
 
+  /** User picked a catalogue product for an unmatched name in an action card. */
+  const resolveClarification = useCallback((messageId: string, index: number, productName: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.action
+          ? {
+              ...m,
+              action: applyProductChoice(m.action, index, productName),
+              clarifications: (m.clarifications ?? []).filter((c) => c.index !== index),
+            }
+          : m,
+      ),
+    );
+  }, []);
+
   const cancelAction = useCallback((messageId: string) => {
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, actionState: 'cancelled' as const } : m)).concat({
@@ -350,6 +372,7 @@ export function useAIAssistant() {
     confirmAction,
     cancelAction,
     updateAction,
+    resolveClarification,
     startListening,
     stopListening,
     reset,
