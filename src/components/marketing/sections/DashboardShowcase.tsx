@@ -216,15 +216,15 @@ function VideoPreview() {
     >
       <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b0f15]/90 shadow-[0_30px_90px_-40px_rgba(34,211,238,0.55)]">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#2C8603]/10 via-transparent to-cyan-400/10" />
-        <video
-          className="relative aspect-video w-full bg-[#0b0f15] object-contain"
-          src="/kuditrack-ads.mp4"
-          poster="/kuditrack-demo-poster.png"
-          controls
-          playsInline
-          preload="metadata"
-          aria-label="KudiTrack demo video"
-        />
+        <div className="relative aspect-video w-full">
+          <iframe
+            className="absolute inset-0 h-full w-full bg-[#0b0f15]"
+            src="https://www.youtube.com/embed/LeTs2m0e_e0?list=PLGmQrnPY48jU&rel=0&modestbranding=1"
+            title="KudiTrack demo video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
