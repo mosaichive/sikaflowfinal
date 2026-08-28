@@ -262,9 +262,14 @@ export async function syncNow(): Promise<void> {
     } finally {
       setState({ syncing: false, progress: null });
       await refreshFromStore();
-      runningPass = null;
     }
   })();
+
+  // Always release the guard, including the early-return paths above (signed
+  // out / offline) which never reach the try/finally block.
+  runningPass = pass.finally(() => {
+    runningPass = null;
+  });
 
   return runningPass;
 }
