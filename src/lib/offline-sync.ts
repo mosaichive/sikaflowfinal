@@ -220,7 +220,7 @@ export async function syncNow(): Promise<void> {
   if (!state.supported) return;
   if (runningPass) return runningPass;
 
-  runningPass = (async () => {
+  const pass = (async () => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) return; // Signed out — keep the queue for later.
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
