@@ -143,8 +143,8 @@ export const useSubscription = () => {
 };
 
 export const PLAN_LABELS: Record<PlanKey, string> = {
-  free_trial: '30-Day Free Trial',
-  trial: '30-Day Free Trial',
+  free_trial: '15-Day Free Trial',
+  trial: '15-Day Free Trial',
   monthly: 'Monthly (Legacy)',
   annual: 'Annual (Legacy)',
   lifetime: 'Lifetime',

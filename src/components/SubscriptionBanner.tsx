@@ -56,7 +56,7 @@ export function SubscriptionBanner({ showAnnouncements = true }: { showAnnouncem
           <div className="flex-1 text-xs">
             <p className="font-semibold text-foreground">
               {subscription?.status === 'trial'
-                ? 'Your 30-day free trial has ended'
+                ? 'Your 15-day free trial has ended'
                 : `Your ${subscription ? PLAN_LABELS[subscription.plan as keyof typeof PLAN_LABELS] : 'subscription'} has ended.`}
             </p>
             <p className="text-muted-foreground mt-0.5">

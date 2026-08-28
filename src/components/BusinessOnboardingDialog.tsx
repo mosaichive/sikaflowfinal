@@ -33,7 +33,7 @@ const STEPS: { key: StepKey; label: string; title: string; subtitle: string }[] 
   {
     key: 'review',
     label: 'Review',
-    title: 'Your 30-day trial is ready',
+    title: 'Your 15-day trial is ready',
     subtitle: 'No billing step here. The app will remind you when it is time to upgrade.',
   },
   {
@@ -262,7 +262,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
               <DialogDescription className="mt-1">{currentStep.subtitle}</DialogDescription>
             </div>
             <span className="inline-flex w-fit items-center gap-1.5 rounded-md bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <BadgeCheck className="h-3.5 w-3.5" /> 30-day trial
+              <BadgeCheck className="h-3.5 w-3.5" /> 15-day trial
             </span>
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2">
@@ -366,7 +366,7 @@ export function BusinessOnboardingDialog({ open, onCompleted }: BusinessOnboardi
                           <Sparkles className="h-5 w-5" />
                         </span>
                         <div>
-                          <p className="font-semibold">Start with full access for 30 days</p>
+                          <p className="font-semibold">Start with full access for 15 days</p>
                           <p className="mt-1 text-sm text-muted-foreground">
                             Your dashboard will update instantly after setup. Pricing stays out of onboarding.
                           </p>

@@ -27,7 +27,7 @@ type PricingPlan = {
 
 // Legacy plans stay selectable so historical/grandfathered subscribers can be adjusted.
 const LEGACY_PLANS: Array<{ value: string; label: string; price: number; days: number | null; status: string }> = [
-  { value: 'trial', label: 'Free Trial (30 days)', price: 0, days: 30, status: 'trial' },
+  { value: 'trial', label: 'Free Trial (15 days)', price: 0, days: 15, status: 'trial' },
   { value: 'monthly', label: 'Legacy Monthly — GH₵50', price: 50, days: 30, status: 'active' },
   { value: 'annual', label: 'Legacy Annual — GH₵500', price: 500, days: 365, status: 'active' },
   { value: 'lifetime', label: 'Lifetime', price: 0, days: null, status: 'lifetime' },

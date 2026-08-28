@@ -11,9 +11,9 @@ interface Props {
 const PLANS: { key: PlanKey; name: string; price: string; sub: string; perks: string[]; badge?: string }[] = [
   {
     key: 'free_trial',
-    name: '30-Day Free Trial',
+    name: '15-Day Free Trial',
     price: 'GH₵0',
-    sub: 'Full access · 30 days',
+    sub: 'Full access · 15 days',
     perks: ['All features unlocked', 'No payment required', 'Pick a plan after trial'],
   },
   {
