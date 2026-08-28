@@ -37,8 +37,8 @@ const DEFAULT_ROWS: PricingRow[] = [
 
 const FAQS = [
   { q: 'Can I change my plan later?', a: 'Yes. You can upgrade at any time from your Billing page. When you upgrade the new features unlock instantly.' },
-  { q: 'What happens after my 30-day free trial?', a: 'Your account switches to read-only until you pick a paid plan. Your data is never deleted — pick a plan any time to resume writing.' },
-  { q: 'Do I need a card to start the trial?', a: 'No. You get 30 days free with no card required. Choose Starter, Business, or Business Plus whenever you\'re ready.' },
+  { q: 'What happens after my 15-day free trial?', a: 'Your account switches to read-only until you pick a paid plan. Your data is never deleted — pick a plan any time to resume writing.' },
+  { q: 'Do I need a card to start the trial?', a: 'No. You get 15 days free with no card required. Choose Starter, Business, or Business Plus whenever you\'re ready.' },
   { q: 'How does annual billing save me money?', a: 'Annual plans give you roughly 2 months free compared to paying monthly, and lock in the price for 12 months.' },
   { q: 'What payment methods do you accept?', a: 'All plans support Mobile Money, Card, and Bank transfer via Paystack. Manual Mobile Money and Bank transfer are also available.' },
   { q: 'Can I get a refund?', a: 'Yes — our Refund Policy covers billing errors and unauthorised charges. Read the full Refund Policy for details.' },
@@ -85,7 +85,7 @@ export default function PricingPage() {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
             className="mx-auto mt-5 max-w-2xl text-lg text-white/60"
           >
-            Choose the plan that fits your business. Start with a 30-day free trial — no card required.
+            Choose the plan that fits your business. Start with a 15-day free trial — no card required.
           </motion.p>
 
           {/* Toggle */}

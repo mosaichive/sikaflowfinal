@@ -79,7 +79,7 @@ function AuthShell({ children }: { children: ReactNode }) {
                 Simple sales, stock, and cash control for daily business.
               </h1>
               <p className="max-w-lg text-base leading-7 text-muted-foreground">
-                Sign in or start a 30-day trial. Pricing stays out of setup so you can get to the dashboard first.
+                Sign in or start a 15-day trial. Pricing stays out of setup so you can get to the dashboard first.
               </p>
             </div>
           </section>
@@ -370,7 +370,7 @@ function SignUpPanel() {
       }
 
       if (data.session) {
-        toast({ title: 'Account created', description: 'Your 30-day trial setup starts on the dashboard.' });
+        toast({ title: 'Account created', description: 'Your 15-day trial setup starts on the dashboard.' });
 
         // Offer to verify the phone now if one was provided.
         if (normalizedPhone) {
@@ -573,7 +573,7 @@ function SignUpPanel() {
         </Link>
       </p>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        New businesses start with a 30-day free trial. No card required.
+        New businesses start with a 15-day free trial. No card required.
       </p>
       <p className="mt-2 text-center text-xs text-muted-foreground">
         By creating an account you agree to our{' '}
@@ -606,8 +606,8 @@ export function SignUpPage() {
   return (
     <>
       <SEO
-        title="Sign up | KudiTrack - Start your 30-day free trial"
-        description="Create a free KudiTrack account and start a 30-day trial to track daily sales, stock, expenses and profit in one dashboard."
+        title="Sign up | KudiTrack - Start your 15-day free trial"
+        description="Create a free KudiTrack account and start a 15-day trial to track daily sales, stock, expenses and profit in one dashboard."
         path="/sign-up"
       />
       <AuthShell>
