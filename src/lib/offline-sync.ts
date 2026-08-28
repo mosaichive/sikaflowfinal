@@ -220,7 +220,7 @@ export async function syncNow(): Promise<void> {
   if (!state.supported) return;
   if (runningPass) return runningPass;
 
-  runningPass = (async () => {
+  const pass = (async () => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) return; // Signed out — keep the queue for later.
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -262,9 +262,14 @@ export async function syncNow(): Promise<void> {
     } finally {
       setState({ syncing: false, progress: null });
       await refreshFromStore();
-      runningPass = null;
     }
   })();
+
+  // Always release the guard, including the early-return paths above (signed
+  // out / offline) which never reach the try/finally block.
+  runningPass = pass.finally(() => {
+    runningPass = null;
+  });
 
   return runningPass;
 }
