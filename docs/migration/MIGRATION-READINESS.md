@@ -13,7 +13,7 @@ that is not imported by any deployed function.
 | File | Purpose | Wired into production? |
 |---|---|---|
 | `supabase/functions/_shared/resend-direct.ts` | Direct `api.resend.com` transport (single + batch), plus `sendEmailAuto`/`sendBatchAuto` that switch on `EMAIL_TRANSPORT` | **No** — nothing imports it yet |
-| `supabase/functions/_shared/ai-provider.ts` | Provider-agnostic assistant turn: Anthropic Claude path + existing Lovable path, switched by `AI_PROVIDER` | **No** — nothing imports it yet |
+| `supabase/functions/_shared/ai-provider.ts` | Vendor-neutral assistant turn: `disabled` (default after cutover) or any OpenAI-compatible endpoint, switched by `AI_PROVIDER`. **No Lovable AI Gateway, no Anthropic.** | **No** — nothing imports it yet |
 | `supabase/migration-package/01–07` | Corrected schema, storage, export, import, validation, cron artifacts (from the verification pass) | Target project only |
 | `docs/migration/MIGRATION-READINESS.md` | This document | — |
 
