@@ -88,8 +88,19 @@ where g.ge in ('anon','authenticated','service_role') group by g.ge order by 1;
 
 -- 10. Extensions and scheduled jobs
 select 'ext.'||extname||'=1' from pg_extension where extname in ('pgcrypto','uuid-ossp','pg_cron','pg_net') order by 1;
-select 'cron.jobs='||count(*) from cron.job;
-select 'cron.job.'||jobname||'='||schedule from cron.job order by 1;
+-- pg_cron may legitimately be absent when this runs (target, before 07_cron.sql),
+-- so probe it dynamically instead of failing the whole fingerprint.
+create or replace function pg_temp.cron_fingerprint() returns setof text language plpgsql as $fn$
+begin
+  if to_regclass('cron.job') is null then
+    return next 'cron.jobs=0';
+    return;
+  end if;
+  return query execute $q$ select 'cron.jobs='||count(*)::text from cron.job $q$;
+  return query execute $q$ select 'cron.job.'||jobname||'='||schedule from cron.job order by 1 $q$;
+end
+$fn$;
+select * from pg_temp.cron_fingerprint();
 
 -- 11. Additional ownership / orphan checks (all must be 0)
 select 'orphan.expenses_without_profile='||count(*) from public.expenses e left join public.profiles p on p.id=e.user_id where p.id is null;

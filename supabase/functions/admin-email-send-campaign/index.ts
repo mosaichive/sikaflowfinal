@@ -14,8 +14,11 @@ import {
   serviceClient,
   wrapHtmlForTracking,
 } from "../_shared/email-bulk.ts";
+import { sendBatchAuto, useDirectResend } from "../_shared/resend-direct.ts";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/resend";
+// Transport is selected by EMAIL_TRANSPORT ("gateway" default today, "direct" after
+// the external-Supabase cutover). Direct mode talks to api.resend.com and needs no
+// Lovable key at all.
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -40,25 +43,7 @@ const BATCH_SIZE = 90; // Resend batch API accepts up to 100
 const BATCH_DELAY_MS = 1100;
 
 async function sendBatch(payload: unknown[]) {
-  const resp = await fetch(`${GATEWAY}/emails/batch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-      "X-Connection-Api-Key": RESEND_API_KEY!,
-    },
-    body: JSON.stringify(payload),
-  });
-  const text = await resp.text();
-  if (!resp.ok) {
-    console.error(`Resend batch failed [${resp.status}]: ${text}`);
-    return { ok: false, status: resp.status, body: text, data: null };
-  }
-  try {
-    return { ok: true, status: 200, body: text, data: JSON.parse(text) };
-  } catch {
-    return { ok: true, status: 200, body: text, data: null };
-  }
+  return await sendBatchAuto(payload);
 }
 
 async function processCampaign(campaignId: string, actorId: string | null) {
@@ -216,7 +201,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-  if (!LOVABLE_API_KEY || !RESEND_API_KEY) {
+  if (!RESEND_API_KEY || (!useDirectResend() && !LOVABLE_API_KEY)) {
     return new Response(
       JSON.stringify({ error: "email provider not configured" }),
       {
