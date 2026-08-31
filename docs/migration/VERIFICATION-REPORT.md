@@ -127,13 +127,16 @@ Both are now scripted in the new **`supabase/migration-package/07_cron.sql`** wi
 
 | Where | What it does | Breaks after leaving Lovable Cloud |
 |---|---|---|
-| `supabase/functions/ai-assistant/index.ts` | LLM behind the KudiTrack AI Business Assistant (chat, voice-driven sales/expense entry, product matching) | The assistant returns errors; the offline parser in `src/lib/offline-assistant.ts` still handles simple commands, so the UI degrades rather than disappears |
+| `supabase/functions/ai-assistant/index.ts` | LLM behind the KudiTrack AI Business Assistant (chat, voice-driven sales/expense entry, product matching) | After the prepared swap the assistant returns a friendly disabled reply instead of errors; the offline parser in `src/lib/offline-assistant.ts` still handles simple commands, so the UI degrades rather than disappears |
 | `supabase/functions/admin-email-send-campaign/index.ts` | Sends Resend batches **through the Lovable gateway** | All bulk email / newsletter sending stops |
 | `supabase/functions/admin-monthly-statements/index.ts` | Same gateway path for statement emails | Monthly PDF statements stop being delivered |
 | `src/integrations/lovable/index.ts`, `src/pages/SignInPage.tsx`, `package.json` | `@lovable.dev/cloud-auth-js` Google sign-in | Google sign-in stops |
 
-**If you replace Lovable AI with Anthropic Claude (not done — awaiting your go-ahead):**
-- `supabase/functions/ai-assistant/index.ts`: swap the endpoint to `https://api.anthropic.com/v1/messages`, headers to `x-api-key: ANTHROPIC_API_KEY` + `anthropic-version: 2023-06-01`, request body to Claude's `{ model, max_tokens, system, messages, tools }` shape (system prompt moves out of `messages`), response parsing from `choices[0].message` to `content[]` blocks, streaming from OpenAI SSE deltas to `content_block_delta` events, and tool-calling from `tool_calls` to Claude `tool_use`/`tool_result` blocks. Add secret `ANTHROPIC_API_KEY`.
+**Decision (owner, 31 Aug 2026): the Lovable AI Gateway is NOT migrated, and Claude/Anthropic will not be used.**
+- `ai-assistant` ships with `AI_PROVIDER=disabled` via `_shared/ai-provider.ts`: no external AI call, a friendly non-error reply, and the offline command parser (`src/lib/offline-assistant.ts`) keeps handling simple sale/expense/stock capture.
+- Optional future provider, no code change: `AI_PROVIDER=openai_compatible` + `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` (any OpenAI-compatible Chat Completions endpoint). The `ACTION_SCHEMA` and `{ reply, action }` contract stay identical.
+- Gateway dependencies to delete in `ai-assistant/index.ts`: the `GATEWAY` and `MODEL` constants, the `LOVABLE_API_KEY` read and guard, the `Lovable-API-Key`/`X-Lovable-AIG-SDK` headers, the Responses-API body (`input[]`, `reasoning`, `text.format.json_schema`) and the SSE reader `readOutputText()`. No other file, table, policy or cron job touches the gateway.
+- `supabase/functions/ai-assistant/index.ts`: replace the inline gateway fetch with `runAssistantTurn({ systemPrompt, messages, schema: ACTION_SCHEMA })` from `_shared/ai-provider.ts`. No AI secret is required at cutover.
 - The two email functions are **not** an AI change: point `GATEWAY` at `https://api.resend.com`, use `Authorization: Bearer RESEND_API_KEY`, and delete the `X-Connection-Api-Key` header and the `LOVABLE_API_KEY` guard.
 
 ---
@@ -147,7 +150,7 @@ Both are now scripted in the new **`supabase/migration-package/07_cron.sql`** wi
 | Africa's Talking / Arkesel SMS | Order, sale, low-stock, invite, OTP SMS | `_shared/at-sms.ts` | `AT_API_KEY`, `AT_SENDER_ID`, `SMS_ENABLED`, `SUPER_ADMIN_SMS_PHONE` | Supabase function secrets | Yes |
 | Twilio | WhatsApp OTP | `phone-*-otp` functions | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` | Supabase function secrets | Yes |
 | Google OAuth | Social sign-in | Lovable auth SDK today | Client ID + Secret | Supabase Auth provider settings | Yes |
-| Lovable AI Gateway | AI assistant + email transport | `LOVABLE_API_KEY` | `LOVABLE_API_KEY` (or `ANTHROPIC_API_KEY` after swap) | Supabase function secrets | Yes — decision required |
+| Lovable AI Gateway | AI assistant + email transport (dropped at cutover) | `LOVABLE_API_KEY` | `AI_PROVIDER=disabled` (no AI key) | Supabase function secrets | Yes — decision required |
 | open.er-api.com | FX rates | `exchange-rates` | none | — | No |
 | Statements cron | Auth for the scheduled call | `x-cron-secret` | `STATEMENTS_CRON_SECRET`, `STATEMENTS_CRON_TOKEN` | Supabase function secrets **and** the cron job body | Yes |
 | Supabase (new project) | DB, auth, storage, functions | supabase-js | `SUPABASE_URL`/`ANON_KEY`/`SERVICE_ROLE_KEY` | auto-injected into functions | No |
@@ -165,7 +168,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<new anon/publishable key>
 VITE_SUPABASE_PROJECT_ID=<new-ref>
 ```
 
-**Server-side / private — set on Supabase Edge Function secrets, NOT on Vercel:** `PAYSTACK_SECRET_KEY`, `RESEND_API_KEY`, `SENDER_DOMAIN`, `PUBLIC_APP_URL`, `APP_PUBLIC_URL`, `STATEMENTS_CRON_SECRET`, `STATEMENTS_CRON_TOKEN`, `AT_API_KEY`, `AT_SENDER_ID`, `SMS_ENABLED`, `SUPER_ADMIN_SMS_PHONE`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `LOVABLE_API_KEY` (or `ANTHROPIC_API_KEY`). Auto-injected, never set by hand: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+**Server-side / private — set on Supabase Edge Function secrets, NOT on Vercel:** `PAYSTACK_SECRET_KEY`, `RESEND_API_KEY`, `SENDER_DOMAIN`, `PUBLIC_APP_URL`, `APP_PUBLIC_URL`, `STATEMENTS_CRON_SECRET`, `STATEMENTS_CRON_TOKEN`, `AT_API_KEY`, `AT_SENDER_ID`, `SMS_ENABLED`, `SUPER_ADMIN_SMS_PHONE`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `AI_PROVIDER` (and `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` only if a provider is added later). Auto-injected, never set by hand: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 **No service-role key or private secret reaches the browser.** Vite only inlines `VITE_`-prefixed variables, and all three are public by design. One caveat: `src/integrations/supabase/client.server.ts` reads `SUPABASE_SERVICE_ROLE_KEY`. It is not imported by any client route today, but it sits inside `src/`, so a future import would bundle it — **delete this file as part of the Phase 8 code change**.
 
@@ -223,7 +226,7 @@ Already covered: per-table row counts (all 52, so users/businesses/products/cust
 
 **RED — blockers that must be resolved before migration**
 1. **Lovable AI Gateway (`LOVABLE_API_KEY`) is on the critical path for bulk email and monthly statements, not just the AI assistant.** Until those two functions are repointed at Resend directly (or the key keeps working), campaign sending and statement delivery stop the moment you leave Lovable Cloud. Decision required.
-2. **`ai-assistant` has no external equivalent configured** — choose Claude (or another provider) and add the secret before cutover, or ship with the assistant degraded to the offline parser.
+2. **`ai-assistant` ships with the AI turn disabled** — resolved decision: no Lovable AI Gateway, no Anthropic. The assistant degrades to the offline parser; an OpenAI-compatible provider can be enabled later purely by setting secrets.
 3. *(Resolved in this pass, previously blocking:)* missing GRANTs and invalid storage-policy syntax — both would have failed the migration outright.
 
 ---

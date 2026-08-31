@@ -216,8 +216,8 @@ new project and a delta import back. Keep the old backend live and untouched for
 · 4. apply `01_schema.sql` + `02_storage.sql` on target · 5. `05_import_data.sh` · 6. `06_storage_sync.sh`
 · 7. URL-rewrite SQL · 8. set all secrets · 9. deploy 24 edge functions · 10. configure Google provider (§2)
 · 11. `07_cron.sql` · 12. run `04_validation.sql` on target and diff · 13. deploy frontend to Vercel with
-new `VITE_*` and swap `EMAIL_TRANSPORT`/`AI_PROVIDER` · 14. smoke tests (login, Google login, sale, order,
-Paystack test charge, campaign test send, assistant turn) · 15. DNS switch · 16. 14-day dual-retention.
+new `VITE_*` and set `EMAIL_TRANSPORT=direct` and `AI_PROVIDER=disabled` · 14. smoke tests (login, Google login, sale, order,
+Paystack test charge, campaign test send, assistant offline-parser turn) · 15. DNS switch · 16. 14-day dual-retention.
 
 ---
 
