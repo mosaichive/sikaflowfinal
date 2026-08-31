@@ -174,13 +174,13 @@ Both use `pg_net` + a shared secret header; update the URL and secret for the ne
 
 **Vercel — public (browser, `VITE_`):**
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (anon), `VITE_SUPABASE_PROJECT_ID`.
-Nothing else. No service-role key, no Resend/Anthropic/Paystack/Twilio key is ever exposed —
+Nothing else. No service-role key, no Resend/Paystack/Twilio/AI key is ever exposed —
 they exist only as Supabase Edge Function secrets.
 
 **Supabase Edge Function secrets (server-side only):**
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (auto),
 `RESEND_API_KEY`, `SENDER_DOMAIN`, `PUBLIC_APP_URL`, `EMAIL_TRANSPORT=direct`,
-`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_PROVIDER=anthropic`,
+`AI_PROVIDER=disabled` (optional later: `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`),
 `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`,
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (or the SMS provider in use),
 `STATEMENTS_CRON_SECRET`, `EMAIL_CRON_SECRET`, `EXCHANGE_RATES_*` if set.
@@ -191,7 +191,7 @@ they exist only as Supabase Edge Function secrets.
 | Service | Purpose | Current integration | Required secret | Stored | Manual step |
 |---|---|---|---|---|---|
 | Resend | Campaigns, statements, transactional | Lovable connector gateway | `RESEND_API_KEY` | Supabase secret | Re-verify `mail.kuditrack.online` DNS on the new account; switch to direct API |
-| Anthropic | AI assistant (replacement) | none yet | `ANTHROPIC_API_KEY` | Supabase secret | Create key, set `AI_PROVIDER=anthropic` |
+| AI provider (future, optional) | AI assistant natural-language turn | none — assistant ships disabled | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | Supabase secret | None at cutover; add later if you want the AI turn back |
 | Paystack | Subscriptions | direct API + webhook | `PAYSTACK_SECRET_KEY`, webhook secret | Supabase secret | Re-point webhook URL to new project ref |
 | Twilio / SMS | Order + status SMS | direct API | `TWILIO_*` | Supabase secret | Copy credentials; sender ID unchanged |
 | Google OAuth | Sign-in | Lovable-brokered | client id/secret | Supabase Auth config | See §2 |
@@ -224,9 +224,10 @@ Paystack test charge, campaign test send, assistant turn) · 15. DNS switch · 1
 ## 11. Final risk register
 
 **RED (blockers, all now have prepared fixes — none applied to production)**
-1. `LOVABLE_API_KEY` in `ai-assistant`, `admin-email-send-campaign`, `admin-monthly-statements`.
-   *Fix prepared:* `_shared/resend-direct.ts`, `_shared/ai-provider.ts`. **Action needed:** obtain
-   `ANTHROPIC_API_KEY`, then approve the three-file swap.
+1. ~~`LOVABLE_API_KEY`~~ — **resolved in plan.** Email/statements move to direct Resend
+   (`_shared/resend-direct.ts`, `EMAIL_TRANSPORT=direct`); `ai-assistant` moves to
+   `_shared/ai-provider.ts` with `AI_PROVIDER=disabled`. No Lovable AI Gateway and no new AI
+   vendor is carried into the new architecture. Action needed: approve the three-file swap.
 2. Google OAuth client ownership (§2). Unresolved until you confirm Branch A or B.
 3. `@lovable.dev/cloud-auth-js` sign-in path must be rewritten to `supabase.auth.signInWithOAuth`
    before the frontend can run off Lovable. Code change is small but touches `SignInPage.tsx`
