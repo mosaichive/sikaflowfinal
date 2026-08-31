@@ -3,13 +3,12 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  // The Lovable auth broker is only bundled when explicitly selected.
-  // Any other build (external Supabase / Vercel) gets an inert stub, so no
-  // Lovable authentication dependency ships to production.
-  const useLovableAuth =
-    (process.env.VITE_AUTH_PROVIDER ?? (mode === "development" ? "lovable" : "")).toLowerCase() ===
-    "lovable";
+export default defineConfig(() => {
+  // The Lovable auth broker is dropped from the bundle as soon as the build
+  // opts into native Supabase Auth (VITE_AUTH_PROVIDER=supabase — the cutover
+  // setting on Vercel). Current Lovable builds are unaffected.
+  const useLovableAuth = (process.env.VITE_AUTH_PROVIDER ?? "").toLowerCase() !== "supabase";
+
 
   return {
     server: {
