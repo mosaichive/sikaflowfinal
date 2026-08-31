@@ -68,10 +68,12 @@ Three functions reference `LOVABLE_API_KEY`. Nothing else in the codebase does.
 - **Secrets after cutover:** `RESEND_API_KEY`, `STATEMENTS_CRON_SECRET`, `PUBLIC_APP_URL`,
   `EMAIL_TRANSPORT=direct`.
 
-### 1.4 Functionality that stops working the moment Lovable Cloud is left, if not swapped
-1. AI Business Assistant (all natural-language sale/expense/stock capture) — hard fail 500.
-2. Bulk email campaigns and test sends — hard fail.
-3. Automated monthly financial statement emails (cron) — hard fail, silent until the log is read.
+### 1.4 Functionality affected the moment Lovable Cloud is left
+1. AI Business Assistant — **by design, the AI turn is switched off** (`AI_PROVIDER=disabled`).
+   The assistant panel stays usable via the offline command parser; no error, no 500.
+   Natural-language understanding of complex phrasing is what is lost until a provider is added.
+2. Bulk email campaigns and test sends — swapped to **direct Resend** (`EMAIL_TRANSPORT=direct`).
+3. Automated monthly financial statement emails (cron) — swapped to **direct Resend**.
 
 Everything else (Paystack, Twilio/SMS, exchange rates, OTP flows, backups, tracking pixels)
 uses its own secret and calls the vendor directly — no Lovable dependency.
