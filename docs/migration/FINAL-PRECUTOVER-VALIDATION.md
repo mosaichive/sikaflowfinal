@@ -337,3 +337,32 @@ package.
 
 Awaiting explicit "APPROVE PRODUCTION CUTOVER". Nothing further will be executed
 against production until then.
+
+---
+
+## 14. Execution model — credentials stay on the operator's machine (31 Aug 2026)
+
+The migration is executed **locally by the project owner**, not from the Lovable
+environment. Target credentials for the new Supabase project — database password /
+connection string, service-role key, anon key and Supabase Personal Access Token —
+are **never** transmitted to, pasted into, or stored by Lovable or any AI tool.
+
+- All values live in `supabase/migration-package/.env`, created from `.env.example`
+  and git-ignored by both the repo root `.gitignore` and the package's own
+  `.gitignore`. Recommended mode `600`.
+- No script prints a secret. `lib/common.sh` redacts `user:password@host` and
+  token-shaped strings from any string it emits; the run logs under
+  `migration-package/runs/<id>/` and `VALIDATION-REPORT.md` contain no credentials.
+- `07_cron.sql` placeholders are filled into a `mktemp` file at run time that is
+  deleted on exit; the real secret is never written into a tracked file.
+- Function secrets reach the Supabase CLI through a mode-600 temp env-file that is
+  deleted on exit; only secret **names** are echoed.
+- `00_preflight.sh` enforces four refusal guards, including a hard-coded refusal to
+  target the Lovable Cloud production ref, and greps the package for embedded tokens.
+- Every database phase runs with `ON_ERROR_STOP=1` inside a single transaction, so a
+  failure rolls back completely rather than partially modifying the target.
+- The source is read-only throughout: `pg_dump` and `SELECT` only.
+
+Entry points: `migrate.sh` (dry-run by default), `README.md` (credential sourcing and
+phase order), `CHECKLIST.md` (when staging may be connected), `ROLLBACK.md` (resetting
+the new project). Nothing in the package switches production traffic.
