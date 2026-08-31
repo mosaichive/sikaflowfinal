@@ -65,3 +65,58 @@ select 'db.triggers='||count(*) from pg_trigger t join pg_class c on c.oid=t.tgr
   join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal;
 select 'db.indexes='||count(*) from pg_indexes where schemaname='public';
 select 'db.realtime_tables='||count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public';
+
+-- 8. Schema-object inventory (added by verification pass)
+select 'db.tables='||count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';
+select 'db.enums='||count(*) from pg_type t join pg_namespace n on n.oid=t.typnamespace where n.nspname='public' and t.typtype='e';
+select 'db.enum.'||t.typname||'='||count(e.enumlabel) from pg_type t join pg_namespace n on n.oid=t.typnamespace
+  join pg_enum e on e.enumtypid=t.oid where n.nspname='public' and t.typtype='e' group by t.typname order by 1;
+select 'db.pk='||count(*) from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=r.relnamespace where n.nspname='public' and c.contype='p';
+select 'db.fk='||count(*) from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=r.relnamespace where n.nspname='public' and c.contype='f';
+select 'db.unique='||count(*) from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=r.relnamespace where n.nspname='public' and c.contype='u';
+select 'db.check='||count(*) from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=r.relnamespace where n.nspname='public' and c.contype='c';
+select 'db.sequences='||count(*) from information_schema.sequences where sequence_schema='public';
+select 'db.identity_columns='||count(*) from information_schema.columns where table_schema='public' and (is_identity='YES' or column_default like 'nextval%');
+select 'db.security_definer_functions='||count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosecdef;
+
+-- 9. GRANTS (must be non-zero or PostgREST returns permission errors)
+select 'grant.'||g.ge||'='||count(*) from (
+  select pg_get_userbyid(a.grantee) ge from pg_class c
+  join pg_namespace n on n.oid=c.relnamespace, aclexplode(coalesce(c.relacl,'{}')) a
+  where n.nspname='public' and c.relkind='r') g
+where g.ge in ('anon','authenticated','service_role') group by g.ge order by 1;
+
+-- 10. Extensions and scheduled jobs
+select 'ext.'||extname||'=1' from pg_extension where extname in ('pgcrypto','uuid-ossp','pg_cron','pg_net') order by 1;
+select 'cron.jobs='||count(*) from cron.job;
+select 'cron.job.'||jobname||'='||schedule from cron.job order by 1;
+
+-- 11. Additional ownership / orphan checks (all must be 0)
+select 'orphan.expenses_without_profile='||count(*) from public.expenses e left join public.profiles p on p.id=e.user_id where p.id is null;
+select 'orphan.other_income_without_profile='||count(*) from public.other_income o left join public.profiles p on p.id=o.user_id where p.id is null;
+select 'orphan.savings_without_profile='||count(*) from public.savings s left join public.profiles p on p.id=s.user_id where p.id is null;
+select 'orphan.restocks_without_profile='||count(*) from public.restocks r left join public.profiles p on p.id=r.user_id where p.id is null;
+select 'orphan.stock_movements_without_product='||count(*) from public.stock_movements m left join public.products pr on pr.id=m.product_id where pr.id is null;
+select 'orphan.customers_without_profile='||count(*) from public.customers c left join public.profiles p on p.id=c.user_id where p.id is null;
+select 'orphan.sale_documents_without_sale='||count(*) from public.sale_documents d left join public.sales s on s.id=d.sale_id where s.id is null;
+select 'orphan.audit_log_without_user='||count(*) from public.audit_log a left join auth.users u on u.id=a.user_id where u.id is null;
+select 'orphan.storage_objects_without_bucket='||count(*) from storage.objects o left join storage.buckets b on b.id=o.bucket_id where b.id is null;
+select 'orphan.identities_without_user='||count(*) from auth.identities i left join auth.users u on u.id=i.user_id where u.id is null;
+
+-- 12. Identity / UUID preservation fingerprints (must be byte-identical source vs target)
+select 'md5.auth_user_ids='||md5(string_agg(id::text,',' order by id)) from auth.users;
+select 'md5.identities='||md5(string_agg(provider||':'||provider_id||':'||user_id::text,',' order by provider, provider_id)) from auth.identities;
+select 'count.auth_identities_google='||count(*) from auth.identities where provider='google';
+select 'count.auth_identities_email='||count(*) from auth.identities where provider='email';
+select 'md5.profile_ids='||md5(string_agg(id::text,',' order by id)) from public.profiles;
+select 'md5.product_ids='||md5(string_agg(id::text,',' order by id)) from public.products;
+select 'md5.sale_ids='||md5(string_agg(id::text,',' order by id)) from public.sales;
+select 'md5.sale_created_at='||md5(string_agg(id::text||'@'||created_at::text,',' order by id)) from public.sales;
+select 'md5.storage_paths='||md5(string_agg(bucket_id||'/'||name,',' order by bucket_id, name)) from storage.objects;
+select 'md5.bucket_config='||md5(string_agg(id||':'||public::text||':'||coalesce(file_size_limit::text,'-'),',' order by id)) from storage.buckets;
+
+-- 13. RLS behaviour: every public table must have RLS on AND at least one policy
+select 'rls.tables_without_rls='||count(*) from pg_tables where schemaname='public' and not rowsecurity;
+select 'rls.tables_without_policy='||count(*) from pg_tables t where t.schemaname='public'
+  and not exists (select 1 from pg_policies p where p.schemaname='public' and p.tablename=t.tablename);
+select 'realtime.tables='||count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public';
