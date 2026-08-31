@@ -23,24 +23,32 @@ that is not imported by any deployed function.
 
 Three functions reference `LOVABLE_API_KEY`. Nothing else in the codebase does.
 
-### 1.1 `ai-assistant`
+### 1.1 `ai-assistant` — Lovable AI Gateway is dropped, not replaced
 - **What the gateway does today:** proxies to `https://ai.gateway.lovable.dev/v1/responses`
   (OpenAI Responses API) with `stream: true`, low-effort reasoning, and strict
   `json_schema` structured output (`assistant_turn` → `{ reply, action }`).
-- **External service behind it:** OpenAI (billed as Lovable AI credits).
-- **API calls:** one `POST /v1/responses` per user turn; SSE stream accumulated server-side.
-- **Secrets today:** `LOVABLE_API_KEY`.
-- **Replacement (prepared, not switched):** `_shared/ai-provider.ts` →
-  `POST https://api.anthropic.com/v1/messages` with `anthropic-version: 2023-06-01`,
-  a single forced tool (`emit_turn`) whose `input_schema` is the *same* `ACTION_SCHEMA`,
-  and `tool_choice: {type:"tool", name:"emit_turn"}`. The `{ reply, action }` contract,
-  offline fallback parser, and product-matching logic are unchanged.
-- **Secrets after cutover:** `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
-  (default `claude-sonnet-4-5`), `AI_PROVIDER=anthropic`.
-- **Cutover edit (one function, ~15 lines):** in `ai-assistant/index.ts` replace the inline
+- **Secrets today:** `LOVABLE_API_KEY` — **not carried into the new architecture.**
+- **Every dependency on the gateway (complete list):**
+  1. `supabase/functions/ai-assistant/index.ts` — the constants `GATEWAY`
+     (`https://ai.gateway.lovable.dev/v1/responses`) and `MODEL` (`openai/gpt-5.6-sol`),
+     the `LOVABLE_API_KEY` env read, the `Lovable-API-Key` / `X-Lovable-AIG-SDK` headers,
+     the Responses-API request body (`input[]`, `reasoning`, `text.format.json_schema`),
+     and the SSE reader `readOutputText()` that accumulates `response.output_text.delta`.
+  2. Nothing else. The client (`src/hooks/useAIAssistant.ts`, `src/components/ai/AIAssistant.tsx`,
+     `src/lib/ai-assistant.ts`, `src/lib/product-match.ts`, `src/lib/offline-assistant.ts`)
+     only calls the edge function and knows nothing about any provider.
+  3. No database object, RLS policy, cron job or storage bucket references the gateway.
+- **Decision:** the assistant ships **disabled** at cutover (`AI_PROVIDER=disabled`, the module
+  default). `runAssistantTurn()` then returns a friendly non-error reply and the existing
+  offline command parser continues to handle simple sale/expense/stock capture — no 500s,
+  no broken UI, no vendor secret required.
+- **Future provider (optional, no code change):** set `AI_PROVIDER=openai_compatible`,
+  `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`. Any OpenAI-compatible Chat Completions endpoint works;
+  the `ACTION_SCHEMA` and `{ reply, action }` contract are unchanged.
+- **Cutover edit (one function, ~15 lines):** in `ai-assistant/index.ts` delete `GATEWAY`,
+  `MODEL`, the `LOVABLE_API_KEY` guard and `readOutputText()`, and replace the inline
   `fetch(GATEWAY, …)` block with
-  `await runAssistantTurn({ systemPrompt, messages: trimmed, schema: ACTION_SCHEMA, lovableModel: MODEL, readOutputText })`
-  and return `result.reply` / `result.action`.
+  `await runAssistantTurn({ systemPrompt: systemPrompt(body?.context ?? {}), messages: trimmed, schema: ACTION_SCHEMA })`.
 
 ### 1.2 `admin-email-send-campaign`
 - **What the gateway does today:** connector proxy
