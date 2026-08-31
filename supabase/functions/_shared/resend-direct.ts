@@ -1,11 +1,12 @@
 // Resend transport that talks to api.resend.com DIRECTLY (no Lovable connector gateway).
 //
-// STATUS: PREPARED FOR MIGRATION — NOT WIRED INTO PRODUCTION YET.
-// Production code (admin-email-send-campaign, admin-monthly-statements) still calls the
-// Lovable connector gateway. After production cutover, replace their local `sendEmail` /
-// `sendBatch` helpers with `sendEmailDirect` / `sendBatchDirect` below. The return shapes
-// are intentionally identical to the current gateway helpers, so the swap is a one-line
-// change in each function.
+// STATUS: WIRED, TRANSPORT-SWITCHED. `admin-email-send-campaign` and
+// `admin-monthly-statements` now call `sendBatchAuto` / `sendEmailAuto` below.
+// The transport is chosen at runtime by EMAIL_TRANSPORT and defaults to "gateway",
+// so current Lovable Cloud production behaviour is byte-for-byte unchanged. Setting
+// EMAIL_TRANSPORT=direct in the new project switches both functions to
+// api.resend.com with no code change and no LOVABLE_API_KEY. Flipping it back to
+// "gateway" is the email half of the rollback plan.
 //
 // Required secret in the target Supabase project:
 //   RESEND_API_KEY  — Resend API key (re-key in Resend after leaving Lovable Cloud)
