@@ -13,7 +13,7 @@ that is not imported by any deployed function.
 | File | Purpose | Wired into production? |
 |---|---|---|
 | `supabase/functions/_shared/resend-direct.ts` | Direct `api.resend.com` transport (single + batch), plus `sendEmailAuto`/`sendBatchAuto` that switch on `EMAIL_TRANSPORT` | **No** — nothing imports it yet |
-| `supabase/functions/_shared/ai-provider.ts` | Provider-agnostic assistant turn: Anthropic Claude path + existing Lovable path, switched by `AI_PROVIDER` | **No** — nothing imports it yet |
+| `supabase/functions/_shared/ai-provider.ts` | Vendor-neutral assistant turn: `disabled` (default after cutover) or any OpenAI-compatible endpoint, switched by `AI_PROVIDER`. **No Lovable AI Gateway, no Anthropic.** | **No** — nothing imports it yet |
 | `supabase/migration-package/01–07` | Corrected schema, storage, export, import, validation, cron artifacts (from the verification pass) | Target project only |
 | `docs/migration/MIGRATION-READINESS.md` | This document | — |
 
@@ -23,24 +23,32 @@ that is not imported by any deployed function.
 
 Three functions reference `LOVABLE_API_KEY`. Nothing else in the codebase does.
 
-### 1.1 `ai-assistant`
+### 1.1 `ai-assistant` — Lovable AI Gateway is dropped, not replaced
 - **What the gateway does today:** proxies to `https://ai.gateway.lovable.dev/v1/responses`
   (OpenAI Responses API) with `stream: true`, low-effort reasoning, and strict
   `json_schema` structured output (`assistant_turn` → `{ reply, action }`).
-- **External service behind it:** OpenAI (billed as Lovable AI credits).
-- **API calls:** one `POST /v1/responses` per user turn; SSE stream accumulated server-side.
-- **Secrets today:** `LOVABLE_API_KEY`.
-- **Replacement (prepared, not switched):** `_shared/ai-provider.ts` →
-  `POST https://api.anthropic.com/v1/messages` with `anthropic-version: 2023-06-01`,
-  a single forced tool (`emit_turn`) whose `input_schema` is the *same* `ACTION_SCHEMA`,
-  and `tool_choice: {type:"tool", name:"emit_turn"}`. The `{ reply, action }` contract,
-  offline fallback parser, and product-matching logic are unchanged.
-- **Secrets after cutover:** `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
-  (default `claude-sonnet-4-5`), `AI_PROVIDER=anthropic`.
-- **Cutover edit (one function, ~15 lines):** in `ai-assistant/index.ts` replace the inline
+- **Secrets today:** `LOVABLE_API_KEY` — **not carried into the new architecture.**
+- **Every dependency on the gateway (complete list):**
+  1. `supabase/functions/ai-assistant/index.ts` — the constants `GATEWAY`
+     (`https://ai.gateway.lovable.dev/v1/responses`) and `MODEL` (`openai/gpt-5.6-sol`),
+     the `LOVABLE_API_KEY` env read, the `Lovable-API-Key` / `X-Lovable-AIG-SDK` headers,
+     the Responses-API request body (`input[]`, `reasoning`, `text.format.json_schema`),
+     and the SSE reader `readOutputText()` that accumulates `response.output_text.delta`.
+  2. Nothing else. The client (`src/hooks/useAIAssistant.ts`, `src/components/ai/AIAssistant.tsx`,
+     `src/lib/ai-assistant.ts`, `src/lib/product-match.ts`, `src/lib/offline-assistant.ts`)
+     only calls the edge function and knows nothing about any provider.
+  3. No database object, RLS policy, cron job or storage bucket references the gateway.
+- **Decision:** the assistant ships **disabled** at cutover (`AI_PROVIDER=disabled`, the module
+  default). `runAssistantTurn()` then returns a friendly non-error reply and the existing
+  offline command parser continues to handle simple sale/expense/stock capture — no 500s,
+  no broken UI, no vendor secret required.
+- **Future provider (optional, no code change):** set `AI_PROVIDER=openai_compatible`,
+  `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`. Any OpenAI-compatible Chat Completions endpoint works;
+  the `ACTION_SCHEMA` and `{ reply, action }` contract are unchanged.
+- **Cutover edit (one function, ~15 lines):** in `ai-assistant/index.ts` delete `GATEWAY`,
+  `MODEL`, the `LOVABLE_API_KEY` guard and `readOutputText()`, and replace the inline
   `fetch(GATEWAY, …)` block with
-  `await runAssistantTurn({ systemPrompt, messages: trimmed, schema: ACTION_SCHEMA, lovableModel: MODEL, readOutputText })`
-  and return `result.reply` / `result.action`.
+  `await runAssistantTurn({ systemPrompt: systemPrompt(body?.context ?? {}), messages: trimmed, schema: ACTION_SCHEMA })`.
 
 ### 1.2 `admin-email-send-campaign`
 - **What the gateway does today:** connector proxy
@@ -60,10 +68,12 @@ Three functions reference `LOVABLE_API_KEY`. Nothing else in the codebase does.
 - **Secrets after cutover:** `RESEND_API_KEY`, `STATEMENTS_CRON_SECRET`, `PUBLIC_APP_URL`,
   `EMAIL_TRANSPORT=direct`.
 
-### 1.4 Functionality that stops working the moment Lovable Cloud is left, if not swapped
-1. AI Business Assistant (all natural-language sale/expense/stock capture) — hard fail 500.
-2. Bulk email campaigns and test sends — hard fail.
-3. Automated monthly financial statement emails (cron) — hard fail, silent until the log is read.
+### 1.4 Functionality affected the moment Lovable Cloud is left
+1. AI Business Assistant — **by design, the AI turn is switched off** (`AI_PROVIDER=disabled`).
+   The assistant panel stays usable via the offline command parser; no error, no 500.
+   Natural-language understanding of complex phrasing is what is lost until a provider is added.
+2. Bulk email campaigns and test sends — swapped to **direct Resend** (`EMAIL_TRANSPORT=direct`).
+3. Automated monthly financial statement emails (cron) — swapped to **direct Resend**.
 
 Everything else (Paystack, Twilio/SMS, exchange rates, OTP flows, backups, tracking pixels)
 uses its own secret and calls the vendor directly — no Lovable dependency.
@@ -164,13 +174,13 @@ Both use `pg_net` + a shared secret header; update the URL and secret for the ne
 
 **Vercel — public (browser, `VITE_`):**
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (anon), `VITE_SUPABASE_PROJECT_ID`.
-Nothing else. No service-role key, no Resend/Anthropic/Paystack/Twilio key is ever exposed —
+Nothing else. No service-role key, no Resend/Paystack/Twilio/AI key is ever exposed —
 they exist only as Supabase Edge Function secrets.
 
 **Supabase Edge Function secrets (server-side only):**
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (auto),
 `RESEND_API_KEY`, `SENDER_DOMAIN`, `PUBLIC_APP_URL`, `EMAIL_TRANSPORT=direct`,
-`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_PROVIDER=anthropic`,
+`AI_PROVIDER=disabled` (optional later: `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`),
 `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`,
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (or the SMS provider in use),
 `STATEMENTS_CRON_SECRET`, `EMAIL_CRON_SECRET`, `EXCHANGE_RATES_*` if set.
@@ -181,7 +191,7 @@ they exist only as Supabase Edge Function secrets.
 | Service | Purpose | Current integration | Required secret | Stored | Manual step |
 |---|---|---|---|---|---|
 | Resend | Campaigns, statements, transactional | Lovable connector gateway | `RESEND_API_KEY` | Supabase secret | Re-verify `mail.kuditrack.online` DNS on the new account; switch to direct API |
-| Anthropic | AI assistant (replacement) | none yet | `ANTHROPIC_API_KEY` | Supabase secret | Create key, set `AI_PROVIDER=anthropic` |
+| AI provider (future, optional) | AI assistant natural-language turn | none — assistant ships disabled | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | Supabase secret | None at cutover; add later if you want the AI turn back |
 | Paystack | Subscriptions | direct API + webhook | `PAYSTACK_SECRET_KEY`, webhook secret | Supabase secret | Re-point webhook URL to new project ref |
 | Twilio / SMS | Order + status SMS | direct API | `TWILIO_*` | Supabase secret | Copy credentials; sender ID unchanged |
 | Google OAuth | Sign-in | Lovable-brokered | client id/secret | Supabase Auth config | See §2 |
@@ -206,17 +216,18 @@ new project and a delta import back. Keep the old backend live and untouched for
 · 4. apply `01_schema.sql` + `02_storage.sql` on target · 5. `05_import_data.sh` · 6. `06_storage_sync.sh`
 · 7. URL-rewrite SQL · 8. set all secrets · 9. deploy 24 edge functions · 10. configure Google provider (§2)
 · 11. `07_cron.sql` · 12. run `04_validation.sql` on target and diff · 13. deploy frontend to Vercel with
-new `VITE_*` and swap `EMAIL_TRANSPORT`/`AI_PROVIDER` · 14. smoke tests (login, Google login, sale, order,
-Paystack test charge, campaign test send, assistant turn) · 15. DNS switch · 16. 14-day dual-retention.
+new `VITE_*` and set `EMAIL_TRANSPORT=direct` and `AI_PROVIDER=disabled` · 14. smoke tests (login, Google login, sale, order,
+Paystack test charge, campaign test send, assistant offline-parser turn) · 15. DNS switch · 16. 14-day dual-retention.
 
 ---
 
 ## 11. Final risk register
 
 **RED (blockers, all now have prepared fixes — none applied to production)**
-1. `LOVABLE_API_KEY` in `ai-assistant`, `admin-email-send-campaign`, `admin-monthly-statements`.
-   *Fix prepared:* `_shared/resend-direct.ts`, `_shared/ai-provider.ts`. **Action needed:** obtain
-   `ANTHROPIC_API_KEY`, then approve the three-file swap.
+1. ~~`LOVABLE_API_KEY`~~ — **resolved in plan.** Email/statements move to direct Resend
+   (`_shared/resend-direct.ts`, `EMAIL_TRANSPORT=direct`); `ai-assistant` moves to
+   `_shared/ai-provider.ts` with `AI_PROVIDER=disabled`. No Lovable AI Gateway and no new AI
+   vendor is carried into the new architecture. Action needed: approve the three-file swap.
 2. Google OAuth client ownership (§2). Unresolved until you confirm Branch A or B.
 3. `@lovable.dev/cloud-auth-js` sign-in path must be rewritten to `supabase.auth.signInWithOAuth`
    before the frontend can run off Lovable. Code change is small but touches `SignInPage.tsx`
