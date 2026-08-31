@@ -20,8 +20,11 @@ import {
   statementFileName,
   statementSubject,
 } from "../_shared/statement-pdf.ts";
+import { sendEmailAuto, useDirectResend } from "../_shared/resend-direct.ts";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/resend";
+// Transport is selected by EMAIL_TRANSPORT ("gateway" default today, "direct" after
+// the external-Supabase cutover). Direct mode talks to api.resend.com and needs no
+// Lovable key at all.
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const CRON_SECRETS = [Deno.env.get("STATEMENTS_CRON_SECRET"), Deno.env.get("STATEMENTS_CRON_TOKEN")]
@@ -34,25 +37,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 async function sendEmail(payload: Record<string, unknown>) {
-  const resp = await fetch(`${GATEWAY}/emails`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-      "X-Connection-Api-Key": RESEND_API_KEY!,
-    },
-    body: JSON.stringify(payload),
-  });
-  const text = await resp.text();
-  if (!resp.ok) {
-    console.error(`Resend send failed [${resp.status}]: ${text}`);
-    return { ok: false, status: resp.status, error: text, id: null as string | null };
-  }
-  let id: string | null = null;
-  try {
-    id = (JSON.parse(text) as { id?: string })?.id ?? null;
-  } catch { /* ignore */ }
-  return { ok: true, status: 200, error: null, id };
+  return await sendEmailAuto(payload);
 }
 
 async function loadSettings(admin: ReturnType<typeof serviceClient>) {
@@ -181,7 +166,7 @@ async function generateAndSend(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!LOVABLE_API_KEY || !RESEND_API_KEY) {
+  if (!RESEND_API_KEY || (!useDirectResend() && !LOVABLE_API_KEY)) {
     return json({ error: "email provider not configured" }, 500);
   }
 
