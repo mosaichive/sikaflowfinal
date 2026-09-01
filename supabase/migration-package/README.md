@@ -158,3 +158,6 @@ this package switches traffic.
 | `09_compare.sh` | source-vs-target validation report |
 | `ROLLBACK.md` | reset/rollback for the new project |
 | `CHECKLIST.md` | final go/no-go before connecting staging |
+| `10_schema_compat.sh` | read-only source-vs-target schema diff (data-only path) |
+| `11_migrate_data_only.sh` | data-only migration into an existing target schema (no DDL) |
+| `DATA-ONLY.md` | step-by-step guide for the data-only path |
