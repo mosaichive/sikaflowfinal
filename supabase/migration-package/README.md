@@ -1,5 +1,13 @@
 # KudiTrack — self-contained migration package
 
+> **Target schema already created?** Use the data-only path instead:
+> **[`DATA-ONLY.md`](./DATA-ONLY.md)** → `./10_schema_compat.sh` then
+> `./11_migrate_data_only.sh`. It applies **no DDL** and preserves every
+> UUID and relationship. The `./migrate.sh` flow below creates the schema
+> itself and requires a completely empty target.
+
+
+
 Run this **on your own machine**. Every credential for the new Supabase project
 stays in a local, git-ignored `.env` file. Nothing in this package transmits your
 database password, service-role key or personal access token anywhere except to
