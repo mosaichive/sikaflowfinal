@@ -147,39 +147,3 @@ function json(payload: unknown, status: number) {
   });
 }
 
-/** Accumulates `response.output_text` deltas from the SSE stream. */
-async function readOutputText(body: ReadableStream<Uint8Array>) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let text = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      try {
-        const event = JSON.parse(payload);
-        if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-          text += event.delta;
-        } else if (event.type === 'response.completed' && !text) {
-          const output = event.response?.output ?? [];
-          for (const item of output) {
-            for (const part of item?.content ?? []) {
-              if (part?.type === 'output_text' && typeof part.text === 'string') text += part.text;
-            }
-          }
-        }
-      } catch {
-        // Ignore malformed SSE frames.
-      }
-    }
-  }
-  return text;
-}
