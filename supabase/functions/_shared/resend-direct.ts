@@ -1,17 +1,10 @@
-// Resend transport that talks to api.resend.com DIRECTLY (no Lovable connector gateway).
+// Resend transport: talks to api.resend.com directly. No third-party gateway.
 //
-// STATUS: WIRED, TRANSPORT-SWITCHED. `admin-email-send-campaign` and
-// `admin-monthly-statements` now call `sendBatchAuto` / `sendEmailAuto` below.
-// The transport is chosen at runtime by EMAIL_TRANSPORT and defaults to "gateway",
-// so current Lovable Cloud production behaviour is byte-for-byte unchanged. Setting
-// EMAIL_TRANSPORT=direct in the new project switches both functions to
-// api.resend.com with no code change and no LOVABLE_API_KEY. Flipping it back to
-// "gateway" is the email half of the rollback plan.
+// Used by `admin-email-send-campaign` and `admin-monthly-statements` via
+// `sendBatchAuto` / `sendEmailAuto`.
 //
-// Required secret in the target Supabase project:
-//   RESEND_API_KEY  — Resend API key (re-key in Resend after leaving Lovable Cloud)
-// Optional:
-//   EMAIL_TRANSPORT = "direct" | "gateway"  (default "gateway" until cutover)
+// Required secret in the Supabase project:
+//   RESEND_API_KEY  — Resend API key
 
 const RESEND_API = "https://api.resend.com";
 
@@ -21,9 +14,9 @@ function apiKey(): string {
   return key;
 }
 
-/** True once the project is cut over and should bypass the Lovable connector gateway. */
+/** Retained for call-site compatibility: delivery is always direct to Resend now. */
 export function useDirectResend(): boolean {
-  return (Deno.env.get("EMAIL_TRANSPORT") ?? "gateway").toLowerCase() === "direct";
+  return true;
 }
 
 /** POST /emails — single send. Mirrors the gateway helper's return shape. */
@@ -70,39 +63,11 @@ export async function sendBatchDirect(payload: unknown[]) {
   }
 }
 
-/**
- * Optional convenience wrappers: keep BOTH transports available during cutover so a
- * rollback needs no code change — only the EMAIL_TRANSPORT env var flips.
- */
-const LOVABLE_GATEWAY = "https://connector-gateway.lovable.dev/resend";
-
-async function viaGateway(path: string, body: unknown) {
-  return await fetch(`${LOVABLE_GATEWAY}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY") ?? ""}`,
-      "X-Connection-Api-Key": Deno.env.get("RESEND_API_KEY") ?? "",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
+/** Both helpers now talk to api.resend.com directly. No connector gateway. */
 export async function sendEmailAuto(payload: Record<string, unknown>) {
-  if (useDirectResend()) return await sendEmailDirect(payload);
-  const resp = await viaGateway("/emails", payload);
-  const text = await resp.text();
-  if (!resp.ok) return { ok: false, status: resp.status, error: text, id: null as string | null };
-  let id: string | null = null;
-  try { id = (JSON.parse(text) as { id?: string })?.id ?? null; } catch { /* ignore */ }
-  return { ok: true, status: 200, error: null, id };
+  return await sendEmailDirect(payload);
 }
 
 export async function sendBatchAuto(payload: unknown[]) {
-  if (useDirectResend()) return await sendBatchDirect(payload);
-  const resp = await viaGateway("/emails/batch", payload);
-  const text = await resp.text();
-  if (!resp.ok) return { ok: false, status: resp.status, body: text, data: null };
-  try { return { ok: true, status: 200, body: text, data: JSON.parse(text) }; }
-  catch { return { ok: true, status: 200, body: text, data: null }; }
+  return await sendBatchDirect(payload);
 }

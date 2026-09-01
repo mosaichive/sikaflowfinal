@@ -4,7 +4,7 @@
 //   { action: "send", campaign_id }                 // send now
 //   { action: "run_scheduled" }                     // pg_cron trigger, sends any campaigns due
 //
-// Rate-limited batched delivery via Resend through the Lovable connector gateway.
+// Rate-limited batched delivery via the Resend API.
 import {
   corsHeaders,
   layoutEmail,
@@ -14,12 +14,9 @@ import {
   serviceClient,
   wrapHtmlForTracking,
 } from "../_shared/email-bulk.ts";
-import { sendBatchAuto, useDirectResend } from "../_shared/resend-direct.ts";
+import { sendBatchAuto } from "../_shared/resend-direct.ts";
 
-// Transport is selected by EMAIL_TRANSPORT ("gateway" default today, "direct" after
-// the external-Supabase cutover). Direct mode talks to api.resend.com and needs no
-// Lovable key at all.
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+// Email is delivered directly through api.resend.com using RESEND_API_KEY.
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://kuditrack.online";
@@ -201,7 +198,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-  if (!RESEND_API_KEY || (!useDirectResend() && !LOVABLE_API_KEY)) {
+  if (!RESEND_API_KEY) {
     return new Response(
       JSON.stringify({ error: "email provider not configured" }),
       {

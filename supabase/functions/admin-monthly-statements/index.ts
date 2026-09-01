@@ -20,12 +20,9 @@ import {
   statementFileName,
   statementSubject,
 } from "../_shared/statement-pdf.ts";
-import { sendEmailAuto, useDirectResend } from "../_shared/resend-direct.ts";
+import { sendEmailAuto } from "../_shared/resend-direct.ts";
 
-// Transport is selected by EMAIL_TRANSPORT ("gateway" default today, "direct" after
-// the external-Supabase cutover). Direct mode talks to api.resend.com and needs no
-// Lovable key at all.
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+// Email is delivered directly through api.resend.com using RESEND_API_KEY.
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const CRON_SECRETS = [Deno.env.get("STATEMENTS_CRON_SECRET"), Deno.env.get("STATEMENTS_CRON_TOKEN")]
   .filter((v): v is string => Boolean(v));
@@ -166,7 +163,7 @@ async function generateAndSend(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!RESEND_API_KEY || (!useDirectResend() && !LOVABLE_API_KEY)) {
+  if (!RESEND_API_KEY) {
     return json({ error: "email provider not configured" }, 500);
   }
 
