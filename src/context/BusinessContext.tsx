@@ -30,6 +30,20 @@ interface BusinessContextType {
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
+function isMissingProfileColumnError(error: unknown, column: string) {
+  const message = String((error as { message?: string } | null)?.message || '').toLowerCase();
+  const details = String((error as { details?: string } | null)?.details || '').toLowerCase();
+  const target = column.toLowerCase();
+  return (
+    (message.includes(target) && (message.includes('schema cache') || message.includes('column'))) ||
+    (details.includes(target) && (details.includes('schema cache') || details.includes('column')))
+  );
+}
+
+function profileIdentityFilter(userId: string) {
+  return `id.eq.${userId},user_id.eq.${userId}`;
+}
+
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const { user, staffMembership } = useAuth();
   const [business, setBusiness] = useState<Business | null>(null);
@@ -53,11 +67,26 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       const db = supabase as any;
       // For team members, ownerUserId points at the inviting business owner.
       // For owners themselves, it points at their own user id.
-      const { data: profile } = await db
+      let { data: profile, error: profileError } = await db
         .from('profiles')
         .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock')
-        .eq('id', ownerUserId)
+        .or(profileIdentityFilter(ownerUserId))
+        .limit(1)
         .maybeSingle();
+
+      if (profileError && isMissingProfileColumnError(profileError, 'user_id')) {
+        const fallbackResult = await db
+          .from('profiles')
+          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock')
+          .eq('id', ownerUserId)
+          .maybeSingle();
+        profile = fallbackResult.data;
+        profileError = fallbackResult.error;
+      }
+
+      if (profileError) {
+        console.warn('Unable to load business profile. Check Supabase auth and RLS policies.', profileError.message);
+      }
 
       if (loadSeq !== loadSeqRef.current) return;
 

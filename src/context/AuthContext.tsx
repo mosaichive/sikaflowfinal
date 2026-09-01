@@ -37,6 +37,10 @@ function isMissingProfileColumnError(error: unknown, column: string) {
   );
 }
 
+function profileIdentityFilter(userId: string) {
+  return `id.eq.${userId},user_id.eq.${userId}`;
+}
+
 export interface AppUser {
   id: string;
   email: string;
@@ -238,17 +242,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let { data, error } = await db
       .from('profiles')
       .select('display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone')
-      .eq('id', uid)
+      .or(profileIdentityFilter(uid))
+      .limit(1)
       .maybeSingle();
+
+    if (error && isMissingProfileColumnError(error, 'user_id')) {
+      const fallbackResult = await db
+        .from('profiles')
+        .select('display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone')
+        .eq('id', uid)
+        .maybeSingle();
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
 
     if (error && isMissingProfileColumnError(error, 'onboarding_completed')) {
       const fallbackResult = await db
         .from('profiles')
         .select('display_name, avatar_url, title, phone, bio')
-        .eq('id', uid)
+        .or(profileIdentityFilter(uid))
+        .limit(1)
         .maybeSingle();
       data = fallbackResult.data ? { ...(fallbackResult.data as any), onboarding_completed: false } : null;
       error = fallbackResult.error;
+
+      if (error && isMissingProfileColumnError(error, 'user_id')) {
+        const idOnlyFallback = await db
+          .from('profiles')
+          .select('display_name, avatar_url, title, phone, bio')
+          .eq('id', uid)
+          .maybeSingle();
+        data = idOnlyFallback.data ? { ...(idOnlyFallback.data as any), onboarding_completed: false } : null;
+        error = idOnlyFallback.error;
+      }
     }
 
     if (error) {

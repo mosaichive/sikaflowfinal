@@ -472,6 +472,67 @@ async function updateWithOptionalColumnFallback<T extends Record<string, unknown
   }
 }
 
+async function updateProfileWithIdentityFallback<T extends Record<string, unknown>>({
+  identity,
+  payload,
+  optionalColumns,
+  context,
+}: {
+  identity: string;
+  payload: T;
+  optionalColumns: string[];
+  context: string;
+}) {
+  const nextPayload: Record<string, unknown> = { ...payload };
+  const remainingColumns = new Set(optionalColumns);
+  const droppedColumns = new Set<string>();
+  let includeUserIdMatch = true;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    let query = supabase
+      .from('profiles' as any)
+      .update(nextPayload as never);
+
+    query = includeUserIdMatch
+      ? query.or(`id.eq.${identity},user_id.eq.${identity}`)
+      : query.eq('id', identity);
+
+    const { error } = await query;
+
+    if (!error) return;
+
+    if (includeUserIdMatch && isMissingColumnError(error, 'user_id', 'profiles')) {
+      logSupabaseError(context, error, {
+        table: 'profiles',
+        missingColumn: 'user_id',
+        fallbackMode: 'updateWithoutUserIdIdentityMatch',
+      });
+      includeUserIdMatch = false;
+      continue;
+    }
+
+    let missingColumn = Array.from(remainingColumns).find((column) =>
+      isMissingColumnError(error, column, 'profiles'),
+    );
+    if (!missingColumn) {
+      const detected = extractMissingColumnFromError(error);
+      if (detected && detected in nextPayload && !droppedColumns.has(detected)) {
+        missingColumn = detected;
+      }
+    }
+    if (!missingColumn) throw error;
+
+    logSupabaseError(context, error, {
+      table: 'profiles',
+      missingColumn,
+      fallbackMode: 'updateWithoutOptionalColumn',
+    });
+    remainingColumns.delete(missingColumn);
+    droppedColumns.add(missingColumn);
+    delete nextPayload[missingColumn];
+  }
+}
+
 async function insertWithOptionalColumnFallback<T extends Record<string, unknown>>({
   table,
   payload,
@@ -526,10 +587,8 @@ export async function updateBusinessWorkspaceRecord(
   // user's business info lives on `profiles`. Update that row instead so
   // setup completes against single-tenant schemas without breaking
   // multi-tenant ones (the helper auto-drops unknown columns).
-  return updateWithOptionalColumnFallback({
-    table: 'profiles',
-    matchColumn: 'id',
-    matchValue: businessId,
+  return updateProfileWithIdentityFallback({
+    identity: businessId,
     payload: {
       business_name: payload.name ?? payload.business_name,
       business_type: payload.business_type,
@@ -546,11 +605,8 @@ export async function updateProfileRecord(
   userId: string,
   payload: Record<string, unknown>,
 ) {
-  return updateWithOptionalColumnFallback({
-    table: 'profiles',
-    // The schema uses `id` (= auth user id) as the primary key.
-    matchColumn: 'id',
-    matchValue: userId,
+  return updateProfileWithIdentityFallback({
+    identity: userId,
     payload,
     optionalColumns: [
       'onboarding_completed',
@@ -1167,7 +1223,8 @@ async function readProfileBusinessId(userId: string): Promise<ProfileBusinessIdL
     const { data, error } = await supabase
       .from('profiles')
       .select('business_id')
-      .eq('id', userId)
+      .or(`id.eq.${userId},user_id.eq.${userId}`)
+      .limit(1)
       .maybeSingle();
 
     if (!error) {
@@ -1175,6 +1232,22 @@ async function readProfileBusinessId(userId: string): Promise<ProfileBusinessIdL
         hasBusinessIdColumn: true,
         businessId: ((data as any)?.business_id as string | null) ?? null,
       };
+    }
+    if (isMissingColumnError(error, 'user_id', 'profiles')) {
+      const fallbackResult = await supabase
+        .from('profiles')
+        .select('business_id')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!fallbackResult.error) {
+        return {
+          hasBusinessIdColumn: true,
+          businessId: ((fallbackResult.data as any)?.business_id as string | null) ?? null,
+        };
+      }
+      if (!isMissingColumnError(fallbackResult.error, 'business_id', 'profiles')) {
+        throw fallbackResult.error;
+      }
     }
     if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
   } catch (error) {
