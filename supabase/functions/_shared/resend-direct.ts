@@ -21,9 +21,9 @@ function apiKey(): string {
   return key;
 }
 
-/** True once the project is cut over and should bypass the Lovable connector gateway. */
+/** Retained for call-site compatibility: delivery is always direct to Resend now. */
 export function useDirectResend(): boolean {
-  return (Deno.env.get("EMAIL_TRANSPORT") ?? "gateway").toLowerCase() === "direct";
+  return true;
 }
 
 /** POST /emails — single send. Mirrors the gateway helper's return shape. */
@@ -70,39 +70,11 @@ export async function sendBatchDirect(payload: unknown[]) {
   }
 }
 
-/**
- * Optional convenience wrappers: keep BOTH transports available during cutover so a
- * rollback needs no code change — only the EMAIL_TRANSPORT env var flips.
- */
-const LOVABLE_GATEWAY = "https://connector-gateway.lovable.dev/resend";
-
-async function viaGateway(path: string, body: unknown) {
-  return await fetch(`${LOVABLE_GATEWAY}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY") ?? ""}`,
-      "X-Connection-Api-Key": Deno.env.get("RESEND_API_KEY") ?? "",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
+/** Both helpers now talk to api.resend.com directly. No connector gateway. */
 export async function sendEmailAuto(payload: Record<string, unknown>) {
-  if (useDirectResend()) return await sendEmailDirect(payload);
-  const resp = await viaGateway("/emails", payload);
-  const text = await resp.text();
-  if (!resp.ok) return { ok: false, status: resp.status, error: text, id: null as string | null };
-  let id: string | null = null;
-  try { id = (JSON.parse(text) as { id?: string })?.id ?? null; } catch { /* ignore */ }
-  return { ok: true, status: 200, error: null, id };
+  return await sendEmailDirect(payload);
 }
 
 export async function sendBatchAuto(payload: unknown[]) {
-  if (useDirectResend()) return await sendBatchDirect(payload);
-  const resp = await viaGateway("/emails/batch", payload);
-  const text = await resp.text();
-  if (!resp.ok) return { ok: false, status: resp.status, body: text, data: null };
-  try { return { ok: true, status: 200, body: text, data: JSON.parse(text) }; }
-  catch { return { ok: true, status: 200, body: text, data: null }; }
+  return await sendBatchDirect(payload);
 }
