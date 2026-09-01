@@ -162,7 +162,7 @@ export function downloadBackup(backup: BackupFile, businessName: string) {
 
 const ARRAY_SECTIONS = [
   'products', 'inventory', 'sales', 'sale_items', 'orders', 'order_items',
-  'customers', 'expenses', 'other_income', 'savings', 'investments', 'bank_accounts', 'branches',
+  'customers', 'expenses', 'other_income', 'savings', 'investments', 'bank_accounts', 'branches', 'staff',
 ] as const;
 
 export type ValidationResult =
