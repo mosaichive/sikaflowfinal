@@ -27,6 +27,20 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue | undefined>(undefined);
 
+function isMissingProfileColumnError(error: unknown, column: string) {
+  const message = String((error as { message?: string } | null)?.message || '').toLowerCase();
+  const details = String((error as { details?: string } | null)?.details || '').toLowerCase();
+  const target = column.toLowerCase();
+  return (
+    (message.includes(target) && (message.includes('schema cache') || message.includes('column'))) ||
+    (details.includes(target) && (details.includes('schema cache') || details.includes('column')))
+  );
+}
+
+function profileIdentityFilter(userId: string) {
+  return `id.eq.${userId},user_id.eq.${userId}`;
+}
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const { user, staffMembership } = useAuth();
   const [currencies, setCurrencies] = useState<CurrencyDef[]>(FALLBACK_CURRENCIES);
@@ -52,11 +66,23 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       setActiveCurrencyCode(DEFAULT_CURRENCY_CODE);
       return;
     }
-    const { data } = await (supabase as any)
+    let { data, error } = await (supabase as any)
       .from('profiles')
       .select('currency')
-      .eq('id', ownerUserId)
+      .or(profileIdentityFilter(ownerUserId))
+      .limit(1)
       .maybeSingle();
+
+    if (error && isMissingProfileColumnError(error, 'user_id')) {
+      const fallbackResult = await (supabase as any)
+        .from('profiles')
+        .select('currency')
+        .eq('id', ownerUserId)
+        .maybeSingle();
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
     setActiveCurrencyCode(data?.currency || DEFAULT_CURRENCY_CODE);
   }, [ownerUserId]);
 
@@ -76,10 +102,29 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const setBusinessCurrency = useCallback(
     async (code: string) => {
       if (!user?.id) throw new Error('You must be signed in to change the business currency.');
-      const { error } = await (supabase as any)
+      let { error } = await (supabase as any)
         .from('profiles')
         .update({ currency: code })
-        .eq('id', user.id);
+        .or(profileIdentityFilter(user.id));
+
+      if (error && isMissingProfileColumnError(error, 'currency')) {
+        setActiveCurrencyCode(code);
+        return;
+      }
+
+      if (error && isMissingProfileColumnError(error, 'user_id')) {
+        const fallbackResult = await (supabase as any)
+          .from('profiles')
+          .update({ currency: code })
+          .eq('id', user.id);
+        error = fallbackResult.error;
+      }
+
+      if (error && isMissingProfileColumnError(error, 'currency')) {
+        setActiveCurrencyCode(code);
+        return;
+      }
+
       if (error) throw error;
       setActiveCurrencyCode(code);
     },

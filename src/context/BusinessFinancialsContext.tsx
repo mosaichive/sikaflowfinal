@@ -26,6 +26,20 @@ const EMPTY_FINANCIALS = calculateBusinessFinancials({
 
 const BusinessFinancialsContext = createContext<BusinessFinancialsContextValue | undefined>(undefined);
 
+function isMissingProfileColumnError(error: unknown, column: string) {
+  const message = String((error as { message?: string } | null)?.message || '').toLowerCase();
+  const details = String((error as { details?: string } | null)?.details || '').toLowerCase();
+  const target = column.toLowerCase();
+  return (
+    (message.includes(target) && (message.includes('schema cache') || message.includes('column'))) ||
+    (details.includes(target) && (details.includes('schema cache') || details.includes('column')))
+  );
+}
+
+function profileIdentityFilter(userId: string) {
+  return `id.eq.${userId},user_id.eq.${userId}`;
+}
+
 export function BusinessFinancialsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { businessId, loading: businessLoading } = useBusiness();
@@ -80,8 +94,25 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         db.from('restocks').select('total_cost,status,is_opening_stock').eq('user_id', userId),
         db.from('investments').select('amount,status').eq('user_id', userId),
         db.from('investor_funding').select('amount').eq('user_id', userId),
-        db.from('profiles').select('opening_cash_balance').eq('id', userId).maybeSingle(),
+        db
+          .from('profiles')
+          .select('opening_cash_balance')
+          .or(profileIdentityFilter(userId))
+          .limit(1)
+          .maybeSingle(),
       ]);
+
+      let profileValue = profileRes.status === 'fulfilled' ? profileRes.value as any : null;
+      if (
+        profileValue?.error
+        && isMissingProfileColumnError(profileValue.error, 'user_id')
+      ) {
+        profileValue = await db
+          .from('profiles')
+          .select('opening_cash_balance')
+          .eq('id', userId)
+          .maybeSingle();
+      }
 
       if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { userId });
       if (productsRes.status === 'rejected') logSupabaseError('financials.load.products', productsRes.reason, { userId });
@@ -110,9 +141,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
       }
 
       const openingCashBalance =
-        profileRes.status === 'fulfilled'
-          ? Number((profileRes.value as any)?.data?.opening_cash_balance ?? 0)
-          : 0;
+        Number(profileValue?.data?.opening_cash_balance ?? 0);
 
       const next = calculateBusinessFinancials({
         sales: sales as any,

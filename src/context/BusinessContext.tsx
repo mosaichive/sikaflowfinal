@@ -44,6 +44,12 @@ function profileIdentityFilter(userId: string) {
   return `id.eq.${userId},user_id.eq.${userId}`;
 }
 
+const BUSINESS_PROFILE_SELECT =
+  'id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock';
+
+const STABLE_BUSINESS_PROFILE_SELECT =
+  'id, business_name, business_type, phone, location, logo_url, onboarding_completed, email';
+
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const { user, staffMembership } = useAuth();
   const [business, setBusiness] = useState<Business | null>(null);
@@ -69,19 +75,40 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       // For owners themselves, it points at their own user id.
       let { data: profile, error: profileError } = await db
         .from('profiles')
-        .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock')
+        .select(BUSINESS_PROFILE_SELECT)
         .or(profileIdentityFilter(ownerUserId))
         .limit(1)
         .maybeSingle();
 
+      if (profileError && isMissingProfileColumnError(profileError, 'allow_sales_without_stock')) {
+        const fallbackResult = await db
+          .from('profiles')
+          .select(STABLE_BUSINESS_PROFILE_SELECT)
+          .or(profileIdentityFilter(ownerUserId))
+          .limit(1)
+          .maybeSingle();
+        profile = fallbackResult.data;
+        profileError = fallbackResult.error;
+      }
+
       if (profileError && isMissingProfileColumnError(profileError, 'user_id')) {
         const fallbackResult = await db
           .from('profiles')
-          .select('id, business_name, business_type, phone, location, logo_url, onboarding_completed, email, allow_sales_without_stock')
+          .select(BUSINESS_PROFILE_SELECT)
           .eq('id', ownerUserId)
           .maybeSingle();
         profile = fallbackResult.data;
         profileError = fallbackResult.error;
+
+        if (profileError && isMissingProfileColumnError(profileError, 'allow_sales_without_stock')) {
+          const stableFallbackResult = await db
+            .from('profiles')
+            .select(STABLE_BUSINESS_PROFILE_SELECT)
+            .eq('id', ownerUserId)
+            .maybeSingle();
+          profile = stableFallbackResult.data;
+          profileError = stableFallbackResult.error;
+        }
       }
 
       if (profileError) {

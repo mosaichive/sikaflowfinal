@@ -41,6 +41,15 @@ function profileIdentityFilter(userId: string) {
   return `id.eq.${userId},user_id.eq.${userId}`;
 }
 
+const PROFILE_SELECT =
+  'display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone';
+
+const STABLE_PROFILE_SELECT =
+  'display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified';
+
+const LEGACY_PROFILE_SELECT =
+  'display_name, avatar_url, title, phone, bio';
+
 export interface AppUser {
   id: string;
   email: string;
@@ -239,39 +248,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!uid) return { found: false, error: false };
 
     const db = supabase as any;
-    let { data, error } = await db
-      .from('profiles')
-      .select('display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone')
-      .or(profileIdentityFilter(uid))
-      .limit(1)
-      .maybeSingle();
-
-    if (error && isMissingProfileColumnError(error, 'user_id')) {
-      const fallbackResult = await db
+    const loadByIdentity = (select: string) =>
+      db
         .from('profiles')
-        .select('display_name, avatar_url, title, phone, bio, onboarding_completed, phone_verified, phone_verified_at, last_verified_phone')
+        .select(select)
+        .or(profileIdentityFilter(uid))
+        .limit(1)
+        .maybeSingle();
+    const loadById = (select: string) =>
+      db
+        .from('profiles')
+        .select(select)
         .eq('id', uid)
         .maybeSingle();
+
+    let { data, error } = await loadByIdentity(PROFILE_SELECT);
+
+    if (error && isMissingProfileColumnError(error, 'user_id')) {
+      const fallbackResult = await loadById(PROFILE_SELECT);
       data = fallbackResult.data;
       error = fallbackResult.error;
     }
 
+    if (
+      error
+      && (
+        isMissingProfileColumnError(error, 'phone_verified_at')
+        || isMissingProfileColumnError(error, 'last_verified_phone')
+      )
+    ) {
+      const fallbackResult = await loadByIdentity(STABLE_PROFILE_SELECT);
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+
+      if (error && isMissingProfileColumnError(error, 'user_id')) {
+        const idOnlyFallback = await loadById(STABLE_PROFILE_SELECT);
+        data = idOnlyFallback.data;
+        error = idOnlyFallback.error;
+      }
+    }
+
     if (error && isMissingProfileColumnError(error, 'onboarding_completed')) {
-      const fallbackResult = await db
-        .from('profiles')
-        .select('display_name, avatar_url, title, phone, bio')
-        .or(profileIdentityFilter(uid))
-        .limit(1)
-        .maybeSingle();
+      const fallbackResult = await loadByIdentity(LEGACY_PROFILE_SELECT);
       data = fallbackResult.data ? { ...(fallbackResult.data as any), onboarding_completed: false } : null;
       error = fallbackResult.error;
 
       if (error && isMissingProfileColumnError(error, 'user_id')) {
-        const idOnlyFallback = await db
-          .from('profiles')
-          .select('display_name, avatar_url, title, phone, bio')
-          .eq('id', uid)
-          .maybeSingle();
+        const idOnlyFallback = await loadById(LEGACY_PROFILE_SELECT);
         data = idOnlyFallback.data ? { ...(idOnlyFallback.data as any), onboarding_completed: false } : null;
         error = idOnlyFallback.error;
       }
