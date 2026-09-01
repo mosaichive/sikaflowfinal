@@ -1,8 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { runAssistantTurn } from '../_shared/ai-provider.ts';
 
-const GATEWAY = 'https://ai.gateway.lovable.dev/v1/responses';
-const MODEL = 'openai/gpt-5.6-sol';
 
 const ACTION_SCHEMA = {
   type: 'object',
