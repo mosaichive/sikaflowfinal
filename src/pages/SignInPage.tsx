@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, Info, MessageSquareText } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
+import { signInWithOAuth } from '@/lib/oauth';
 import { AboutModal } from '@/components/auth/AboutModal';
 import { ContactModal } from '@/components/auth/ContactModal';
 import { SEO } from '@/components/SEO';
@@ -155,9 +155,9 @@ function SignInPanel() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: redirectTo,
-        extraParams: { prompt: 'select_account' },
+      const result = await signInWithOAuth('google', {
+        redirectTo,
+        queryParams: { prompt: 'select_account' },
       });
       if (result.error) throw result.error;
       if (result.redirected) return;
@@ -313,9 +313,9 @@ function SignUpPanel() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: redirectTo,
-        extraParams: { prompt: 'select_account' },
+      const result = await signInWithOAuth('google', {
+        redirectTo,
+        queryParams: { prompt: 'select_account' },
       });
       if (result.error) throw result.error;
       if (result.redirected) return;
