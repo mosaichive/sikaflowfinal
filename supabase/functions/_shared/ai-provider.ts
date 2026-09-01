@@ -1,17 +1,13 @@
 // Provider-agnostic AI turn for the KudiTrack Business Assistant.
 //
-// STATUS: PREPARED FOR MIGRATION — NOT WIRED INTO PRODUCTION YET.
-// `supabase/functions/ai-assistant/index.ts` still calls the Lovable AI Gateway directly on
-// Lovable Cloud. The Lovable AI Gateway is NOT migrated into the new production architecture.
-//
-// After cutover the assistant runs in one of two modes:
-//   AI_PROVIDER=disabled           (DEFAULT, and the post-migration default)
+// The assistant runs in one of two modes:
+//   AI_PROVIDER=disabled           (DEFAULT)
 //       No external AI call is made. The function returns a clean, non-fatal payload and the
 //       client falls back to the offline command parser (`src/lib/offline-assistant.ts`),
 //       which still handles simple sale/expense/stock commands and product matching.
-//   AI_PROVIDER=openai_compatible  (future provider, opt-in)
+//   AI_PROVIDER=openai_compatible  (opt-in)
 //       Any OpenAI-compatible Chat Completions endpoint (OpenAI, Azure OpenAI, Groq,
-//       OpenRouter, a self-hosted gateway, ...). No vendor lock-in, no Lovable dependency.
+//       OpenRouter, a self-hosted gateway, ...). No vendor lock-in.
 //       Secrets: AI_BASE_URL (e.g. https://api.openai.com/v1), AI_API_KEY, AI_MODEL.
 //
 // The `{ reply, action }` contract, the ACTION_SCHEMA, the offline fallback parser and the
