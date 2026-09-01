@@ -116,9 +116,6 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) return json({ error: 'Unauthorized' }, 401);
 
-    const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!apiKey) return json({ error: 'AI is not configured on this workspace.' }, 500);
-
     const body = await req.json().catch(() => null);
     const messages = Array.isArray(body?.messages) ? body.messages : null;
     if (!messages || messages.length === 0) return json({ error: 'messages is required' }, 400);
@@ -128,55 +125,15 @@ Deno.serve(async (req) => {
       .slice(-12)
       .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
 
-    const res = await fetch(GATEWAY, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Lovable-API-Key': apiKey,
-        'X-Lovable-AIG-SDK': 'fetch',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        // Reasoning models can run long: always stream and accumulate server-side.
-        stream: true,
-        reasoning: { effort: 'low', summary: 'auto' },
-        input: [
-          { role: 'system', content: [{ type: 'input_text', text: systemPrompt(body?.context ?? {}) }] },
-          ...trimmed.map((m: any) => ({
-            role: m.role,
-            content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }],
-          })),
-        ],
-        text: {
-          format: { type: 'json_schema', name: 'assistant_turn', strict: true, schema: ACTION_SCHEMA },
-        },
-      }),
+    const result = await runAssistantTurn({
+      systemPrompt: systemPrompt(body?.context ?? {}),
+      messages: trimmed,
+      schema: ACTION_SCHEMA,
     });
 
-    if (!res.ok || !res.body) {
-      const detail = await res.text().catch(() => '');
-      console.error('[ai-assistant] gateway error', res.status, detail);
-      if (res.status === 429) {
-        return json({ error: 'The assistant is busy right now. Please try again in a moment.' }, 429);
-      }
-      if (res.status === 402) {
-        return json({ error: 'AI credits are exhausted. Please top up to keep using the assistant.' }, 402);
-      }
-      return json({ error: 'The assistant could not respond right now.' }, 502);
-    }
+    if (!result.ok) return json({ error: result.error }, result.status);
 
-    const raw = await readOutputText(res.body);
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = { reply: String(raw || 'Sorry, I did not catch that.'), action: null };
-    }
-
-    return json({
-      reply: typeof parsed?.reply === 'string' ? parsed.reply : 'Sorry, I did not catch that.',
-      action: parsed?.action ?? null,
-    }, 200);
+    return json({ reply: result.reply, action: result.action ?? null }, 200);
   } catch (error) {
     console.error('[ai-assistant] unexpected', error);
     return json({ error: 'Unexpected assistant error.' }, 500);
