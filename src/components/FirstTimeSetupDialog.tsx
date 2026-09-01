@@ -237,10 +237,8 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
       }
 
       await updateProfileRecord(user.id, {
-          business_id: businessId,
           display_name: displayName || user.email || trimmedBusinessName,
           phone: trimmedPhone,
-          email_verified: true,
         });
 
       if (hasOpeningStock === 'yes' && activeProducts.length > 0) {

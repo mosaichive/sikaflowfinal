@@ -7,6 +7,11 @@ type SupabaseErrorLike = {
   hint?: string;
 };
 
+type ProfileBusinessIdLookup = {
+  hasBusinessIdColumn: boolean;
+  businessId: string | null;
+};
+
 type EnsureWorkspaceInput = {
   existingBusinessId?: string | null;
   user: {
@@ -363,6 +368,27 @@ function isMissingTableError(error: unknown, tableName?: string) {
       || details.includes('schema cache')
       || message.includes('relation')
       || details.includes('relation')
+    )
+  );
+}
+
+function isWorkspaceRpcCompatibilityError(error: unknown, requestedBusinessId?: string | null, userId?: string) {
+  const normalized = (error ?? {}) as SupabaseErrorLike;
+  const message = normalized.message?.toLowerCase() ?? '';
+  const details = normalized.details?.toLowerCase() ?? '';
+  const text = `${message} ${details}`;
+
+  return (
+    isMissingFunctionError(error)
+    || isMissingTableError(error, 'businesses')
+    || isMissingColumnError(error, 'user_id', 'profiles')
+    || isMissingColumnError(error, 'business_id', 'profiles')
+    || (
+      requestedBusinessId === userId
+      && (
+        text.includes('business/workspace does not exist')
+        || text.includes('business/workspace not found')
+      )
     )
   );
 }
@@ -1136,23 +1162,33 @@ export function logSupabaseError(context: string, error: unknown, extra?: Record
   });
 }
 
-export async function resolveCurrentBusinessId(userId: string) {
-  // Try the multi-tenant column first; fall back to single-tenant where
-  // each user IS their own workspace (businessId = userId).
+async function readProfileBusinessId(userId: string): Promise<ProfileBusinessIdLookup> {
   try {
     const { data, error } = await supabase
       .from('profiles')
       .select('business_id')
       .eq('id', userId)
       .maybeSingle();
+
     if (!error) {
-      return ((data as any)?.business_id as string | null) ?? userId;
+      return {
+        hasBusinessIdColumn: true,
+        businessId: ((data as any)?.business_id as string | null) ?? null,
+      };
     }
     if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
   } catch (error) {
     if (!isMissingColumnError(error, 'business_id', 'profiles')) throw error;
   }
-  return userId;
+
+  return { hasBusinessIdColumn: false, businessId: null };
+}
+
+export async function resolveCurrentBusinessId(userId: string) {
+  // Try the multi-tenant column first; fall back to single-tenant where
+  // each user IS their own workspace (businessId = userId).
+  const profileBusiness = await readProfileBusinessId(userId);
+  return profileBusiness.businessId ?? userId;
 }
 
 async function fallbackProfileMembership({
@@ -1203,7 +1239,7 @@ export async function ensureUserBusinessWorkspace({
     });
 
     if (error) {
-      if (isMissingFunctionError(error)) {
+      if (isWorkspaceRpcCompatibilityError(error, businessId, user.id)) {
         logSupabaseError('workspace.ensureMembershipFallback', error, {
           businessId,
           userId: user.id,
@@ -1226,9 +1262,24 @@ export async function ensureUserBusinessWorkspace({
     return ensureMembership(existingBusinessId);
   }
 
-  const profileBusinessId = await resolveCurrentBusinessId(user.id);
-  if (profileBusinessId) {
-    return ensureMembership(profileBusinessId);
+  const profileBusiness = await readProfileBusinessId(user.id);
+  if (profileBusiness.businessId) {
+    return ensureMembership(profileBusiness.businessId);
+  }
+
+  if (!profileBusiness.hasBusinessIdColumn) {
+    if (!allowCreate) {
+      return null;
+    }
+    // Profile-based deployments use the auth user id as the workspace id and
+    // do not have the multi-tenant RPC/breadcrumb columns available.
+    return fallbackProfileMembership({
+      businessId: user.id,
+      userId: user.id,
+      displayName,
+      email: user.email,
+      phone,
+    });
   }
 
   if (!allowCreate) {
@@ -1252,10 +1303,16 @@ export async function ensureUserBusinessWorkspace({
   });
 
   if (error) {
-    if (isMissingFunctionError(error)) {
+    if (isWorkspaceRpcCompatibilityError(error, user.id, user.id)) {
       // Single-tenant fallback: the user IS their own workspace.
       logSupabaseError('workspace.createBusinessFallback', error, { userId: user.id });
-      return ensureMembership(user.id);
+      return fallbackProfileMembership({
+        businessId: user.id,
+        userId: user.id,
+        displayName,
+        email: user.email,
+        phone,
+      });
     }
     throw error;
   }
