@@ -87,7 +87,14 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
       return;
     }
 
-    const ownerId = businessId ?? user.id;
+    if (!businessId) {
+      setFinancials(EMPTY_FINANCIALS);
+      setLoading(false);
+      hasLoadedOnceRef.current = true;
+      return;
+    }
+
+    const ownerId = businessId;
 
     if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
@@ -229,9 +236,9 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
   }, [load]);
 
   useEffect(() => {
-    if (!user) return;
-    const ownerId = businessId ?? user.id;
-    const tableFilter = businessId ? `business_id=eq.${businessId}` : `user_id=eq.${ownerId}`;
+    if (!user || businessLoading || !businessId) return;
+    const ownerId = businessId;
+    const tableFilter = `business_id=eq.${businessId}`;
 
     const refresh = () => {
       void load(false);
@@ -255,7 +262,7 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [businessId, load, user]);
+  }, [businessId, businessLoading, load, user]);
 
   const refresh = useCallback(() => load(false), [load]);
 
