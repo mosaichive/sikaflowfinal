@@ -1042,58 +1042,46 @@ export type Database = {
           amount: number
           attachment_name: string | null
           attachment_path: string | null
-          category: string | null
-          client_txn_id: string | null
+          business_id: string
+          category: string
           created_at: string
-          created_offline: boolean
-          description: string | null
+          description: string
           id: string
           income_date: string
-          note: string | null
-          payment_method: string | null
+          payment_method: string
           recorded_by: string | null
-          recorded_by_name: string | null
-          source: string | null
+          recorded_by_name: string
           updated_at: string
-          user_id: string
         }
         Insert: {
           amount?: number
           attachment_name?: string | null
           attachment_path?: string | null
-          category?: string | null
-          client_txn_id?: string | null
+          business_id: string
+          category?: string
           created_at?: string
-          created_offline?: boolean
-          description?: string | null
+          description?: string
           id?: string
           income_date?: string
-          note?: string | null
-          payment_method?: string | null
+          payment_method?: string
           recorded_by?: string | null
-          recorded_by_name?: string | null
-          source?: string | null
+          recorded_by_name?: string
           updated_at?: string
-          user_id: string
         }
         Update: {
           amount?: number
           attachment_name?: string | null
           attachment_path?: string | null
-          category?: string | null
-          client_txn_id?: string | null
+          business_id?: string
+          category?: string
           created_at?: string
-          created_offline?: boolean
-          description?: string | null
+          description?: string
           id?: string
           income_date?: string
-          note?: string | null
-          payment_method?: string | null
+          payment_method?: string
           recorded_by?: string | null
-          recorded_by_name?: string | null
-          source?: string | null
+          recorded_by_name?: string
           updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }

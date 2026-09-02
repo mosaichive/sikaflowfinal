@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, OTHER_INCOME_CATEGORIES, PAYMENT_METHODS, SIKAFLOW_TOOLTIPS } from '@/lib/constants';
+import { insertOtherIncomeRecord, loadRowsForBusinessCompat, logSupabaseError } from '@/lib/workspace';
 import { Banknote, Plus, Trash2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -48,29 +49,37 @@ export default function OtherIncomePage() {
   const canManage = isAdmin || isManager;
 
   const fetchRows = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('other_income' as any)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('income_date', { ascending: false });
-    if (error) {
-      console.error('[other_income] fetch failed', error);
+    if (!user || !businessId) {
+      setRows([]);
       return;
     }
-    setRows((data || []) as OtherIncomeRow[]);
-  }, [user]);
+    try {
+      const ownerId = effectiveBusinessOwnerId ?? businessId ?? user.id;
+      const data = await loadRowsForBusinessCompat<OtherIncomeRow>({
+        table: 'other_income',
+        businessId,
+        ownerId,
+        order: { column: 'income_date', ascending: false },
+        context: 'otherIncome.load',
+      });
+      setRows(data);
+    } catch (error) {
+      logSupabaseError('otherIncome.load', error, { businessId });
+      setRows([]);
+    }
+  }, [businessId, effectiveBusinessOwnerId, user]);
 
   useEffect(() => {
     void fetchRows();
+    if (!businessId) return;
     const channel = supabase
-      .channel('other-income-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income' }, () => { void fetchRows(); })
+      .channel(`other-income-page:${businessId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income', filter: `business_id=eq.${businessId}` }, () => { void fetchRows(); })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [fetchRows]);
+  }, [businessId, fetchRows]);
 
   const totalOtherIncome = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
@@ -79,7 +88,7 @@ export default function OtherIncomePage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user) {
+    if (!user || !businessId) {
       toast({ title: 'Not signed in', description: 'Please sign in again and retry.', variant: 'destructive' });
       return;
     }
@@ -101,34 +110,34 @@ export default function OtherIncomePage() {
           .from('other-income-receipts')
           .upload(path, attachment, { upsert: true });
         if (uploadError) {
-          console.error('[other_income] upload failed', uploadError);
+          logSupabaseError('otherIncome.upload', uploadError, { businessId });
           throw uploadError;
         }
         attachmentPath = path;
         attachmentName = attachment.name;
       }
 
-      const payload: Record<string, unknown> = {
-        user_id: effectiveBusinessOwnerId ?? user.id,
-        source: form.category, // legacy NOT-NULL-friendly column; trigger also syncs this
+      const ownerId = effectiveBusinessOwnerId ?? businessId ?? user.id;
+      const businessPayload: Record<string, unknown> = {
+        business_id: businessId,
         category: form.category,
         amount: amountValue,
         income_date: form.income_date,
         payment_method: form.payment_method,
         description: form.description,
-        note: form.description, // keep legacy "note" column populated for older readers
         attachment_path: attachmentPath,
         attachment_name: attachmentName,
         recorded_by: user.id,
         recorded_by_name: displayName || user.email || '',
       };
-      // other_income is scoped by user_id; no business_id column exists in this schema.
+      const legacyPayload: Record<string, unknown> = {
+        ...businessPayload,
+        user_id: ownerId,
+        source: form.category,
+        note: form.description,
+      };
 
-      const { error } = await supabase.from('other_income' as any).insert(payload);
-      if (error) {
-        console.error('[other_income] insert failed', error, payload);
-        throw error;
-      }
+      await insertOtherIncomeRecord({ businessPayload, legacyPayload });
 
       toast({ title: 'Other income saved', description: 'This income now contributes to available business money.' });
       setForm({

@@ -956,6 +956,40 @@ export async function updateExpenseRecord(
   });
 }
 
+export async function insertOtherIncomeRecord({
+  businessPayload,
+  legacyPayload,
+}: {
+  businessPayload: Record<string, unknown>;
+  legacyPayload: Record<string, unknown>;
+}) {
+  try {
+    return await insertWithOptionalColumnFallback({
+      table: 'other_income',
+      payload: businessPayload,
+      optionalColumns: ['payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
+      context: 'workspace.insertOtherIncome',
+    });
+  } catch (error) {
+    if (!isMissingColumnError(error, 'business_id', 'other_income')) throw error;
+  }
+
+  return insertWithOptionalColumnFallback({
+    table: 'other_income',
+    payload: legacyPayload,
+    optionalColumns: [
+      'source',
+      'note',
+      'payment_method',
+      'attachment_path',
+      'attachment_name',
+      'recorded_by',
+      'recorded_by_name',
+    ],
+    context: 'workspace.insertOtherIncomeLegacy',
+  });
+}
+
 export async function loadProductsCompat(showArchived: boolean, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const allCachedRows = readAllCachedProducts();
