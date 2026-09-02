@@ -354,7 +354,7 @@ export default function SavingsPage() {
   }
 
   async function handleSaveDestination() {
-    if (!user) return;
+    if (!user || !businessId) return;
 
     const type = destinationForm.account_type;
     const isBank = type === 'bank';
@@ -380,6 +380,7 @@ export default function SavingsPage() {
 
     const payload = {
       user_id: effectiveBusinessOwnerId ?? user.id,
+      business_id: businessId,
       account_type: type,
       bank_name: destinationForm.bank_name.trim(),
       account_name: accountName,

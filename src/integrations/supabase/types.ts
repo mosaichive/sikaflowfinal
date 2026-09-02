@@ -141,6 +141,7 @@ export type Database = {
           account_type: string
           bank_name: string
           branch: string | null
+          business_id: string
           created_at: string
           id: string
           mobile_money_name: string | null
@@ -155,6 +156,7 @@ export type Database = {
           account_type?: string
           bank_name?: string
           branch?: string | null
+          business_id: string
           created_at?: string
           id?: string
           mobile_money_name?: string | null
@@ -169,6 +171,7 @@ export type Database = {
           account_type?: string
           bank_name?: string
           branch?: string | null
+          business_id?: string
           created_at?: string
           id?: string
           mobile_money_name?: string | null
@@ -1693,6 +1696,7 @@ export type Database = {
           amount_ghs: number
           amount_paid_ghs: number
           balance_ghs: number
+          business_id: string
           created_at: string
           customer_name: string | null
           customer_phone: string | null
@@ -1707,16 +1711,16 @@ export type Database = {
           seller_name: string | null
           snapshot: Json
           updated_at: string
-          user_id: string
         }
         Insert: {
           amount_ghs?: number
           amount_paid_ghs?: number
           balance_ghs?: number
+          business_id: string
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
-          document_number: string
+          document_number?: string
           id?: string
           issued_at?: string
           issued_by?: string | null
@@ -1727,12 +1731,12 @@ export type Database = {
           seller_name?: string | null
           snapshot?: Json
           updated_at?: string
-          user_id: string
         }
         Update: {
           amount_ghs?: number
           amount_paid_ghs?: number
           balance_ghs?: number
+          business_id?: string
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
@@ -1747,7 +1751,6 @@ export type Database = {
           seller_name?: string | null
           snapshot?: Json
           updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
