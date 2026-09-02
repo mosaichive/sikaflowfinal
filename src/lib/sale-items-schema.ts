@@ -6,9 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 // Sale-item payload validation
 // ---------------------------------------------------------------------------
 //
-// The single-tenant `sale_items` table requires:
-//   user_id, sale_id, product_name (text), quantity (>0), unit_price (>=0),
-//   unit_cost (>=0). product_id is optional but strongly preferred.
+// The `sale_items` table has existed in both owner-scoped and business-scoped
+// forms. It requires sale/product/quantity/price fields, plus either
+// user_id/unit_cost (legacy) or business_id/cost_price (current production).
 //
 // We validate the *normalized* payload (i.e. after `cost_price` has been
 // remapped to `unit_cost` and `line_total` to `total`). Use
@@ -105,13 +105,16 @@ export function validateSaleItemPayload(
 
 const REQUIRED_SALE_ITEMS_COLUMNS = new Set<string>([
   'id',
-  'user_id',
   'sale_id',
   'product_name',
   'quantity',
   'unit_price',
-  'unit_cost',
 ]);
+
+const REQUIRED_SALE_ITEMS_COLUMN_GROUPS = [
+  ['user_id', 'business_id'],
+  ['unit_cost', 'cost_price'],
+] as const;
 
 const KNOWN_OPTIONAL_SALE_ITEMS_COLUMNS = new Set<string>([
   'product_id',
@@ -147,7 +150,6 @@ async function fetchTableColumns(table: string): Promise<string[] | null> {
     _table_name: table,
   } as never);
   if (error) {
-    // eslint-disable-next-line no-console
     console.warn(`[schema-check] could not introspect ${table}:`, error.message);
     return null;
   }
@@ -178,9 +180,13 @@ export async function runSaleItemsSchemaCheck(options?: {
   for (const col of REQUIRED_SALE_ITEMS_COLUMNS) {
     if (!liveSet.has(col)) missingRequired.push(col);
   }
+  for (const group of REQUIRED_SALE_ITEMS_COLUMN_GROUPS) {
+    if (!group.some((col) => liveSet.has(col))) missingRequired.push(group.join(' or '));
+  }
 
   const expected = new Set([
     ...REQUIRED_SALE_ITEMS_COLUMNS,
+    ...REQUIRED_SALE_ITEMS_COLUMN_GROUPS.flat(),
     ...KNOWN_OPTIONAL_SALE_ITEMS_COLUMNS,
   ]);
   const unexpectedColumns = columns.filter((col) => !expected.has(col));
@@ -193,7 +199,6 @@ export async function runSaleItemsSchemaCheck(options?: {
   };
 
   if (missingRequired.length > 0) {
-    // eslint-disable-next-line no-console
     console.error(
       '[schema-check] sale_items is missing required columns:',
       missingRequired,
@@ -201,13 +206,11 @@ export async function runSaleItemsSchemaCheck(options?: {
       columns,
     );
   } else if (unexpectedColumns.length > 0) {
-    // eslint-disable-next-line no-console
     console.info(
       '[schema-check] sale_items has unexpected columns (not used by the app):',
       unexpectedColumns,
     );
   } else {
-    // eslint-disable-next-line no-console
     console.debug('[schema-check] sale_items schema OK', { columns });
   }
 

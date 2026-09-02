@@ -44,7 +44,7 @@ export type CachedProductRow = {
 // keeps older single-tenant schemas working when optional catalog columns are
 // missing from the API schema cache.
 const PRODUCT_SELECT =
-  'id,name,sku,category,image_url,is_archived,stock,cost,price,low_stock_threshold,created_at,updated_at';
+  'id,business_id,name,sku,category,image_url,is_archived,quantity,cost_price,selling_price,reorder_level,stock,low_stock_threshold,created_at,updated_at';
 
 // Use only columns that actually exist in the single-tenant products schema.
 // `quantity`/`cost_price`/`selling_price`/`reorder_level`/`business_id` are
@@ -53,7 +53,18 @@ const PRODUCT_SELECT =
 const STABLE_PRODUCT_SELECT =
   'id,name,sku,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
-const OPTIONAL_PRODUCT_READ_COLUMNS = ['category', 'image_url', 'is_archived'] as const;
+const OPTIONAL_PRODUCT_READ_COLUMNS = [
+  'business_id',
+  'category',
+  'image_url',
+  'is_archived',
+  'quantity',
+  'cost_price',
+  'selling_price',
+  'reorder_level',
+  'stock',
+  'low_stock_threshold',
+] as const;
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
@@ -887,7 +898,13 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
   const loadStableRows = async () => {
     const { data: stableData, error: stableError } = await stableBaseQuery();
     if (stableError) throw stableError;
-    return ((stableData ?? []) as Array<Record<string, unknown>>).map(normalizeProductRow);
+    return ((stableData ?? []) as Array<Record<string, unknown>>)
+      .map(normalizeProductRow)
+      .map((row) => (
+        row.business_id || !effectiveBusinessId
+          ? row
+          : { ...row, business_id: effectiveBusinessId }
+      ));
   };
 
   if (showArchived) {
