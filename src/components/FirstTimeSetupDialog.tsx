@@ -181,6 +181,18 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
     setOpeningStockProducts((rows) => (rows.length === 1 ? rows : rows.filter((row) => row.id !== id)));
   };
 
+  const handleRestoreCompleted = () => {
+    if (user?.id && typeof window !== 'undefined') {
+      window.localStorage.setItem(getOnboardingCompletionKey(user.id), 'true');
+    }
+    onCompleted?.();
+    setRestoreOpen(false);
+    onOpenChange(false);
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => window.location.assign('/dashboard'), 500);
+    }
+  };
+
   const goNext = () => {
     if (!validateCurrentStep()) return;
     setStepIndex((value) => Math.min(value + 1, steps.length - 1));
@@ -621,7 +633,7 @@ export function FirstTimeSetupDialog({ open, onOpenChange, onCompleted }: FirstT
         open={restoreOpen}
         onOpenChange={setRestoreOpen}
         onboarding
-        onRestored={() => { onOpenChange(false); window.setTimeout(() => window.location.reload(), 1200); }}
+        onRestored={handleRestoreCompleted}
       />
     </Dialog>
   );
