@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { isMissingColumnError } from '@/lib/workspace';
 
 export const BACKUP_FORMAT = 'kuditrack-backup';
 export const BACKUP_VERSION = 1;
@@ -67,12 +68,73 @@ async function fetchAll(table: string, column: string, value: string) {
       .select('*')
       .eq(column, value)
       .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (error) throw new Error(`${table}: ${error.message}`);
+    if (error) {
+      const wrapped = new Error(`${table}: ${error.message}`) as Error & { sourceError?: unknown };
+      wrapped.sourceError = error;
+      throw wrapped;
+    }
     const batch = data || [];
     rows.push(...batch);
     if (batch.length < pageSize) break;
   }
   return rows;
+}
+
+function mergeRowsById(...sets: any[][]) {
+  const byId = new Map<string, any>();
+  const withoutId: any[] = [];
+
+  for (const rows of sets) {
+    for (const row of rows) {
+      if (row?.id) {
+        byId.set(String(row.id), row);
+      } else {
+        withoutId.push(row);
+      }
+    }
+  }
+
+  return [...byId.values(), ...withoutId];
+}
+
+function getSourceError(error: unknown) {
+  return (error as { sourceError?: unknown } | null)?.sourceError ?? error;
+}
+
+async function fetchAllScoped(
+  table: string,
+  ownerId: string,
+  options: {
+    businessColumn?: string;
+    ownerColumn?: string;
+  } = {},
+) {
+  const businessColumn = options.businessColumn ?? 'business_id';
+  const ownerColumn = options.ownerColumn ?? 'user_id';
+  let businessRows: any[] = [];
+  let businessColumnAvailable = true;
+
+  try {
+    businessRows = await fetchAll(table, businessColumn, ownerId);
+  } catch (error) {
+    const sourceError = getSourceError(error);
+    if (!isMissingColumnError(sourceError, businessColumn, table)) throw error;
+    businessColumnAvailable = false;
+  }
+
+  if (!ownerColumn || ownerColumn === businessColumn) return businessRows;
+  if (businessColumnAvailable && businessRows.length > 0) return businessRows;
+
+  try {
+    const ownerRows = await fetchAll(table, ownerColumn, ownerId);
+    return mergeRowsById(businessRows, ownerRows);
+  } catch (error) {
+    const sourceError = getSourceError(error);
+    if (businessColumnAvailable && isMissingColumnError(sourceError, ownerColumn, table)) {
+      return businessRows;
+    }
+    throw error;
+  }
 }
 
 /** Builds the full backup payload for a business owner (RLS scoped to the caller). */
@@ -85,19 +147,19 @@ export async function buildBackup(ownerId: string): Promise<BackupFile> {
     products, customers, restocks, expenses, otherIncome, savings, investments,
     bankAccounts, sales, saleItems, orders, orderItems, staff,
   ] = await Promise.all([
-    fetchAll('products', 'user_id', ownerId),
-    fetchAll('customers', 'user_id', ownerId),
-    fetchAll('restocks', 'user_id', ownerId),
-    fetchAll('expenses', 'user_id', ownerId),
-    fetchAll('other_income', 'user_id', ownerId),
-    fetchAll('savings', 'user_id', ownerId),
-    fetchAll('investments', 'user_id', ownerId),
-    fetchAll('bank_accounts', 'user_id', ownerId),
-    fetchAll('sales', 'user_id', ownerId),
-    fetchAll('sale_items', 'user_id', ownerId),
-    fetchAll('orders', 'business_id', ownerId),
-    fetchAll('order_items', 'business_id', ownerId),
-    fetchAll('staff_members', 'business_owner_id', ownerId),
+    fetchAllScoped('products', ownerId),
+    fetchAllScoped('customers', ownerId),
+    fetchAllScoped('restocks', ownerId),
+    fetchAllScoped('expenses', ownerId),
+    fetchAllScoped('other_income', ownerId),
+    fetchAllScoped('savings', ownerId),
+    fetchAllScoped('investments', ownerId),
+    fetchAllScoped('bank_accounts', ownerId),
+    fetchAllScoped('sales', ownerId),
+    fetchAllScoped('sale_items', ownerId),
+    fetchAllScoped('orders', ownerId),
+    fetchAllScoped('order_items', ownerId),
+    fetchAllScoped('staff_members', ownerId, { ownerColumn: 'business_owner_id' }),
   ]);
 
   const businessProfile = pick(profile, SAFE_PROFILE_FIELDS);
@@ -273,11 +335,36 @@ export async function restoreBackup(backup: BackupFile, mode: RestoreMode) {
 
 /** Detects whether the signed-in owner already has business data. */
 export async function hasExistingBusinessData(ownerId: string) {
-  const checks = await Promise.all([
-    supabase.from('products').select('id', { count: 'exact', head: true }).eq('user_id', ownerId),
-    supabase.from('sales').select('id', { count: 'exact', head: true }).eq('user_id', ownerId),
-    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('user_id', ownerId),
-    supabase.from('expenses').select('id', { count: 'exact', head: true }).eq('user_id', ownerId),
+  const countRows = async (table: string, column: string) => {
+    const { count, error } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq(column, ownerId);
+    if (error) throw error;
+    return count || 0;
+  };
+
+  const countScopedRows = async (table: string) => {
+    try {
+      const businessCount = await countRows(table, 'business_id');
+      if (businessCount > 0) return businessCount;
+    } catch (error) {
+      if (!isMissingColumnError(error, 'business_id', table)) throw error;
+    }
+
+    try {
+      return await countRows(table, 'user_id');
+    } catch (error) {
+      if (isMissingColumnError(error, 'user_id', table)) return 0;
+      throw error;
+    }
+  };
+
+  const checks = await Promise.allSettled([
+    countScopedRows('products'),
+    countScopedRows('sales'),
+    countScopedRows('customers'),
+    countScopedRows('expenses'),
   ]);
-  return checks.some((res: any) => (res.count || 0) > 0);
+  return checks.some((res) => res.status === 'fulfilled' && res.value > 0);
 }

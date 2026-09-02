@@ -112,7 +112,7 @@ export type Database = {
           id: string
           performed_by: string | null
           performed_by_name: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           action: string
@@ -121,7 +121,7 @@ export type Database = {
           id?: string
           performed_by?: string | null
           performed_by_name?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           action?: string
@@ -130,7 +130,7 @@ export type Database = {
           id?: string
           performed_by?: string | null
           performed_by_name?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1756,49 +1756,55 @@ export type Database = {
       }
       sale_items: {
         Row: {
-          business_id: string | null
+          business_id: string
+          color: string | null
           cost_price: number
           created_at: string
+          default_price: number
           id: string
           line_total: number
+          price_note: string | null
           product_id: string | null
           product_name: string
           quantity: number
           sale_id: string
+          size: string | null
           sku: string | null
-          unit_cost: number
           unit_price: number
-          user_id: string
         }
         Insert: {
-          business_id?: string | null
+          business_id: string
+          color?: string | null
           cost_price?: number
           created_at?: string
+          default_price?: number
           id?: string
           line_total?: number
+          price_note?: string | null
           product_id?: string | null
           product_name: string
           quantity?: number
           sale_id: string
+          size?: string | null
           sku?: string | null
-          unit_cost?: number
           unit_price?: number
-          user_id: string
         }
         Update: {
-          business_id?: string | null
+          business_id?: string
+          color?: string | null
           cost_price?: number
           created_at?: string
+          default_price?: number
           id?: string
           line_total?: number
+          price_note?: string | null
           product_id?: string | null
           product_name?: string
           quantity?: number
           sale_id?: string
+          size?: string | null
           sku?: string | null
-          unit_cost?: number
           unit_price?: number
-          user_id?: string
         }
         Relationships: [
           {
@@ -1918,52 +1924,43 @@ export type Database = {
       }
       savings: {
         Row: {
-          account_name: string | null
           amount: number
           bank_account_id: string | null
+          business_id: string
           created_at: string
           id: string
-          institution: string | null
           note: string | null
-          recorded_by: string | null
+          recorded_by: string
           reference: string | null
           savings_date: string
           source: string | null
-          type: Database["public"]["Enums"]["savings_type"] | null
           updated_at: string
-          user_id: string
         }
         Insert: {
-          account_name?: string | null
           amount?: number
           bank_account_id?: string | null
+          business_id: string
           created_at?: string
           id?: string
-          institution?: string | null
           note?: string | null
-          recorded_by?: string | null
+          recorded_by?: string
           reference?: string | null
           savings_date?: string
           source?: string | null
-          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
-          user_id: string
         }
         Update: {
-          account_name?: string | null
           amount?: number
           bank_account_id?: string | null
+          business_id?: string
           created_at?: string
           id?: string
-          institution?: string | null
           note?: string | null
-          recorded_by?: string | null
+          recorded_by?: string
           reference?: string | null
           savings_date?: string
           source?: string | null
-          type?: Database["public"]["Enums"]["savings_type"] | null
           updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }

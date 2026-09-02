@@ -304,7 +304,7 @@ function isMissingFunctionError(error: unknown) {
   );
 }
 
-function isMissingColumnError(error: unknown, columnName?: string, tableName?: string) {
+export function isMissingColumnError(error: unknown, columnName?: string, tableName?: string) {
   const normalized = (error ?? {}) as SupabaseErrorLike;
   const message = normalized.message?.toLowerCase() ?? '';
   const details = normalized.details?.toLowerCase() ?? '';
@@ -588,6 +588,90 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
     droppedColumns.add(missingColumn);
     delete nextPayload[missingColumn];
   }
+}
+
+type ScopedRowOrder = {
+  column: string;
+  ascending?: boolean;
+};
+
+function applyScopedRowOptions(query: any, options: { order?: ScopedRowOrder; limit?: number }) {
+  let next = query;
+  if (options.order?.column) {
+    next = next.order(options.order.column, { ascending: options.order.ascending ?? false });
+  }
+  if (typeof options.limit === 'number') {
+    next = next.limit(options.limit);
+  }
+  return next;
+}
+
+export async function loadRowsForBusinessCompat<T = Record<string, unknown>>({
+  table,
+  select = '*',
+  businessId,
+  ownerId,
+  order,
+  limit,
+  context,
+}: {
+  table: string;
+  select?: string;
+  businessId?: string | null;
+  ownerId?: string | null;
+  order?: ScopedRowOrder;
+  limit?: number;
+  context?: string;
+}): Promise<T[]> {
+  const db = supabase as any;
+  const scopes: Array<{ column: 'business_id' | 'user_id'; value: string }> = [];
+  if (businessId) scopes.push({ column: 'business_id', value: businessId });
+  if (ownerId) scopes.push({ column: 'user_id', value: ownerId });
+
+  const runQuery = async (scope?: { column: 'business_id' | 'user_id'; value: string }) => {
+    let query = db.from(table).select(select);
+    if (scope) query = query.eq(scope.column, scope.value);
+    return applyScopedRowOptions(query, { order, limit });
+  };
+
+  for (const scope of scopes) {
+    const { data, error } = await runQuery(scope);
+    if (!error) return (data ?? []) as T[];
+    if (!isMissingColumnError(error, scope.column, table)) throw error;
+
+    logSupabaseError(context || `workspace.loadRowsForBusinessCompat.${table}`, error, {
+      table,
+      missingColumn: scope.column,
+      fallbackMode: 'loadWithAlternateScopeColumn',
+    });
+  }
+
+  const { data, error } = await runQuery();
+  if (error) throw error;
+  return (data ?? []) as T[];
+}
+
+export async function insertSavingsRecord(payload: Record<string, unknown>) {
+  return insertWithOptionalColumnFallback({
+    table: 'savings',
+    payload,
+    optionalColumns: ['user_id', 'business_id', 'recorded_by', 'bank_account_id', 'reference'],
+    context: 'workspace.insertSavings',
+  });
+}
+
+export async function updateSavingsRecord(
+  savingsId: string,
+  payload: Record<string, unknown>,
+) {
+  return updateWithOptionalColumnFallback({
+    table: 'savings',
+    matchColumn: 'id',
+    matchValue: savingsId,
+    payload,
+    optionalColumns: ['user_id', 'business_id', 'recorded_by', 'bank_account_id', 'reference'],
+    context: 'workspace.updateSavings',
+  });
 }
 
 export async function updateBusinessWorkspaceRecord(
