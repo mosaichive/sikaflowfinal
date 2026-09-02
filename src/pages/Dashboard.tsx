@@ -35,7 +35,7 @@ import { formatCurrency } from '@/lib/constants';
 import { sumTodaySales, toNumber } from '@/lib/sales-inventory';
 import { calculateBusinessFinancials } from '@/lib/business-money';
 import { cn } from '@/lib/utils';
-import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
+import { loadProductsCompat, loadRowsForBusinessCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { LayoutGrid } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -565,17 +565,33 @@ export default function Dashboard() {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
+      if (!user || !businessId) {
+        setData({
+          sales: [],
+          saleItems: [],
+          products: [],
+          expenses: [],
+          otherIncome: [],
+          savings: [],
+          investments: [],
+          investorFunds: [],
+          restocks: [],
+          stockMovements: [],
+        });
+        return;
+      }
+      const ownerId = businessId;
       const [salesRes, saleItemsRes, productsRes, expensesRes, otherIncomeRes, savingsRes, investmentsRes, investorFundsRes, restocksRes, stockMovementsRes] = await Promise.allSettled([
-        supabase.from('sales').select('*').order('sale_date', { ascending: false }),
-        supabase.from('sale_items').select('*'),
+        loadRowsForBusinessCompat<SaleRow>({ table: 'sales', businessId, ownerId, order: { column: 'sale_date', ascending: false }, context: 'dashboard.load.sales' }),
+        loadRowsForBusinessCompat<SaleItemRow>({ table: 'sale_items', businessId, ownerId, context: 'dashboard.load.saleItems' }),
         loadProductsCompat(false, businessId),
-        supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
-        supabase.from('other_income' as any).select('*').order('income_date', { ascending: false }),
-        supabase.from('savings').select('id,amount,savings_date,source,note,reference'),
-        supabase.from('investments').select('amount,investment_date'),
-        supabase.from('investor_funding').select('amount,date_received,investor_name,reference').order('date_received', { ascending: false }),
-        supabase.from('restocks').select('total_cost,status,restock_date,is_opening_stock').order('restock_date', { ascending: false }),
-        supabase.from('stock_movements').select('id,product_id,change,reason,note,created_at').order('created_at', { ascending: false }).limit(20),
+        loadRowsForBusinessCompat<ExpenseRow>({ table: 'expenses', businessId, ownerId, order: { column: 'expense_date', ascending: false }, context: 'dashboard.load.expenses' }),
+        loadRowsForBusinessCompat<OtherIncomeRow>({ table: 'other_income', businessId, ownerId, order: { column: 'income_date', ascending: false }, context: 'dashboard.load.otherIncome' }),
+        loadRowsForBusinessCompat<SavingsRow>({ table: 'savings', select: 'id,amount,savings_date,source,note,reference', businessId, ownerId, context: 'dashboard.load.savings' }),
+        loadRowsForBusinessCompat<InvestmentRow>({ table: 'investments', select: 'amount,investment_date', businessId, ownerId, context: 'dashboard.load.investments' }),
+        loadRowsForBusinessCompat<FundingRow>({ table: 'investor_funding', select: 'amount,date_received,investor_name,reference', businessId, ownerId, order: { column: 'date_received', ascending: false }, context: 'dashboard.load.investorFunds' }),
+        loadRowsForBusinessCompat<RestockRow>({ table: 'restocks', select: 'total_cost,status,restock_date,is_opening_stock', businessId, ownerId, order: { column: 'restock_date', ascending: false }, context: 'dashboard.load.restocks' }),
+        loadStockMovementsCompat(20, businessId),
       ]);
 
       if (salesRes.status === 'rejected') logSupabaseError('dashboard.load.sales', salesRes.reason);
@@ -588,31 +604,22 @@ export default function Dashboard() {
       if (investorFundsRes.status === 'rejected') logSupabaseError('dashboard.load.investorFunds', investorFundsRes.reason);
       if (restocksRes.status === 'rejected') logSupabaseError('dashboard.load.restocks', restocksRes.reason);
 
-      if (salesRes.status === 'fulfilled' && salesRes.value.error) logSupabaseError('dashboard.load.sales', salesRes.value.error);
-      if (saleItemsRes.status === 'fulfilled' && saleItemsRes.value.error) logSupabaseError('dashboard.load.saleItems', saleItemsRes.value.error);
-      if (expensesRes.status === 'fulfilled' && expensesRes.value.error) logSupabaseError('dashboard.load.expenses', expensesRes.value.error);
-      if (otherIncomeRes.status === 'fulfilled' && otherIncomeRes.value.error) logSupabaseError('dashboard.load.otherIncome', otherIncomeRes.value.error);
-      if (savingsRes.status === 'fulfilled' && savingsRes.value.error) logSupabaseError('dashboard.load.savings', savingsRes.value.error);
-      if (investmentsRes.status === 'fulfilled' && investmentsRes.value.error) logSupabaseError('dashboard.load.investments', investmentsRes.value.error);
-      if (investorFundsRes.status === 'fulfilled' && investorFundsRes.value.error) logSupabaseError('dashboard.load.investorFunds', investorFundsRes.value.error);
-      if (restocksRes.status === 'fulfilled' && restocksRes.value.error) logSupabaseError('dashboard.load.restocks', restocksRes.value.error);
-
       setData({
-        sales: salesRes.status === 'fulfilled' ? ((salesRes.value.data || []) as SaleRow[]) : [],
-        saleItems: saleItemsRes.status === 'fulfilled' ? ((saleItemsRes.value.data || []) as SaleItemRow[]) : [],
+        sales: salesRes.status === 'fulfilled' ? (salesRes.value ?? []) : [],
+        saleItems: saleItemsRes.status === 'fulfilled' ? (saleItemsRes.value ?? []) : [],
         products: productsRes.status === 'fulfilled' ? ((Array.isArray(productsRes.value) ? productsRes.value : []) as ProductRow[]) : [],
-        expenses: expensesRes.status === 'fulfilled' ? ((expensesRes.value.data || []) as ExpenseRow[]) : [],
-        otherIncome: otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value.data || []) as OtherIncomeRow[]) : [],
-        savings: savingsRes.status === 'fulfilled' ? ((savingsRes.value.data || []) as SavingsRow[]) : [],
-        investments: investmentsRes.status === 'fulfilled' ? ((investmentsRes.value.data || []) as InvestmentRow[]) : [],
-        investorFunds: investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value.data || []) as FundingRow[]) : [],
-        restocks: restocksRes.status === 'fulfilled' ? ((restocksRes.value.data || []) as RestockRow[]) : [],
-        stockMovements: stockMovementsRes.status === 'fulfilled' ? ((stockMovementsRes.value.data || []) as any[]) : [],
+        expenses: expensesRes.status === 'fulfilled' ? (expensesRes.value ?? []) : [],
+        otherIncome: otherIncomeRes.status === 'fulfilled' ? (otherIncomeRes.value ?? []) : [],
+        savings: savingsRes.status === 'fulfilled' ? (savingsRes.value ?? []) : [],
+        investments: investmentsRes.status === 'fulfilled' ? (investmentsRes.value ?? []) : [],
+        investorFunds: investorFundsRes.status === 'fulfilled' ? (investorFundsRes.value ?? []) : [],
+        restocks: restocksRes.status === 'fulfilled' ? (restocksRes.value ?? []) : [],
+        stockMovements: stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [],
       });
     } finally {
       setLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, user]);
 
   useEffect(() => {
     void fetchDashboard();

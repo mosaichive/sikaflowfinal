@@ -30,7 +30,7 @@ import {
   ShoppingCart, Tag, TrendingUp, Wallet, Eye,
 } from 'lucide-react';
 import { buildReportStatement, downloadReportSlipPdf } from '@/lib/report-slip';
-import { loadProductsCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
+import { loadProductsCompat, loadRowsForBusinessCompat, loadStockMovementsCompat, logSupabaseError } from '@/lib/workspace';
 import { useBusinessFinancials } from '@/context/BusinessFinancialsContext';
 import { calculateReportCumulativeFinancials, isDefaultLiveDashboardReport } from '@/lib/report-calculations';
 
@@ -169,15 +169,32 @@ export default function ReportsPage() {
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
+    if (!user || !businessId) {
+      setRaw({
+        sales: [],
+        saleItems: [],
+        expenses: [],
+        savings: [],
+        investments: [],
+        funding: [],
+        restocks: [],
+        otherIncome: [],
+        products: [],
+        stockMovements: [],
+      });
+      setLoading(false);
+      return;
+    }
+    const ownerId = businessId;
     const [salesRes, itemsRes, expRes, savRes, invRes, funRes, restockRes, otherIncomeRes, productsRes, stockMovementsRes] = await Promise.allSettled([
-      supabase.from('sales').select('*').order('sale_date', { ascending: false }),
-      supabase.from('sale_items').select('*'),
-      supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
-      supabase.from('savings').select('*').order('savings_date', { ascending: false }),
-      supabase.from('investments').select('*').order('investment_date', { ascending: false }),
-      supabase.from('investor_funding').select('*').order('date_received', { ascending: false }),
-      supabase.from('restocks').select('*').order('restock_date', { ascending: false }),
-      supabase.from('other_income' as any).select('*').order('income_date', { ascending: false }),
+      loadRowsForBusinessCompat({ table: 'sales', businessId, ownerId, order: { column: 'sale_date', ascending: false }, context: 'reports.load.sales' }),
+      loadRowsForBusinessCompat({ table: 'sale_items', businessId, ownerId, context: 'reports.load.saleItems' }),
+      loadRowsForBusinessCompat({ table: 'expenses', businessId, ownerId, order: { column: 'expense_date', ascending: false }, context: 'reports.load.expenses' }),
+      loadRowsForBusinessCompat({ table: 'savings', businessId, ownerId, order: { column: 'savings_date', ascending: false }, context: 'reports.load.savings' }),
+      loadRowsForBusinessCompat({ table: 'investments', businessId, ownerId, order: { column: 'investment_date', ascending: false }, context: 'reports.load.investments' }),
+      loadRowsForBusinessCompat({ table: 'investor_funding', businessId, ownerId, order: { column: 'date_received', ascending: false }, context: 'reports.load.investorFunding' }),
+      loadRowsForBusinessCompat({ table: 'restocks', businessId, ownerId, order: { column: 'restock_date', ascending: false }, context: 'reports.load.restocks' }),
+      loadRowsForBusinessCompat({ table: 'other_income', businessId, ownerId, order: { column: 'income_date', ascending: false }, context: 'reports.load.otherIncome' }),
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(500, businessId),
     ]);
@@ -186,14 +203,14 @@ export default function ReportsPage() {
     const stockMovementsData = stockMovementsRes.status === 'fulfilled' ? (stockMovementsRes.value ?? []) : [];
 
     setRaw({
-      sales: salesRes.status === 'fulfilled' && !salesRes.value.error ? (salesRes.value.data ?? []) : [],
-      saleItems: itemsRes.status === 'fulfilled' && !itemsRes.value.error ? (itemsRes.value.data ?? []) : [],
-      expenses: expRes.status === 'fulfilled' && !expRes.value.error ? (expRes.value.data ?? []) : [],
-      savings: savRes.status === 'fulfilled' && !savRes.value.error ? (savRes.value.data ?? []) : [],
-      investments: invRes.status === 'fulfilled' && !invRes.value.error ? (invRes.value.data ?? []) : [],
-      funding: funRes.status === 'fulfilled' && !funRes.value.error ? (funRes.value.data ?? []) : [],
-      restocks: restockRes.status === 'fulfilled' && !restockRes.value.error ? (restockRes.value.data ?? []) : [],
-      otherIncome: otherIncomeRes.status === 'fulfilled' && !otherIncomeRes.value.error ? (otherIncomeRes.value.data ?? []) : [],
+      sales: salesRes.status === 'fulfilled' ? (salesRes.value ?? []) : [],
+      saleItems: itemsRes.status === 'fulfilled' ? (itemsRes.value ?? []) : [],
+      expenses: expRes.status === 'fulfilled' ? (expRes.value ?? []) : [],
+      savings: savRes.status === 'fulfilled' ? (savRes.value ?? []) : [],
+      investments: invRes.status === 'fulfilled' ? (invRes.value ?? []) : [],
+      funding: funRes.status === 'fulfilled' ? (funRes.value ?? []) : [],
+      restocks: restockRes.status === 'fulfilled' ? (restockRes.value ?? []) : [],
+      otherIncome: otherIncomeRes.status === 'fulfilled' ? (otherIncomeRes.value ?? []) : [],
       products: productsData,
       stockMovements: stockMovementsData,
     });
@@ -208,7 +225,7 @@ export default function ReportsPage() {
     if (productsRes.status === 'rejected') logSupabaseError('reports.load.products', productsRes.reason, { businessId });
     if (stockMovementsRes.status === 'rejected') logSupabaseError('reports.load.stockMovements', stockMovementsRes.reason, { businessId });
     setLoading(false);
-  }, [businessId]);
+  }, [businessId, user]);
 
   useEffect(() => {
     void fetchReport();

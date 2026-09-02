@@ -937,7 +937,7 @@ export async function insertExpenseRecord(
   return insertWithOptionalColumnFallback({
     table: 'expenses',
     payload,
-    optionalColumns: ['business_id', 'payment_method', 'attachment_path', 'attachment_name'],
+    optionalColumns: ['user_id', 'business_id', 'payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
     context: 'workspace.insertExpense',
   });
 }
@@ -951,7 +951,7 @@ export async function updateExpenseRecord(
     matchColumn: 'id',
     matchValue: expenseId,
     payload,
-    optionalColumns: ['business_id', 'payment_method', 'attachment_path', 'attachment_name'],
+    optionalColumns: ['user_id', 'business_id', 'payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
     context: 'workspace.updateExpense',
   });
 }
@@ -1180,27 +1180,27 @@ function normalizeStockMovementRow(row: Record<string, unknown>) {
 export async function loadStockMovementsCompat(limit = 100, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const { data: authData } = await supabase.auth.getUser();
-  const userId = authData.user?.id ?? effectiveBusinessId ?? null;
-  let query = supabase
-    .from('stock_movements' as any)
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const userId = authData.user?.id ?? null;
 
-  if (userId) {
-    query = query.eq('user_id', userId);
+  try {
+    const rows = await loadRowsForBusinessCompat<Record<string, unknown>>({
+      table: 'stock_movements',
+      businessId: effectiveBusinessId,
+      ownerId: userId,
+      order: { column: 'created_at', ascending: false },
+      limit,
+      context: 'workspace.loadStockMovementsCompat',
+    });
+    return rows.map(normalizeStockMovementRow) as any[];
+  } catch (error) {
+    if (!isMissingTableError(error, 'stock_movements')) throw error;
+
+    logSupabaseError('workspace.loadStockMovementsCompat', error, {
+      table: 'stock_movements',
+      fallbackMode: 'loadWithoutStockMovementsTable',
+    });
+    return [];
   }
-
-  const { data, error } = await query;
-
-  if (!error) return ((data ?? []) as Array<Record<string, unknown>>).map(normalizeStockMovementRow) as any[];
-  if (!isMissingTableError(error, 'stock_movements')) throw error;
-
-  logSupabaseError('workspace.loadStockMovementsCompat', error, {
-    table: 'stock_movements',
-    fallbackMode: 'loadWithoutStockMovementsTable',
-  });
-  return [];
 }
 
 export async function insertStockMovementCompat(
@@ -1252,7 +1252,11 @@ export async function insertStockMovementCompat(
     table: 'stock_movements',
     payload: remapped,
     optionalColumns: [
+      'user_id',
       'business_id',
+      'change',
+      'reason',
+      'reference_id',
       'movement_type',
       'quantity_change',
       'quantity_after',
@@ -1260,6 +1264,7 @@ export async function insertStockMovementCompat(
       'unit_price',
       'created_by',
       'created_by_name',
+      'added_by_name',
       'movement_date',
       'source_table',
       'source_id',
