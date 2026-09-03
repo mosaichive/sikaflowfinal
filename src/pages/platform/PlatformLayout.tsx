@@ -79,9 +79,9 @@ export default function PlatformLayout() {
   if (mfaState === 'needs-enroll') return <Navigate to="/super-admin/login?step=enroll" replace />;
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen overflow-hidden bg-background flex">
       {/* Sidebar */}
-      <aside className="w-60 border-r border-border bg-card/50 flex flex-col">
+      <aside className="h-screen w-60 shrink-0 overflow-hidden border-r border-border bg-card/50 flex flex-col">
         <div className="p-4 flex items-center gap-3 border-b border-border">
           <Logo className="h-9 w-9" />
           <div>
@@ -89,7 +89,7 @@ export default function PlatformLayout() {
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Platform Admin</p>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-auto">
+        <nav className="min-h-0 flex-1 p-3 space-y-1 overflow-y-auto overscroll-contain">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
@@ -119,15 +119,15 @@ export default function PlatformLayout() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col">
-        <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50">
+      <div className="h-screen min-w-0 min-h-0 flex-1 overflow-hidden flex flex-col">
+        <header className="h-14 shrink-0 border-b border-border flex items-center justify-between px-6 bg-card/50">
           <div>
             <p className="text-xs text-muted-foreground">Signed in as</p>
             <p className="text-sm font-semibold text-foreground">{user.email}</p>
           </div>
           <ThemeToggle />
         </header>
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="min-h-0 flex-1 p-6 overflow-y-auto overscroll-contain">
           <Outlet />
         </main>
       </div>
