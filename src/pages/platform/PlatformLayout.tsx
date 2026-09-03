@@ -45,8 +45,12 @@ export default function PlatformLayout() {
     let cancelled = false;
     (async () => {
       try {
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        const { data: f } = await supabase.auth.mfa.listFactors();
+        const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalError) throw aalError;
+
+        const { data: f, error: factorsError } = await supabase.auth.mfa.listFactors();
+        if (factorsError) throw factorsError;
+
         const verified = (f?.totp ?? []).find((x: any) => x.status === 'verified');
         if (cancelled) return;
         if (!verified) {
@@ -57,7 +61,8 @@ export default function PlatformLayout() {
           setMfaState('ok');
         }
       } catch {
-        if (!cancelled) setMfaState('ok'); // fail-open to avoid lockout if API unreachable
+        // Never expose platform administration when MFA status cannot be verified.
+        if (!cancelled) setMfaState('needs-challenge');
       }
     })();
     return () => { cancelled = true; };
