@@ -54,23 +54,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    await admin.from('profiles').update({ email_verified: true }).eq('user_id', user.id);
-
-    const { data: profile } = await admin
-      .from('profiles').select('business_id').eq('user_id', user.id).maybeSingle();
-
-    let activated = false;
-    let phoneVerified = false;
-    if (profile?.business_id) {
-      await admin.from('businesses').update({ email_verified: true }).eq('id', profile.business_id);
-      const { data: biz } = await admin
-        .from('businesses').select('email_verified, phone_verified, status').eq('id', profile.business_id).maybeSingle();
-      phoneVerified = !!biz?.phone_verified;
-      if (biz && biz.email_verified && biz.phone_verified && biz.status !== 'active') {
-        await admin.from('businesses').update({ status: 'active' }).eq('id', profile.business_id);
-        activated = true;
-      }
-    }
+    // The live schema has no profiles.business_id / profiles.email_verified / businesses table:
+    // verification state lives on auth.users. Nothing else to sync here.
+    const activated = false;
+    const phoneVerified = await admin
+      .from('profiles')
+      .select('phone_verified')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => !!data?.phone_verified)
+      .catch(() => false);
 
     return new Response(JSON.stringify({ verified: true, activated, phoneVerified, confirmedAt }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

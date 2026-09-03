@@ -97,7 +97,7 @@ export default function SubscriptionsPage() {
     } else if (legacyMatch) {
       if (newPlan === 'trial') {
         payload.subscription_status = 'trial';
-        payload.trial_end_date = new Date(now.getTime() + 30 * 86400000).toISOString();
+        payload.trial_end_date = new Date(now.getTime() + (legacyMatch.days ?? 15) * 86400000).toISOString();
       } else if (newPlan === 'lifetime') {
         payload.subscription_status = 'lifetime';
         payload.subscription_start_date = now.toISOString();

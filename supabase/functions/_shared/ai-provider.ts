@@ -27,8 +27,8 @@ export function aiProvider(): Provider {
 }
 
 const DISABLED_REPLY =
-  "The AI assistant is not enabled on this workspace right now. You can still type simple " +
-  "commands like “sold 2 shirts at 50” and I will record them.";
+  "The AI assistant is not enabled on this workspace right now. I will try to read your " +
+  "message with the built-in command parser instead.";
 
 function parseAssistantJson(raw: string): { reply: string; action: unknown } {
   try {
