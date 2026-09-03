@@ -1,6 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { runAssistantTurn } from '../_shared/ai-provider.ts';
+import { aiProvider, runAssistantTurn } from '../_shared/ai-provider.ts';
 
 
 const ACTION_SCHEMA = {
@@ -133,7 +133,10 @@ Deno.serve(async (req) => {
 
     if (!result.ok) return json({ error: result.error }, result.status);
 
-    return json({ reply: result.reply, action: result.action ?? null }, 200);
+    return json(
+      { reply: result.reply, action: result.action ?? null, provider_disabled: aiProvider() === 'disabled' },
+      200,
+    );
   } catch (error) {
     console.error('[ai-assistant] unexpected', error);
     return json({ error: 'Unexpected assistant error.' }, 500);

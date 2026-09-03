@@ -164,6 +164,16 @@ export function useAIAssistant() {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
+        // Provider disabled server-side: use the on-device command parser so recording still works.
+        if (data?.provider_disabled && offlineStorageAvailable()) {
+          try {
+            await runOffline(trimmed);
+            return;
+          } catch {
+            /* fall through to the plain reply below */
+          }
+        }
+
         const action: AssistantAction | null = data?.action ?? null;
         const blocked = action && !hasModule(ACTION_MODULE[action.type]);
         const catalogue =
