@@ -2219,6 +2219,7 @@ export type Database = {
           change: number
           created_at: string
           id: string
+          movement_date: string
           note: string | null
           product_id: string
           reason: string
@@ -2230,6 +2231,7 @@ export type Database = {
           change: number
           created_at?: string
           id?: string
+          movement_date?: string
           note?: string | null
           product_id: string
           reason?: string
@@ -2241,6 +2243,7 @@ export type Database = {
           change?: number
           created_at?: string
           id?: string
+          movement_date?: string
           note?: string | null
           product_id?: string
           reason?: string
