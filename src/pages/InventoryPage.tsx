@@ -34,6 +34,7 @@ import {
   insertRestockRecord,
   insertStockMovementCompat,
   loadProductsCompat,
+  loadRowsForBusinessCompat,
   loadStockMovementsCompat,
   logSupabaseError,
   rememberCachedProduct,
@@ -201,18 +202,33 @@ export default function InventoryPage() {
   const ownerUserId = effectiveBusinessOwnerId ?? userId;
 
   const load = useCallback(async () => {
+    if (!user || !businessId) {
+      setProducts([]);
+      setMovements([]);
+      setRestocks([]);
+      setDamagedGoods([]);
+      setExpenses([]);
+      return;
+    }
     const [productsRes, movementsRes, restocksRes, damagedRes, expensesRes] = await Promise.allSettled([
       loadProductsCompat(false, businessId),
       loadStockMovementsCompat(100, businessId),
-      ownerUserId
-        ? supabase.from('restocks').select('*').eq('user_id', ownerUserId).order('restock_date', { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
+      loadRowsForBusinessCompat<RestockRow>({
+        table: 'restocks',
+        businessId,
+        ownerId: ownerUserId,
+        order: { column: 'restock_date', ascending: false },
+        context: 'inventory.load.restocks',
+      }),
       ownerUserId
         ? supabase.from('damaged_goods' as any).select('*').eq('user_id', ownerUserId).order('damage_date', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
-      ownerUserId
-        ? supabase.from('expenses').select('*').eq('user_id', ownerUserId)
-        : Promise.resolve({ data: [], error: null }),
+      loadRowsForBusinessCompat<ExpenseRow>({
+        table: 'expenses',
+        businessId,
+        ownerId: ownerUserId,
+        context: 'inventory.load.expenses',
+      }),
     ]);
 
     let nextProducts: ProductRow[] = [];
@@ -235,7 +251,7 @@ export default function InventoryPage() {
     }
 
     if (restocksRes.status === 'fulfilled') {
-      setRestocks((restocksRes.value.error ? [] : ((restocksRes.value.data || []) as RestockRow[])) ?? []);
+      setRestocks(restocksRes.value ?? []);
     } else {
       logSupabaseError('inventory.load.restocks', restocksRes.reason);
       setRestocks([]);
@@ -258,12 +274,12 @@ export default function InventoryPage() {
     }
 
     if (expensesRes.status === 'fulfilled') {
-      setExpenses((expensesRes.value.error ? [] : ((expensesRes.value.data || []) as ExpenseRow[])) ?? []);
+      setExpenses(expensesRes.value ?? []);
     } else {
       logSupabaseError('inventory.load.expenses', expensesRes.reason);
       setExpenses([]);
     }
-  }, [businessId, ownerUserId]);
+  }, [businessId, ownerUserId, user]);
 
   const handleRecomputeStock = useCallback(async () => {
     setRecomputing(true);
@@ -289,19 +305,19 @@ export default function InventoryPage() {
 
   useEffect(() => {
     void load();
-    if (!ownerUserId) return;
+    if (!user || !businessId) return;
     const channel = supabase
-      .channel('inventory-v2')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'damaged_goods', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${ownerUserId}` }, () => { void load(); })
+      .channel(`inventory-v2:${businessId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `business_id=eq.${businessId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `business_id=eq.${businessId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `business_id=eq.${businessId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'damaged_goods', filter: `business_id=eq.${businessId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `business_id=eq.${businessId}` }, () => { void load(); })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load, ownerUserId]);
+  }, [businessId, load, user]);
 
   const selectedProduct = products.find((product) => product.id === form.product_id) || null;
   const selectedDamageProduct = products.find((product) => product.id === damageForm.product_id) || null;

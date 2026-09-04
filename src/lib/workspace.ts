@@ -44,7 +44,7 @@ export type CachedProductRow = {
 // keeps older single-tenant schemas working when optional catalog columns are
 // missing from the API schema cache.
 const PRODUCT_SELECT =
-  'id,name,sku,category,image_url,is_archived,stock,cost,price,low_stock_threshold,created_at,updated_at';
+  'id,business_id,name,sku,category,image_url,is_archived,quantity,cost_price,selling_price,reorder_level,stock,low_stock_threshold,created_at,updated_at';
 
 // Use only columns that actually exist in the single-tenant products schema.
 // `quantity`/`cost_price`/`selling_price`/`reorder_level`/`business_id` are
@@ -53,7 +53,18 @@ const PRODUCT_SELECT =
 const STABLE_PRODUCT_SELECT =
   'id,name,sku,stock,cost,price,low_stock_threshold,created_at,updated_at';
 
-const OPTIONAL_PRODUCT_READ_COLUMNS = ['category', 'image_url', 'is_archived'] as const;
+const OPTIONAL_PRODUCT_READ_COLUMNS = [
+  'business_id',
+  'category',
+  'image_url',
+  'is_archived',
+  'quantity',
+  'cost_price',
+  'selling_price',
+  'reorder_level',
+  'stock',
+  'low_stock_threshold',
+] as const;
 
 function getProductCacheKey(businessId: string) {
   return `sikaflow_products_${businessId}`;
@@ -293,7 +304,7 @@ function isMissingFunctionError(error: unknown) {
   );
 }
 
-function isMissingColumnError(error: unknown, columnName?: string, tableName?: string) {
+export function isMissingColumnError(error: unknown, columnName?: string, tableName?: string) {
   const normalized = (error ?? {}) as SupabaseErrorLike;
   const message = normalized.message?.toLowerCase() ?? '';
   const details = normalized.details?.toLowerCase() ?? '';
@@ -579,6 +590,90 @@ async function insertWithOptionalColumnFallback<T extends Record<string, unknown
   }
 }
 
+type ScopedRowOrder = {
+  column: string;
+  ascending?: boolean;
+};
+
+function applyScopedRowOptions(query: any, options: { order?: ScopedRowOrder; limit?: number }) {
+  let next = query;
+  if (options.order?.column) {
+    next = next.order(options.order.column, { ascending: options.order.ascending ?? false });
+  }
+  if (typeof options.limit === 'number') {
+    next = next.limit(options.limit);
+  }
+  return next;
+}
+
+export async function loadRowsForBusinessCompat<T = Record<string, unknown>>({
+  table,
+  select = '*',
+  businessId,
+  ownerId,
+  order,
+  limit,
+  context,
+}: {
+  table: string;
+  select?: string;
+  businessId?: string | null;
+  ownerId?: string | null;
+  order?: ScopedRowOrder;
+  limit?: number;
+  context?: string;
+}): Promise<T[]> {
+  const db = supabase as any;
+  const scopes: Array<{ column: 'business_id' | 'user_id'; value: string }> = [];
+  if (businessId) scopes.push({ column: 'business_id', value: businessId });
+  if (ownerId) scopes.push({ column: 'user_id', value: ownerId });
+
+  const runQuery = async (scope?: { column: 'business_id' | 'user_id'; value: string }) => {
+    let query = db.from(table).select(select);
+    if (scope) query = query.eq(scope.column, scope.value);
+    return applyScopedRowOptions(query, { order, limit });
+  };
+
+  for (const scope of scopes) {
+    const { data, error } = await runQuery(scope);
+    if (!error) return (data ?? []) as T[];
+    if (!isMissingColumnError(error, scope.column, table)) throw error;
+
+    logSupabaseError(context || `workspace.loadRowsForBusinessCompat.${table}`, error, {
+      table,
+      missingColumn: scope.column,
+      fallbackMode: 'loadWithAlternateScopeColumn',
+    });
+  }
+
+  const { data, error } = await runQuery();
+  if (error) throw error;
+  return (data ?? []) as T[];
+}
+
+export async function insertSavingsRecord(payload: Record<string, unknown>) {
+  return insertWithOptionalColumnFallback({
+    table: 'savings',
+    payload,
+    optionalColumns: ['user_id', 'business_id', 'recorded_by', 'bank_account_id', 'reference'],
+    context: 'workspace.insertSavings',
+  });
+}
+
+export async function updateSavingsRecord(
+  savingsId: string,
+  payload: Record<string, unknown>,
+) {
+  return updateWithOptionalColumnFallback({
+    table: 'savings',
+    matchColumn: 'id',
+    matchValue: savingsId,
+    payload,
+    optionalColumns: ['user_id', 'business_id', 'recorded_by', 'bank_account_id', 'reference'],
+    context: 'workspace.updateSavings',
+  });
+}
+
 export async function updateBusinessWorkspaceRecord(
   businessId: string,
   payload: Record<string, unknown>,
@@ -842,7 +937,7 @@ export async function insertExpenseRecord(
   return insertWithOptionalColumnFallback({
     table: 'expenses',
     payload,
-    optionalColumns: ['business_id', 'payment_method', 'attachment_path', 'attachment_name'],
+    optionalColumns: ['user_id', 'business_id', 'payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
     context: 'workspace.insertExpense',
   });
 }
@@ -856,8 +951,42 @@ export async function updateExpenseRecord(
     matchColumn: 'id',
     matchValue: expenseId,
     payload,
-    optionalColumns: ['business_id', 'payment_method', 'attachment_path', 'attachment_name'],
+    optionalColumns: ['user_id', 'business_id', 'payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
     context: 'workspace.updateExpense',
+  });
+}
+
+export async function insertOtherIncomeRecord({
+  businessPayload,
+  legacyPayload,
+}: {
+  businessPayload: Record<string, unknown>;
+  legacyPayload: Record<string, unknown>;
+}) {
+  try {
+    return await insertWithOptionalColumnFallback({
+      table: 'other_income',
+      payload: businessPayload,
+      optionalColumns: ['payment_method', 'attachment_path', 'attachment_name', 'recorded_by', 'recorded_by_name'],
+      context: 'workspace.insertOtherIncome',
+    });
+  } catch (error) {
+    if (!isMissingColumnError(error, 'business_id', 'other_income')) throw error;
+  }
+
+  return insertWithOptionalColumnFallback({
+    table: 'other_income',
+    payload: legacyPayload,
+    optionalColumns: [
+      'source',
+      'note',
+      'payment_method',
+      'attachment_path',
+      'attachment_name',
+      'recorded_by',
+      'recorded_by_name',
+    ],
+    context: 'workspace.insertOtherIncomeLegacy',
   });
 }
 
@@ -887,7 +1016,13 @@ export async function loadProductsCompat(showArchived: boolean, businessId?: str
   const loadStableRows = async () => {
     const { data: stableData, error: stableError } = await stableBaseQuery();
     if (stableError) throw stableError;
-    return ((stableData ?? []) as Array<Record<string, unknown>>).map(normalizeProductRow);
+    return ((stableData ?? []) as Array<Record<string, unknown>>)
+      .map(normalizeProductRow)
+      .map((row) => (
+        row.business_id || !effectiveBusinessId
+          ? row
+          : { ...row, business_id: effectiveBusinessId }
+      ));
   };
 
   if (showArchived) {
@@ -1045,27 +1180,27 @@ function normalizeStockMovementRow(row: Record<string, unknown>) {
 export async function loadStockMovementsCompat(limit = 100, businessId?: string | null) {
   const effectiveBusinessId = businessId ?? await resolveActiveBusinessIdFromSession();
   const { data: authData } = await supabase.auth.getUser();
-  const userId = authData.user?.id ?? effectiveBusinessId ?? null;
-  let query = supabase
-    .from('stock_movements' as any)
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const userId = authData.user?.id ?? null;
 
-  if (userId) {
-    query = query.eq('user_id', userId);
+  try {
+    const rows = await loadRowsForBusinessCompat<Record<string, unknown>>({
+      table: 'stock_movements',
+      businessId: effectiveBusinessId,
+      ownerId: userId,
+      order: { column: 'created_at', ascending: false },
+      limit,
+      context: 'workspace.loadStockMovementsCompat',
+    });
+    return rows.map(normalizeStockMovementRow) as any[];
+  } catch (error) {
+    if (!isMissingTableError(error, 'stock_movements')) throw error;
+
+    logSupabaseError('workspace.loadStockMovementsCompat', error, {
+      table: 'stock_movements',
+      fallbackMode: 'loadWithoutStockMovementsTable',
+    });
+    return [];
   }
-
-  const { data, error } = await query;
-
-  if (!error) return ((data ?? []) as Array<Record<string, unknown>>).map(normalizeStockMovementRow) as any[];
-  if (!isMissingTableError(error, 'stock_movements')) throw error;
-
-  logSupabaseError('workspace.loadStockMovementsCompat', error, {
-    table: 'stock_movements',
-    fallbackMode: 'loadWithoutStockMovementsTable',
-  });
-  return [];
 }
 
 export async function insertStockMovementCompat(
@@ -1117,7 +1252,11 @@ export async function insertStockMovementCompat(
     table: 'stock_movements',
     payload: remapped,
     optionalColumns: [
+      'user_id',
       'business_id',
+      'change',
+      'reason',
+      'reference_id',
       'movement_type',
       'quantity_change',
       'quantity_after',
@@ -1125,6 +1264,7 @@ export async function insertStockMovementCompat(
       'unit_price',
       'created_by',
       'created_by_name',
+      'added_by_name',
       'movement_date',
       'source_table',
       'source_id',

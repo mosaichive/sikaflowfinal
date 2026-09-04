@@ -28,7 +28,12 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Banknote, Landmark, PiggyBank, Plus, Pencil, Smartphone, Trash2, WalletCards } from 'lucide-react';
-import { logSupabaseError } from '@/lib/workspace';
+import {
+  insertSavingsRecord,
+  loadRowsForBusinessCompat,
+  logSupabaseError,
+  updateSavingsRecord,
+} from '@/lib/workspace';
 import { getTodaySalesTotal } from '@/lib/sales-inventory';
 
 type DestinationType = 'bank' | 'mobile_money' | 'susu';
@@ -153,47 +158,63 @@ export default function SavingsPage() {
   const [editDestinationId, setEditDestinationId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!user) return;
+    if (!user || !businessId) {
+      setDestinations([]);
+      setSavings([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    const ownerId = effectiveBusinessOwnerId ?? businessId ?? user.id;
 
     const [destinationsRes, savingsRes] = await Promise.allSettled([
-      supabase.from('bank_accounts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('savings').select('*').eq('user_id', user.id).order('savings_date', { ascending: false }),
+      loadRowsForBusinessCompat<SavingsDestination>({
+        table: 'bank_accounts',
+        businessId,
+        ownerId,
+        order: { column: 'created_at', ascending: false },
+        context: 'savings.load.destinations',
+      }),
+      loadRowsForBusinessCompat<SavingsRecord>({
+        table: 'savings',
+        businessId,
+        ownerId,
+        order: { column: 'savings_date', ascending: false },
+        context: 'savings.load.records',
+      }),
     ]);
 
     if (destinationsRes.status === 'fulfilled') {
-      if (destinationsRes.value.error) logSupabaseError('savings.load.destinations', destinationsRes.value.error, { businessId });
-      setDestinations((destinationsRes.value.data || []) as SavingsDestination[]);
+      setDestinations(destinationsRes.value);
     } else {
       logSupabaseError('savings.load.destinations', destinationsRes.reason, { businessId });
       setDestinations([]);
     }
 
     if (savingsRes.status === 'fulfilled') {
-      if (savingsRes.value.error) logSupabaseError('savings.load.records', savingsRes.value.error, { businessId });
-      setSavings((savingsRes.value.data || []) as SavingsRecord[]);
+      setSavings(savingsRes.value);
     } else {
       logSupabaseError('savings.load.records', savingsRes.reason, { businessId });
       setSavings([]);
     }
 
     setLoading(false);
-  }, [user]);
+  }, [businessId, effectiveBusinessOwnerId, user]);
 
   useEffect(() => {
     void fetchAll();
-    if (!user) return;
+    if (!user || !businessId) return;
 
     const channel = supabase
-      .channel('savings-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `user_id=eq.${user.id}` }, () => { void fetchAll(); })
+      .channel(`savings-page:${businessId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `business_id=eq.${businessId}` }, () => { void fetchAll(); })
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user, fetchAll]);
+  }, [businessId, user, fetchAll]);
 
   const availableBusinessMoney = financials.availableBusinessMoney;
 
@@ -269,17 +290,6 @@ export default function SavingsPage() {
       const todaySales = await getTodaySalesTotal(supabase, businessId);
       const remainingSales = Math.max(0, todaySales - netAmount);
       const deficitBefore = availableBusinessMoney - todaySales; // ABM before today's sales contribution
-      // Debug trace — remove once verified.
-      // eslint-disable-next-line no-console
-      console.log('[savings:negative-mode]', {
-        businessId,
-        availableBusinessMoney,
-        todaySales,
-        savingsAmount: netAmount,
-        remainingSales,
-        projectedBalance: projected,
-        deficitBefore,
-      });
       setNegativeConfirm({ projected, amount: netAmount, todaySales, remainingSales, deficitBefore });
       return;
     }
@@ -295,9 +305,11 @@ export default function SavingsPage() {
     const netAmount = savingForm.amount - Number(currentRow?.amount || 0);
     const newBalance = previousBalance - netAmount;
     const destination = destinations.find((d) => d.id === savingForm.bank_account_id);
+    const ownerId = effectiveBusinessOwnerId ?? businessId ?? user.id;
 
     const payload: any = {
-      user_id: effectiveBusinessOwnerId ?? user.id,
+      business_id: businessId,
+      user_id: ownerId,
       amount: savingForm.amount,
       savings_date: new Date(savingForm.savings_date).toISOString(),
       source: savingForm.savings_type,
@@ -307,11 +319,13 @@ export default function SavingsPage() {
       recorded_by: user.id,
     };
 
-    const { error } = editSavingId
-      ? await supabase.from('savings').update(payload).eq('id', editSavingId)
-      : await supabase.from('savings').insert(payload);
-
-    if (error) {
+    try {
+      if (editSavingId) {
+        await updateSavingsRecord(editSavingId, payload);
+      } else {
+        await insertSavingsRecord(payload);
+      }
+    } catch (error: any) {
       logSupabaseError('savings.save', error, { businessId, editSavingId });
       toast({ title: 'Could not save savings', description: error.message, variant: 'destructive' });
       return;
@@ -354,7 +368,7 @@ export default function SavingsPage() {
   }
 
   async function handleSaveDestination() {
-    if (!user) return;
+    if (!user || !businessId) return;
 
     const type = destinationForm.account_type;
     const isBank = type === 'bank';
@@ -380,6 +394,7 @@ export default function SavingsPage() {
 
     const payload = {
       user_id: effectiveBusinessOwnerId ?? user.id,
+      business_id: businessId,
       account_type: type,
       bank_name: destinationForm.bank_name.trim(),
       account_name: accountName,

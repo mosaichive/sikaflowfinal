@@ -723,7 +723,7 @@ export default function SalesPage() {
       const { data, error } = await supabase
         .from('sale_documents' as any)
         .upsert({
-          user_id: effectiveBusinessOwnerId ?? user.id,
+          business_id: businessId,
           sale_id: sale.id,
           kind,
           sale_date: sale.sale_date,

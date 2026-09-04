@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Receipt, X, Paperclip, Trash2, WalletCards } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getErrorMessage, insertExpenseRecord, logSupabaseError } from '@/lib/workspace';
+import { getErrorMessage, insertExpenseRecord, loadRowsForBusinessCompat, logSupabaseError } from '@/lib/workspace';
 
 type ExpenseRow = {
   id: string;
@@ -73,22 +73,39 @@ export default function ExpensesPage() {
   const canManage = isAdmin || isManager;
 
   const fetchExpenses = useCallback(async () => {
-    const { data } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
-    setExpenses((data || []) as ExpenseRow[]);
-  }, []);
+    if (!user || !businessId) {
+      setExpenses([]);
+      return;
+    }
+    const ownerId = effectiveBusinessOwnerId ?? businessId ?? user.id;
+    try {
+      const data = await loadRowsForBusinessCompat<ExpenseRow>({
+        table: 'expenses',
+        businessId,
+        ownerId,
+        order: { column: 'expense_date', ascending: false },
+        context: 'expenses.load',
+      });
+      setExpenses(data);
+    } catch (error) {
+      logSupabaseError('expenses.load', error, { businessId, userId: user.id });
+      setExpenses([]);
+    }
+  }, [businessId, effectiveBusinessOwnerId, user]);
 
   useEffect(() => {
     void fetchExpenses();
+    if (!user || !businessId) return;
     const ch = supabase
-      .channel('expenses-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
+      .channel(`expenses-page:${businessId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `business_id=eq.${businessId}` }, () => {
         void fetchExpenses();
       })
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [fetchExpenses]);
+  }, [businessId, fetchExpenses, user]);
 
   const filteredExpenses = useMemo(
     () => expenses.filter((expense) => matchesDateRange(expense.expense_date, dateFrom, dateTo)),

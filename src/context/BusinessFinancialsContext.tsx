@@ -3,7 +3,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { type BusinessFinancials, calculateBusinessFinancials } from '@/lib/business-money';
 import { supabase } from '@/integrations/supabase/client';
-import { loadProductsCompat, logSupabaseError } from '@/lib/workspace';
+import {
+  isMissingColumnError,
+  loadProductsCompat,
+  loadRowsForBusinessCompat,
+  logSupabaseError,
+} from '@/lib/workspace';
 
 type BusinessFinancialsContextValue = {
   financials: BusinessFinancials;
@@ -40,6 +45,31 @@ function profileIdentityFilter(userId: string) {
   return `id.eq.${userId},user_id.eq.${userId}`;
 }
 
+async function loadSaleItemsForSales(
+  db: any,
+  saleIds: string[],
+  context: Record<string, unknown>,
+) {
+  let result = await db
+    .from('sale_items')
+    .select('sale_id,quantity,cost_price,unit_price')
+    .in('sale_id', saleIds);
+
+  if (result.error && isMissingColumnError(result.error, 'cost_price', 'sale_items')) {
+    result = await db
+      .from('sale_items')
+      .select('sale_id,quantity,unit_cost,unit_price')
+      .in('sale_id', saleIds);
+  }
+
+  if (result.error) {
+    logSupabaseError('financials.load.saleItems', result.error, context);
+    return [];
+  }
+
+  return (result.data as any[]) ?? [];
+}
+
 export function BusinessFinancialsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { businessId, loading: businessLoading } = useBusiness();
@@ -57,12 +87,14 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
       return;
     }
 
-    // For owners businessId === user.id. For invited staff, businessId is
-    // the owning business's user_id (resolved via staff_members in
-    // BusinessContext). RLS team policies grant staff read access to the
-    // owner's rows, so scoping by businessId surfaces the business data
-    // instead of the staff member's empty own-account rows.
-    const userId = businessId ?? user.id;
+    if (!businessId) {
+      setFinancials(EMPTY_FINANCIALS);
+      setLoading(false);
+      hasLoadedOnceRef.current = true;
+      return;
+    }
+
+    const ownerId = businessId;
 
     if (showLoading || !hasLoadedOnceRef.current) setLoading(true);
 
@@ -82,22 +114,61 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         investorFundsRes,
         profileRes,
       ] = await Promise.allSettled([
-        db
-          .from('sales')
-          .select('id,total,amount_paid,sale_date')
-          .eq('user_id', userId)
-          .order('sale_date', { ascending: false }),
-        loadProductsCompat(false, businessId ?? userId),
-        db.from('expenses').select('amount,category,note,description').eq('user_id', userId),
-        db.from('other_income').select('amount').eq('user_id', userId),
-        db.from('savings').select('amount').eq('user_id', userId),
-        db.from('restocks').select('total_cost,status,is_opening_stock').eq('user_id', userId),
-        db.from('investments').select('amount,status').eq('user_id', userId),
-        db.from('investor_funding').select('amount').eq('user_id', userId),
+        loadRowsForBusinessCompat({
+          table: 'sales',
+          select: 'id,total,amount_paid,sale_date,payment_status,status,stock_status,sale_channel',
+          businessId,
+          ownerId,
+          order: { column: 'sale_date', ascending: false },
+          context: 'financials.load.sales',
+        }),
+        loadProductsCompat(false, businessId ?? ownerId),
+        loadRowsForBusinessCompat({
+          table: 'expenses',
+          select: 'amount,category,description',
+          businessId,
+          ownerId,
+          context: 'financials.load.expenses',
+        }),
+        loadRowsForBusinessCompat({
+          table: 'other_income',
+          select: 'amount',
+          businessId,
+          ownerId,
+          context: 'financials.load.otherIncome',
+        }),
+        loadRowsForBusinessCompat({
+          table: 'savings',
+          select: 'amount',
+          businessId,
+          ownerId,
+          context: 'financials.load.savings',
+        }),
+        loadRowsForBusinessCompat({
+          table: 'restocks',
+          select: 'total_cost,status,is_opening_stock',
+          businessId,
+          ownerId,
+          context: 'financials.load.restocks',
+        }),
+        loadRowsForBusinessCompat({
+          table: 'investments',
+          select: 'amount,status',
+          businessId,
+          ownerId,
+          context: 'financials.load.investments',
+        }),
+        loadRowsForBusinessCompat({
+          table: 'investor_funding',
+          select: 'amount',
+          businessId,
+          ownerId,
+          context: 'financials.load.investorFunds',
+        }),
         db
           .from('profiles')
           .select('opening_cash_balance')
-          .or(profileIdentityFilter(userId))
+          .or(profileIdentityFilter(ownerId))
           .limit(1)
           .maybeSingle(),
       ]);
@@ -110,33 +181,24 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         profileValue = await db
           .from('profiles')
           .select('opening_cash_balance')
-          .eq('id', userId)
+          .eq('id', ownerId)
           .maybeSingle();
       }
 
-      if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { userId });
-      if (productsRes.status === 'rejected') logSupabaseError('financials.load.products', productsRes.reason, { userId });
-      if (expensesRes.status === 'rejected') logSupabaseError('financials.load.expenses', expensesRes.reason, { userId });
-      if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { userId });
-      if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { userId });
-      if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { userId });
+      if (salesRes.status === 'rejected') logSupabaseError('financials.load.sales', salesRes.reason, { ownerId, businessId });
+      if (productsRes.status === 'rejected') logSupabaseError('financials.load.products', productsRes.reason, { ownerId, businessId });
+      if (expensesRes.status === 'rejected') logSupabaseError('financials.load.expenses', expensesRes.reason, { ownerId, businessId });
+      if (otherIncomeRes.status === 'rejected') logSupabaseError('financials.load.otherIncome', otherIncomeRes.reason, { ownerId, businessId });
+      if (savingsRes.status === 'rejected') logSupabaseError('financials.load.savings', savingsRes.reason, { ownerId, businessId });
+      if (restocksRes.status === 'rejected') logSupabaseError('financials.load.restocks', restocksRes.reason, { ownerId, businessId });
 
-      const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
+      const sales: any[] = salesRes.status === 'fulfilled' ? ((salesRes.value as any) ?? []) : [];
       let saleItems: any[] = [];
 
-      if (salesRes.status === 'fulfilled' && !(salesRes.value as any).error) {
+      if (salesRes.status === 'fulfilled') {
         const saleIds = sales.map((sale: any) => sale.id).filter(Boolean);
         if (saleIds.length > 0) {
-          const { data, error } = await db
-            .from('sale_items')
-            .select('sale_id,quantity,unit_cost,unit_price')
-            .in('sale_id', saleIds);
-
-          if (error) {
-            logSupabaseError('financials.load.saleItems', error, { userId, saleCount: saleIds.length });
-          } else {
-            saleItems = (data as any[]) ?? [];
-          }
+          saleItems = await loadSaleItemsForSales(db, saleIds, { ownerId, businessId, saleCount: saleIds.length });
         }
       }
 
@@ -147,12 +209,12 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
         sales: sales as any,
         saleItems,
         products: (productsRes.status === 'fulfilled' ? ((productsRes.value as any) ?? []) : []) as any,
-        otherIncome: (otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value as any).data ?? []) : []) as any,
-        expenses: (expensesRes.status === 'fulfilled' ? ((expensesRes.value as any).data ?? []) : []) as any,
-        savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any).data ?? []) : []) as any,
-        investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any).data ?? []) : []) as any,
-        investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any).data ?? []) : []) as any,
-        restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any).data ?? []) : []) as any,
+        otherIncome: (otherIncomeRes.status === 'fulfilled' ? ((otherIncomeRes.value as any) ?? []) : []) as any,
+        expenses: (expensesRes.status === 'fulfilled' ? ((expensesRes.value as any) ?? []) : []) as any,
+        savings: (savingsRes.status === 'fulfilled' ? ((savingsRes.value as any) ?? []) : []) as any,
+        investments: (investmentsRes.status === 'fulfilled' ? ((investmentsRes.value as any) ?? []) : []) as any,
+        investorFunds: (investorFundsRes.status === 'fulfilled' ? ((investorFundsRes.value as any) ?? []) : []) as any,
+        restocks: (restocksRes.status === 'fulfilled' ? ((restocksRes.value as any) ?? []) : []) as any,
         openingCashBalance,
       });
 
@@ -174,35 +236,33 @@ export function BusinessFinancialsProvider({ children }: { children: ReactNode }
   }, [load]);
 
   useEffect(() => {
-    if (!user) return;
-    const userId = businessId ?? user.id;
+    if (!user || businessLoading || !businessId) return;
+    const ownerId = businessId;
+    const tableFilter = `business_id=eq.${businessId}`;
 
     const refresh = () => {
       void load(false);
     };
 
-    // Tenant rows are scoped by the owner's user_id. Staff members therefore
-    // subscribe to the owner id so owner/staff dashboard figures refresh from
-    // the same workspace changes.
     const channel = supabase
-      .channel(`business-financials:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sale_items', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'investments', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'investor_funding', filter: `user_id=eq.${userId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, refresh)
+      .channel(`business-financials:${ownerId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sale_items', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'savings', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'investments', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'investor_funding', filter: tableFilter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${ownerId}` }, refresh)
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [businessId, load, user]);
+  }, [businessId, businessLoading, load, user]);
 
   const refresh = useCallback(() => load(false), [load]);
 
