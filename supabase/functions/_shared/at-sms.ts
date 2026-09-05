@@ -192,6 +192,11 @@ async function postWithRetry(endpoint: string, username: string, apiKey: string,
 // Public API
 // ---------------------------------------------------------------------------
 
+function redactPhone(phone: string): string {
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.length >= 4 ? `***${digits.slice(-4)}` : 'redacted';
+}
+
 export async function sendSms(args: SmsSendArgs): Promise<SmsSendResult> {
   const to = String(args.to ?? '').trim();
   const message = String(args.message ?? '');
@@ -211,7 +216,7 @@ export async function sendSms(args: SmsSendArgs): Promise<SmsSendResult> {
 
   console.log('[sms] dispatch', {
     provider: 'africastalking',
-    to,
+    to: redactPhone(to),
     senderId: senderId || '(default)',
     messageLength: message.length,
     smsEnabled: enabled,
@@ -220,7 +225,7 @@ export async function sendSms(args: SmsSendArgs): Promise<SmsSendResult> {
   });
 
   if (!enabled) {
-    console.log('[sms] SMS_ENABLED=false — dry run, not dispatching', { to });
+    console.log('[sms] SMS_ENABLED=false — dry run, not dispatching', { to: redactPhone(to) });
     return { ok: true, provider: 'africastalking', delivered: false, dryRun: true };
   }
 
@@ -268,7 +273,7 @@ export async function sendSms(args: SmsSendArgs): Promise<SmsSendResult> {
   }
 
   console.log('[sms] queued', {
-    to: recipient.number,
+    to: redactPhone(recipient.number || to),
     status: recipient.status,
     messageId: recipient.messageId,
     cost: recipient.cost,

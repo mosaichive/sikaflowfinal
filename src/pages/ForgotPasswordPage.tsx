@@ -121,17 +121,11 @@ function PhoneReset() {
           phone: phone.trim(),
           otp,
           new_password: newPassword,
-          redirect_to: `${window.location.origin}/dashboard`,
         },
       });
       if (fnErr) throw fnErr;
       if ((data as any)?.error) throw new Error((data as any).error);
-      const link = (data as any)?.action_link;
       setDone(true);
-      if (link) {
-        // Sign the user in immediately.
-        window.location.href = link;
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid or expired code.');
     } finally {
@@ -143,7 +137,7 @@ function PhoneReset() {
     return (
       <Alert className="mt-4">
         <AlertDescription>
-          Password updated. Signing you in…
+          Password updated. You can now sign in with your new password.
         </AlertDescription>
       </Alert>
     );

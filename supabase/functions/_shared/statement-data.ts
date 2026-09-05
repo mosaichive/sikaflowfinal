@@ -56,6 +56,7 @@ export type StatementLedgerRow = {
 export type StatementData = {
   business: {
     id: string;
+    ownerUserId: string;
     name: string;
     ownerName: string;
     email: string | null;
@@ -115,29 +116,47 @@ export type StatementData = {
 
 export async function buildStatementData(
   admin: SupabaseClient,
-  businessId: string,
+  businessSelector: string,
   period: StatementPeriod,
 ): Promise<StatementData> {
   const { start, end } = period;
 
+  let { data: business } = await admin
+    .from("businesses")
+    .select("id, owner_user_id, name, location, phone")
+    .eq("id", businessSelector)
+    .maybeSingle();
+  if (!business) {
+    const result = await admin
+      .from("businesses")
+      .select("id, owner_user_id, name, location, phone")
+      .eq("owner_user_id", businessSelector)
+      .limit(1)
+      .maybeSingle();
+    business = result.data;
+  }
+  if (!business?.id || !business.owner_user_id) throw new Error("Business not found");
+  const businessId = business.id as string;
+  const ownerUserId = business.owner_user_id as string;
+
   const { data: profile } = await admin
     .from("profiles")
     .select("id, email, business_name, display_name, phone, location, currency, opening_cash_balance")
-    .eq("id", businessId)
+    .eq("user_id", ownerUserId)
     .maybeSingle();
 
   if (!profile) throw new Error("Business not found");
 
   const [salesRes, productsRes, expensesRes, incomeRes, savingsRes, investRes, fundingRes, restockRes, ordersRes] =
     await Promise.all([
-      admin.from("sales").select("*").eq("user_id", businessId).gte("sale_date", start).lt("sale_date", end),
-      admin.from("products").select("*").eq("user_id", businessId),
-      admin.from("expenses").select("*").eq("user_id", businessId).gte("expense_date", start).lt("expense_date", end),
-      admin.from("other_income").select("*").eq("user_id", businessId).gte("income_date", start).lt("income_date", end),
-      admin.from("savings").select("*").eq("user_id", businessId).gte("savings_date", start).lt("savings_date", end),
-      admin.from("investments").select("*").eq("user_id", businessId).gte("investment_date", start).lt("investment_date", end),
-      admin.from("investor_funding").select("*").eq("user_id", businessId).gte("date_received", start).lt("date_received", end),
-      admin.from("restocks").select("*").eq("user_id", businessId).gte("restock_date", start).lt("restock_date", end),
+      admin.from("sales").select("*").eq("business_id", businessId).gte("sale_date", start).lt("sale_date", end),
+      admin.from("products").select("*").eq("business_id", businessId),
+      admin.from("expenses").select("*").eq("business_id", businessId).gte("expense_date", start).lt("expense_date", end),
+      admin.from("other_income").select("*").eq("business_id", businessId).gte("income_date", start).lt("income_date", end),
+      admin.from("savings").select("*").eq("business_id", businessId).gte("savings_date", start).lt("savings_date", end),
+      admin.from("investments").select("*").eq("business_id", businessId).gte("investment_date", start).lt("investment_date", end),
+      admin.from("investor_funding").select("*").eq("business_id", businessId).gte("date_received", start).lt("date_received", end),
+      admin.from("restocks").select("*").eq("business_id", businessId).gte("restock_date", start).lt("restock_date", end),
       admin.from("orders").select("*").eq("business_id", businessId).gte("order_date", start).lt("order_date", end),
     ]);
 
@@ -149,7 +168,7 @@ export async function buildStatementData(
       const { data } = await admin
         .from("sale_items")
         .select("*")
-        .eq("user_id", businessId)
+        .eq("business_id", businessId)
         .in("sale_id", saleIds.slice(i, i + 500));
       saleItems = saleItems.concat(data ?? []);
     }
@@ -157,24 +176,24 @@ export async function buildStatementData(
 
   const [movementsRes, currencyRes, priorSalesRes, priorExpensesRes, priorIncomeRes, priorSavingsRes, priorInvestRes, priorFundingRes, priorRestockRes] =
     await Promise.all([
-      admin.from("stock_movements").select("*").eq("user_id", businessId)
+      admin.from("stock_movements").select("*").eq("business_id", businessId)
         .gte("movement_date", start).lt("movement_date", end),
       admin.from("currencies").select("code, symbol")
         .eq("code", (profile as any).currency || "GHS").maybeSingle(),
-      admin.from("sales").select("*").eq("user_id", businessId).lt("sale_date", start),
-      admin.from("expenses").select("*").eq("user_id", businessId).lt("expense_date", start),
-      admin.from("other_income").select("amount").eq("user_id", businessId).lt("income_date", start),
-      admin.from("savings").select("amount").eq("user_id", businessId).lt("savings_date", start),
-      admin.from("investments").select("amount").eq("user_id", businessId).lt("investment_date", start),
-      admin.from("investor_funding").select("amount").eq("user_id", businessId).lt("date_received", start),
-      admin.from("restocks").select("total_cost, status, is_opening_stock").eq("user_id", businessId).lt("restock_date", start),
+      admin.from("sales").select("*").eq("business_id", businessId).lt("sale_date", start),
+      admin.from("expenses").select("*").eq("business_id", businessId).lt("expense_date", start),
+      admin.from("other_income").select("amount").eq("business_id", businessId).lt("income_date", start),
+      admin.from("savings").select("amount").eq("business_id", businessId).lt("savings_date", start),
+      admin.from("investments").select("amount").eq("business_id", businessId).lt("investment_date", start),
+      admin.from("investor_funding").select("amount").eq("business_id", businessId).lt("date_received", start),
+      admin.from("restocks").select("total_cost, status, is_opening_stock").eq("business_id", businessId).lt("restock_date", start),
     ]);
 
   const products = (productsRes.data ?? []).map((p: any) => ({
     ...p,
     quantity: p.stock,
-    cost_price: p.cost,
-    selling_price: p.price,
+    cost_price: p.cost_price,
+    selling_price: p.selling_price,
   }));
   const expenses = expensesRes.data ?? [];
   const otherIncome = incomeRes.data ?? [];
@@ -343,11 +362,12 @@ export async function buildStatementData(
   return {
     business: {
       id: businessId,
-      name: (profile as any).business_name || (profile as any).display_name || "Your business",
+      ownerUserId,
+      name: (profile as any).business_name || business.name || (profile as any).display_name || "Your business",
       ownerName: (profile as any).display_name || (profile as any).email || "KudiTrack User",
       email: (profile as any).email ?? null,
-      phone: (profile as any).phone ?? null,
-      location: (profile as any).location ?? null,
+      phone: (profile as any).phone ?? business.phone ?? null,
+      location: (profile as any).location ?? business.location ?? null,
       currency: (profile as any).currency || "GHS",
       currencySymbol: (currencyRes.data as any)?.symbol || (profile as any).currency || "GHS",
     },

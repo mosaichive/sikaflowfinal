@@ -1,6 +1,6 @@
 // Paystack webhook — verifies HMAC signature, then activates the matching
 // subscription_payments row using the same logic as paystack-verify.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { activatePayment } from "../_shared/paystack.ts";
 
 const corsHeaders = {
@@ -27,17 +27,28 @@ async function hmacSha512Hex(secret: string, payload: string) {
   return Array.from(new Uint8Array(signature)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function constantTimeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   try {
     const paystackSecret = Deno.env.get("PAYSTACK_SECRET_KEY");
-    if (!paystackSecret) return json({ error: "paystack_not_configured" }, 500);
+    if (!paystackSecret) return json({ error: "payment_provider_unavailable" }, 503);
 
+    const declaredLength = Number(req.headers.get("content-length") || 0);
+    if (declaredLength > 262144) return json({ error: "payload_too_large" }, 413);
     const payloadText = await req.text();
+    if (payloadText.length > 262144) return json({ error: "payload_too_large" }, 413);
     const signature = req.headers.get("x-paystack-signature") ?? "";
     const expected = await hmacSha512Hex(paystackSecret, payloadText);
-    if (!signature || signature !== expected) return json({ error: "invalid_signature" }, 401);
+    if (!signature || !constantTimeEqual(signature, expected)) return json({ error: "invalid_signature" }, 401);
 
     const event = JSON.parse(payloadText);
     if (event?.event !== "charge.success") return json({ success: true, ignored: true });
@@ -46,7 +57,7 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const reference: string | undefined = event?.data?.reference;
-    if (!reference) return json({ success: true, ignored: true });
+    if (!reference || !/^[A-Za-z0-9_-]{10,120}$/.test(reference)) return json({ success: true, ignored: true });
 
     const { data: payment } = await admin
       .from("subscription_payments")
@@ -58,7 +69,7 @@ Deno.serve(async (req) => {
     const result = await activatePayment(admin, payment, event, reference);
     return json({ success: true, ...result });
   } catch (error) {
-    console.error("paystack-webhook error", error);
-    return json({ error: String((error as Error)?.message ?? error) }, 500);
+    console.error("[paystack-webhook] error", error instanceof Error ? error.name : "unknown_error");
+    return json({ error: "request_failed" }, 500);
   }
 });

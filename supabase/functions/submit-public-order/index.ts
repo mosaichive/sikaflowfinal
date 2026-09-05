@@ -4,6 +4,7 @@
 // business owner + staff-with-orders-access. Fire-and-forget SMS.
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
+const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
 
 const recentSubmissions = new Map<string, number>();
 function dedupeKey(slug: string, phone: string, total: number) {
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
     const paymentName = String(body?.payment_name ?? '').trim().slice(0, 120);
     const paymentReference = String(body?.payment_reference ?? '').trim().slice(0, 80);
 
-    if (!slug || !customerName || !customerPhoneRaw || items.length === 0) {
+    if (!slug || !customerName || !customerPhoneRaw || items.length === 0 || items.length > 50) {
       return json({ ok: false, reason: 'missing_fields' }, 400);
     }
 
@@ -59,13 +60,14 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await admin
       .from('profiles')
-      .select('id, business_name, online_ordering_enabled, phone, sms_notify_new_order, store_default_delivery_fee, store_payment_methods, store_allow_pickup, store_allow_delivery, orders_auto_publish_products')
+      .select('id, user_id, business_id, business_name, online_ordering_enabled, phone, sms_notify_new_order, store_default_delivery_fee, store_payment_methods, store_allow_pickup, store_allow_delivery, orders_auto_publish_products')
       .eq('store_slug', slug)
       .maybeSingle();
-    if (!profile || profile.online_ordering_enabled !== true) {
+    if (!profile?.business_id || profile.online_ordering_enabled !== true) {
       return json({ ok: false, reason: 'store_unavailable' }, 404);
     }
-    const businessId = profile.id as string;
+    const businessId = profile.business_id as string;
+    const ownerUserId = profile.user_id as string;
 
     if (fulfillmentType === 'pickup' && profile.store_allow_pickup === false) {
       return json({ ok: false, reason: 'pickup_disabled' }, 400);
@@ -78,11 +80,13 @@ Deno.serve(async (req) => {
     }
 
     const productIds = items.map((it: any) => String(it?.product_id ?? '')).filter(Boolean);
-    if (productIds.length === 0) return json({ ok: false, reason: 'invalid_items' }, 400);
+    if (productIds.length === 0 || new Set(productIds).size !== productIds.length) {
+      return json({ ok: false, reason: 'invalid_items' }, 400);
+    }
     const { data: products } = await admin
       .from('products')
-      .select('id, name, price, cost, stock, available_online, is_archived')
-      .eq('user_id', businessId)
+      .select('id, name, sku, selling_price, cost_price, stock, available_online, is_archived')
+      .eq('business_id', businessId)
       .in('id', productIds);
 
     const autoPublish = profile.orders_auto_publish_products !== false;
@@ -91,27 +95,30 @@ Deno.serve(async (req) => {
     let subtotal = 0;
     for (const raw of items) {
       const pid = String(raw?.product_id ?? '');
-      const qty = Math.max(1, Math.floor(Number(raw?.quantity ?? 0)));
+      const qty = Math.floor(Number(raw?.quantity ?? 0));
       const product = productMap.get(pid);
-      if (!product || product.is_archived) {
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 1000 || !product || product.is_archived) {
         return json({ ok: false, reason: 'product_unavailable', product_id: pid }, 400);
       }
       if (!autoPublish && product.available_online !== true) {
         return json({ ok: false, reason: 'product_unavailable', product_id: pid }, 400);
       }
-      if (Number(product.stock ?? 0) <= 0) {
+      if (Number(product.stock ?? 0) < qty) {
         return json({ ok: false, reason: 'out_of_stock', product_id: pid }, 400);
       }
-      const price = Number(product.price ?? 0);
+      const price = Number(product.selling_price ?? 0);
+      if (!Number.isFinite(price) || price < 0) return json({ ok: false, reason: 'product_unavailable' }, 400);
       const line_total = price * qty;
       subtotal += line_total;
       orderItems.push({
         business_id: businessId,
+        user_id: ownerUserId,
         product_id: pid,
         product_name: product.name,
+        sku: product.sku || '',
         quantity: qty,
         unit_price: price,
-        cost_price: Number(product.cost ?? 0),
+        cost_price: Number(product.cost_price ?? 0),
         line_total,
       });
     }
@@ -131,12 +138,21 @@ Deno.serve(async (req) => {
 
     const key = dedupeKey(slug, customerPhone, total);
     if (seenRecently(key)) return json({ ok: false, reason: 'duplicate_submission' }, 409);
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'public_order_submit',
+      entity: `${slug}|${customerPhone}`,
+      limit: 5,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
     recentSubmissions.set(key, Date.now());
 
     const { data: order, error: orderErr } = await admin
       .from('orders')
       .insert({
         business_id: businessId,
+        user_id: ownerUserId,
         customer_name: customerName,
         customer_phone: customerPhone,
         delivery_location: fulfillmentType === 'delivery' ? (deliveryLocation || null) : null,
@@ -160,16 +176,16 @@ Deno.serve(async (req) => {
       .single();
 
     if (orderErr || !order) {
-      console.error('[submit-public-order] order insert failed', orderErr);
-      return json({ ok: false, reason: 'order_create_failed', error: orderErr?.message }, 500);
+      console.error('[submit-public-order] order insert failed', orderErr?.code || 'unknown');
+      return json({ ok: false, reason: 'order_create_failed' }, 500);
     }
 
     const itemRows = orderItems.map((r) => ({ ...r, order_id: order.id }));
     const { error: itemsErr } = await admin.from('order_items').insert(itemRows);
     if (itemsErr) {
-      console.error('[submit-public-order] items insert failed', itemsErr);
+      console.error('[submit-public-order] items insert failed', itemsErr.code || 'unknown');
       await admin.from('orders').delete().eq('id', order.id);
-      return json({ ok: false, reason: 'order_items_failed', error: itemsErr.message }, 500);
+      return json({ ok: false, reason: 'order_items_failed' }, 500);
     }
 
     const trackingUrl = `${PUBLIC_BASE_URL}/track/${order.tracking_code}`;
@@ -189,7 +205,7 @@ Deno.serve(async (req) => {
       const { data: staff } = await admin
         .from('staff_members')
         .select('staff_user_id, permissions, active')
-        .eq('business_owner_id', businessId)
+        .eq('business_id', businessId)
         .eq('active', true);
       const staffIds: string[] = [];
       for (const s of staff ?? []) {
@@ -200,7 +216,7 @@ Deno.serve(async (req) => {
         }
       }
       if (staffIds.length > 0) {
-        const { data: staffProfiles } = await admin.from('profiles').select('id, phone').in('id', staffIds);
+        const { data: staffProfiles } = await admin.from('profiles').select('user_id, phone').in('user_id', staffIds);
         for (const sp of staffProfiles ?? []) {
           const p = normalizePhone(String((sp as any).phone ?? ''));
           if (/^\+\d{9,15}$/.test(p)) recipients.add(p);
@@ -232,7 +248,7 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, tracking_code: order.tracking_code, tracking_url: trackingUrl });
   } catch (err) {
-    console.error('[submit-public-order] unexpected', err);
-    return json({ ok: false, reason: 'unexpected_error', error: err instanceof Error ? err.message : String(err) }, 500);
+    console.error('[submit-public-order] unexpected', err instanceof Error ? err.name : 'unknown_error');
+    return json({ ok: false, reason: 'unexpected_error' }, 500);
   }
 });

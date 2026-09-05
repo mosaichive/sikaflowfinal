@@ -1,6 +1,7 @@
 // Send a 6-digit SMS OTP for phone-based password reset.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAtSms, normalizePhone, hashCode, SmsConfigError, SmsDeliveryError } from '../_shared/at-sms.ts';
+import { consumeRateLimit, redactPhone } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +19,15 @@ Deno.serve(async (req) => {
       return json({ error: 'Please enter a valid phone number (e.g. 0244123456 or +233244123456).' }, 400);
     }
 
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'password_reset_send',
+      entity: phone,
+      limit: 3,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
+
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     const { data: profile } = await admin
@@ -27,7 +37,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!profile || !profile.phone_verified) {
-      console.log('[password-reset-send-otp] unknown or unverified phone (returning success)', { phone });
+      console.log('[password-reset-send-otp] generic response for unavailable phone', { phone: redactPhone(phone) });
       return json({ success: true });
     }
 
@@ -42,13 +52,14 @@ Deno.serve(async (req) => {
       return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const random = crypto.getRandomValues(new Uint32Array(1))[0];
+    const code = String(100000 + (random % 900000));
     const code_hash = await hashCode(code);
 
     try {
       await sendAtSms(phone, `Your KudiTrack password reset code is ${code}. It expires in 10 minutes.`);
     } catch (err) {
-      console.error('[password-reset-send-otp] sms failed', { phone, err });
+      console.error('[password-reset-send-otp] sms failed', { phone: redactPhone(phone), kind: err instanceof Error ? err.name : 'unknown_error' });
       if (err instanceof SmsConfigError) return json({ error: err.message, kind: 'config' }, 503);
       if (err instanceof SmsDeliveryError) return json({ error: err.message, kind: 'delivery' }, 502);
       return json({ error: 'Could not send the verification code. Please try again.' }, 502);
@@ -63,7 +74,7 @@ Deno.serve(async (req) => {
 
     return json({ success: true });
   } catch (err) {
-    console.error('[password-reset-send-otp] internal error', err);
-    return json({ error: (err as Error).message || 'Internal error' }, 500);
+    console.error('[password-reset-send-otp] internal error', err instanceof Error ? err.name : 'unknown_error');
+    return json({ error: 'Could not process the reset request.' }, 500);
   }
 });

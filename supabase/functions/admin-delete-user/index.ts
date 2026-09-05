@@ -1,7 +1,6 @@
 // Permanently remove a non-Super-Admin account and any business it owns.
 // Database foreign keys perform the tenant-data cleanup in the Auth delete
-// transaction. Storage objects are removed first because Storage is external
-// to that database transaction.
+// transaction. Storage cleanup follows only after that transaction succeeds.
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
 
 const corsHeaders = {
@@ -178,14 +177,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    const storageObjectsRemoved = await removeStorageObjects(admin, storagePrefixes);
-
     // Deleting auth.users is the transactional boundary: owner_user_id cascades
     // to the business, and business_id cascades clear tenant-owned records.
     const { error: deleteError } = await admin.auth.admin.deleteUser(targetId, false);
     if (deleteError) {
       console.error("[admin-delete-user] Auth deletion failed", deleteError.message);
       return json({ error: "The account could not be deleted. No database records were removed." }, 500);
+    }
+
+    let storageObjectsRemoved = 0;
+    let storageCleanupPending = false;
+    try {
+      storageObjectsRemoved = await removeStorageObjects(admin, storagePrefixes);
+    } catch (storageError) {
+      storageCleanupPending = true;
+      console.error(
+        "[admin-delete-user] Storage cleanup failed after account deletion",
+        storageError instanceof Error ? storageError.message : "unknown_error",
+      );
     }
 
     const deletedBusinessIds = [...businessIds];
@@ -198,6 +207,7 @@ Deno.serve(async (req) => {
         deleted_user_id: targetId,
         deleted_business_ids: deletedBusinessIds,
         storage_objects_removed: storageObjectsRemoved,
+        storage_cleanup_pending: storageCleanupPending,
       },
     });
     if (auditError) console.error("[admin-delete-user] Audit insert failed", auditError.message);
@@ -207,6 +217,7 @@ Deno.serve(async (req) => {
       message: "User account and owned business data were permanently deleted.",
       deleted_businesses: deletedBusinessIds.length,
       storage_objects_removed: storageObjectsRemoved,
+      storage_cleanup_pending: storageCleanupPending,
     });
   } catch (error) {
     console.error("[admin-delete-user] Request failed", error);

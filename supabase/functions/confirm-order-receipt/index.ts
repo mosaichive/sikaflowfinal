@@ -3,6 +3,7 @@
 // orders access by SMS. Fire-and-forget SMS.
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,13 +23,21 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const code = String(body?.code ?? '').trim();
-    if (!code) return json({ ok: false, reason: 'missing_code' }, 400);
+    if (!/^KT-[A-F0-9]{12}$/.test(code.toUpperCase())) return json({ ok: false, reason: 'invalid_code' }, 400);
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'order_receipt_confirm',
+      entity: code.toUpperCase(),
+      limit: 8,
+      windowSeconds: 900,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
 
     const admin = adminClient();
     const { data: res, error } = await admin.rpc('public_confirm_order_receipt_by_code' as any, { _code: code });
     if (error) {
-      console.error('[confirm-order-receipt] rpc error', error);
-      return json({ ok: false, reason: 'rpc_error', error: error.message }, 500);
+      console.error('[confirm-order-receipt] rpc error', error.code || 'unknown');
+      return json({ ok: false, reason: 'rpc_error' }, 500);
     }
     const r = res as any;
     if (!r?.ok) return json(r ?? { ok: false, reason: 'unknown' }, 400);
@@ -39,14 +48,21 @@ Deno.serve(async (req) => {
       const customerName = String(r.customer_name || 'A customer');
       const trackingCode = String(r.tracking_code || code);
 
-      const { data: profile } = await admin
-        .from('profiles')
-        .select('business_name, phone, sms_notify_order_status')
+      const { data: business } = await admin
+        .from('businesses')
+        .select('owner_user_id, name')
         .eq('id', businessId)
         .maybeSingle();
+      const { data: profile } = business?.owner_user_id
+        ? await admin
+          .from('profiles')
+          .select('business_name, phone, sms_notify_order_status')
+          .eq('user_id', business.owner_user_id)
+          .maybeSingle()
+        : { data: null };
 
       if ((profile as any)?.sms_notify_order_status !== false) {
-        const businessName = (profile as any)?.business_name?.trim() || 'your store';
+        const businessName = (profile as any)?.business_name?.trim() || business?.name?.trim() || 'your store';
         const msg = `${customerName} confirmed delivery of order #${trackingCode}. It is now Completed on ${businessName}.`;
 
         const recipients = new Set<string>();
@@ -55,7 +71,7 @@ Deno.serve(async (req) => {
 
         const { data: staff } = await admin
           .from('staff_members').select('staff_user_id, permissions, active')
-          .eq('business_owner_id', businessId).eq('active', true);
+          .eq('business_id', businessId).eq('active', true);
         const staffIds: string[] = [];
         for (const s of staff ?? []) {
           const perms = (s as any).permissions || {};
@@ -65,7 +81,7 @@ Deno.serve(async (req) => {
           }
         }
         if (staffIds.length > 0) {
-          const { data: sp } = await admin.from('profiles').select('id, phone').in('id', staffIds);
+          const { data: sp } = await admin.from('profiles').select('user_id, phone').in('user_id', staffIds);
           for (const p of sp ?? []) {
             const ph = normalizePhone(String((p as any).phone ?? ''));
             if (/^\+\d{9,15}$/.test(ph)) recipients.add(ph);
@@ -85,7 +101,7 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, already: !!r.already });
   } catch (err) {
-    console.error('[confirm-order-receipt] unexpected', err);
-    return json({ ok: false, reason: 'unexpected_error', error: err instanceof Error ? err.message : String(err) }, 500);
+    console.error('[confirm-order-receipt] unexpected', err instanceof Error ? err.name : 'unknown_error');
+    return json({ ok: false, reason: 'unexpected_error' }, 500);
   }
 });

@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils';
 interface Announcement {
   id: string;
   title: string;
-  message: string;
-  priority: string;
+  body: string;
+  level: string;
 }
 
 const dismissedKey = (id: string) => `ann_dismissed_${id}`;
@@ -27,10 +27,10 @@ export function SubscriptionBanner({ showAnnouncements = true }: { showAnnouncem
 
     (async () => {
       const { data } = await supabase
-        .from('announcements')
-        .select('id,title,message,priority')
-        .lte('publish_at', new Date().toISOString())
-        .order('publish_at', { ascending: false })
+        .from('platform_announcements')
+        .select('id,title,body,level')
+        .lte('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: false })
         .limit(5);
       const list = ((data ?? []) as unknown) as Announcement[];
       setAnns(list.filter((a) => !localStorage.getItem(dismissedKey(a.id))));
@@ -86,20 +86,20 @@ export function SubscriptionBanner({ showAnnouncements = true }: { showAnnouncem
 
       {anns.map((a) => {
         const tone =
-          a.priority === 'critical' ? 'border-destructive/40 bg-destructive/5'
-          : a.priority === 'high' ? 'border-amber-500/40 bg-amber-500/5'
+          a.level === 'critical' ? 'border-destructive/40 bg-destructive/5'
+          : a.level === 'warning' ? 'border-amber-500/40 bg-amber-500/5'
           : 'border-border bg-muted/30';
-        const Icon = a.priority === 'critical' ? AlertTriangle : a.priority === 'high' ? Megaphone : Info;
+        const Icon = a.level === 'critical' ? AlertTriangle : a.level === 'warning' ? Megaphone : Info;
         const iconColor =
-          a.priority === 'critical' ? 'text-destructive'
-          : a.priority === 'high' ? 'text-amber-500'
+          a.level === 'critical' ? 'text-destructive'
+          : a.level === 'warning' ? 'text-amber-500'
           : 'text-primary';
         return (
           <div key={a.id} className={cn('rounded-lg border p-3 flex items-start gap-3', tone)}>
             <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', iconColor)} />
             <div className="flex-1 text-xs">
               <p className="font-semibold text-foreground">{a.title}</p>
-              {a.message && <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">{a.message}</p>}
+              {a.body && <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">{a.body}</p>}
             </div>
             <button onClick={() => dismiss(a.id)} className="text-muted-foreground hover:text-foreground" aria-label="Dismiss">
               <X className="h-3.5 w-3.5" />

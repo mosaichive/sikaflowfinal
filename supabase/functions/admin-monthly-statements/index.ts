@@ -51,20 +51,26 @@ async function loadSettings(admin: ReturnType<typeof serviceClient>) {
   };
 }
 
-async function ownerDisplayName(admin: ReturnType<typeof serviceClient>, businessId: string) {
-  const { data } = await admin
-    .from("profiles").select("display_name, business_name").eq("id", businessId).maybeSingle();
-  return (data?.display_name || data?.business_name || null) as string | null;
+async function resolveBusinessId(admin: ReturnType<typeof serviceClient>, selector: string) {
+  const { data: direct } = await admin.from("businesses").select("id").eq("id", selector).maybeSingle();
+  if (direct?.id) return direct.id as string;
+  const { data: owned } = await admin
+    .from("businesses")
+    .select("id")
+    .eq("owner_user_id", selector)
+    .limit(1)
+    .maybeSingle();
+  return (owned?.id as string | undefined) ?? null;
 }
 
 /** Statements are sensitive, so the recipient must be the confirmed auth email. */
 async function isEmailVerified(
   admin: ReturnType<typeof serviceClient>,
-  businessId: string,
+  ownerUserId: string,
   recipient: string,
 ) {
   try {
-    const { data } = await admin.auth.admin.getUserById(businessId);
+    const { data } = await admin.auth.admin.getUserById(ownerUserId);
     const authUser = data?.user;
     if (!authUser?.email_confirmed_at) return false;
     return (authUser.email ?? "").toLowerCase() === recipient.toLowerCase();
@@ -81,8 +87,9 @@ async function generateAndSend(
 ) {
   const period = resolvePeriod(periodKey);
   const data = await buildStatementData(admin, businessId, period);
+  const resolvedBusinessId = data.business.id;
   const recipient = (opts.to ?? data.business.email ?? "").trim();
-  const displayName = await ownerDisplayName(admin, businessId);
+  const displayName = data.business.ownerName;
 
   const pdf = await renderStatementPdf(data);
   const totals = {
@@ -95,7 +102,7 @@ async function generateAndSend(
   if (!recipient) {
     if (opts.log) {
       await admin.from("statement_deliveries").upsert({
-        business_id: businessId,
+        business_id: resolvedBusinessId,
         business_name: data.business.name,
         email: "",
         period: period.period,
@@ -109,10 +116,10 @@ async function generateAndSend(
   }
 
   // Financial statements only ever go to a verified account email.
-  if (!opts.test && !(await isEmailVerified(admin, businessId, recipient))) {
+  if (!opts.test && !(await isEmailVerified(admin, data.business.ownerUserId, recipient))) {
     if (opts.log) {
       await admin.from("statement_deliveries").upsert({
-        business_id: businessId,
+        business_id: resolvedBusinessId,
         business_name: data.business.name,
         email: recipient,
         period: period.period,
@@ -138,13 +145,13 @@ async function generateAndSend(
     const { data: existing } = await admin
       .from("statement_deliveries")
       .select("id, retry_count")
-      .eq("business_id", businessId)
+      .eq("business_id", resolvedBusinessId)
       .eq("period", period.period)
       .maybeSingle();
 
     await admin.from("statement_deliveries").upsert({
       ...(existing?.id ? { id: existing.id } : {}),
-      business_id: businessId,
+      business_id: resolvedBusinessId,
       business_name: data.business.name,
       email: recipient,
       period: period.period,
@@ -163,9 +170,6 @@ async function generateAndSend(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!RESEND_API_KEY) {
-    return json({ error: "email provider not configured" }, 500);
-  }
 
   try {
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -199,6 +203,8 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (!RESEND_API_KEY) return json({ error: "email provider not configured" }, 503);
+
       if (!owner.email_confirmed_at) {
         return json({ error: "Please verify your email address to receive your monthly financial statement." }, 400);
       }
@@ -225,6 +231,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "test") {
+      if (!RESEND_API_KEY) return json({ error: "email provider not configured" }, 503);
       const res = await generateAndSend(admin, String((body as any).business_id), (body as any).period ?? null, {
         to: String((body as any).to ?? ""),
         from_name: settings.from_name,
@@ -236,6 +243,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "resend") {
+      if (!RESEND_API_KEY) return json({ error: "email provider not configured" }, 503);
       const { data: delivery } = await admin
         .from("statement_deliveries")
         .select("*")
@@ -252,6 +260,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "run") {
+      if (!RESEND_API_KEY) return json({ error: "email provider not configured" }, 503);
       const periodKey = ((body as any).period as string | null) ?? null;
       const period = resolvePeriod(periodKey);
       if (isCron && !settings.automation_enabled) {
@@ -264,12 +273,16 @@ Deno.serve(async (req) => {
       if (!ids.length) {
         const { data: profiles } = await admin
           .from("profiles")
-          .select("id")
+          .select("business_id")
           .not("email", "is", null)
+          .not("business_id", "is", null)
           .eq("suspended", false)
           .eq("monthly_statement_enabled", true)
           .limit(20000);
-        ids = (profiles ?? []).map((p: any) => p.id);
+        ids = (profiles ?? []).map((p: any) => p.business_id).filter(Boolean);
+      } else {
+        const resolved = await Promise.all(ids.map((id) => resolveBusinessId(admin, id)));
+        ids = resolved.filter((id): id is string => Boolean(id));
       }
 
       // Skip businesses already sent for this period unless a resend is forced.
@@ -299,7 +312,7 @@ Deno.serve(async (req) => {
           else failed++;
         } catch (e) {
           failed++;
-          console.error("statement failed for", id, e);
+          console.error("statement failed", { businessId: id, kind: e instanceof Error ? e.name : "unknown_error" });
           await admin.from("statement_deliveries").upsert({
             business_id: id,
             email: "",

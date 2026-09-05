@@ -1,5 +1,5 @@
 // Shared Paystack helpers used by paystack-verify and paystack-webhook.
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { notifySuperAdmin } from "./super-admin-sms.ts";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -51,7 +51,10 @@ export async function activatePayment(
   }
 
   const amountPaid = typeof verifyData?.data?.amount === "number" ? verifyData.data.amount / 100 : 0;
+  const gatewayReference = String(verifyData?.data?.reference ?? "");
+  const gatewayCurrency = String(verifyData?.data?.currency ?? "").toUpperCase();
   const metadataUserId = verifyData?.data?.metadata?.user_id;
+  const metadataPaymentId = verifyData?.data?.metadata?.payment_id;
   const metadataCycle = (verifyData?.data?.metadata?.cycle === "annual" ? "annual" : "monthly") as "monthly" | "annual";
   // Derive cycle for legacy plans from the plan name itself.
   const cycle: "monthly" | "annual" =
@@ -60,6 +63,16 @@ export async function activatePayment(
   const pricing = await resolvePlanPricing(admin, payment.plan, cycle);
   const expectedAmount = pricing?.amount ?? Number(payment.amount);
   const days = pricing?.days ?? 30;
+
+  if (gatewayReference !== reference || gatewayCurrency !== "GHS" || (metadataPaymentId && metadataPaymentId !== payment.id)) {
+    await admin.from("subscription_payments").update({
+      status: "review",
+      note: "Gateway transaction metadata mismatch",
+      amount_paid: amountPaid,
+      provider_response: verifyData,
+    }).eq("id", payment.id);
+    return { status: "review", expires_at: null, reason: "gateway_metadata_mismatch" };
+  }
 
   if (Math.abs(amountPaid - expectedAmount) > 0.01) {
     await admin.from("subscription_payments").update({

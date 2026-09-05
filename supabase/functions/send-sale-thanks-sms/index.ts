@@ -4,6 +4,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,21 +35,52 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const saleId = String(body?.sale_id ?? '').trim();
-    if (!saleId) return json({ ok: false, reason: 'missing_sale_id' }, 400);
+    if (!/^[0-9a-f-]{36}$/i.test(saleId)) return json({ ok: false, reason: 'invalid_sale_id' }, 400);
+
+    const callerId = ures.user.id;
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'sale_thanks_sms',
+      entity: `${callerId}|${saleId}`,
+      limit: 5,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
 
     const admin = adminClient();
     const { data: sale, error: saleErr } = await admin
       .from('sales')
-      .select('id, user_id, total, amount_paid, balance, due_date, payment_status, customer_phone, customer_name')
+      .select('id, business_id, total, amount_paid, balance, due_date, payment_status, customer_phone, customer_name')
       .eq('id', saleId)
       .maybeSingle();
     if (saleErr || !sale) return json({ ok: false, reason: 'sale_not_found' });
 
-    const ownerId = sale.user_id as string;
+    const businessId = sale.business_id as string;
+    const { data: business } = await admin
+      .from('businesses')
+      .select('id, owner_user_id, name')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (!business?.owner_user_id) return json({ ok: false, reason: 'business_not_found' }, 404);
+
+    if (callerId !== business.owner_user_id) {
+      const { data: membership } = await admin
+        .from('staff_members')
+        .select('permissions')
+        .eq('business_id', businessId)
+        .eq('staff_user_id', callerId)
+        .eq('active', true)
+        .maybeSingle();
+      const permissions = membership?.permissions as { role?: string; modules?: string[] } | null;
+      const allowed = permissions?.role === 'admin' || permissions?.role === 'manager' ||
+        (Array.isArray(permissions?.modules) && permissions.modules.includes('sales'));
+      if (!allowed) return json({ ok: false, reason: 'forbidden' }, 403);
+    }
+
     const { data: profile } = await admin
       .from('profiles')
       .select('business_name, sms_notify_sale_thanks')
-      .eq('id', ownerId)
+      .eq('user_id', business.owner_user_id)
       .maybeSingle();
 
     if (profile && profile.sms_notify_sale_thanks === false) {
@@ -60,7 +92,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, reason: 'no_valid_phone' });
     }
 
-    const businessName = profile?.business_name?.trim() || 'our store';
+    const businessName = profile?.business_name?.trim() || business.name?.trim() || 'our store';
     const total = Number(sale.total ?? 0);
     const paid = Number(sale.amount_paid ?? 0);
     const balance = Number(sale.balance ?? Math.max(0, total - paid));
@@ -79,7 +111,7 @@ Deno.serve(async (req) => {
     try {
       const provider = await sendAtSms(phone, message);
       await logSms({
-        business_id: ownerId,
+        business_id: businessId,
         recipient_phone: phone,
         notification_type: 'sale_thanks',
         message,
@@ -90,9 +122,9 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[send-sale-thanks-sms] send failed', errMsg);
+      console.error('[send-sale-thanks-sms] send failed', err instanceof Error ? err.name : 'unknown_error');
       await logSms({
-        business_id: ownerId,
+        business_id: businessId,
         recipient_phone: phone,
         notification_type: 'sale_thanks',
         message,
@@ -100,7 +132,7 @@ Deno.serve(async (req) => {
         error_message: errMsg,
         reference_id: sale.id,
       });
-      return json({ ok: false, reason: 'send_failed', error: errMsg });
+      return json({ ok: false, reason: 'send_failed' });
     }
   } catch (err) {
     console.error('[send-sale-thanks-sms] unexpected', err);

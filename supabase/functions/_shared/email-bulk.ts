@@ -16,6 +16,19 @@ export function serviceClient(): SupabaseClient {
   );
 }
 
+function tokenAal(token: string): string | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const claims = JSON.parse(atob(padded)) as { aal?: unknown };
+    return typeof claims.aal === 'string' ? claims.aal : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requireSuperAdmin(req: Request): Promise<
   { userId: string; email: string | null } | Response
 > {
@@ -35,11 +48,18 @@ export async function requireSuperAdmin(req: Request): Promise<
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  if (tokenAal(token) !== "aal2") {
+    return new Response(JSON.stringify({ error: "mfa_required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const { data: role } = await admin
     .from("user_roles")
-    .select("id")
+    .select("id, business_id")
     .eq("user_id", userData.user.id)
     .eq("role", "super_admin")
+    .is("business_id", null)
     .maybeSingle();
   if (!role) {
     return new Response(JSON.stringify({ error: "forbidden" }), {

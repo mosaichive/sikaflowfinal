@@ -40,6 +40,7 @@ const describeMaybe = credsAvailable ? describe : describe.skip;
 describeMaybe('sale_items live integration', () => {
   let client: SupabaseClient;
   let userId = '';
+  let businessId = '';
   const createdSaleIds: string[] = [];
 
   beforeAll(async () => {
@@ -54,6 +55,15 @@ describeMaybe('sale_items live integration', () => {
       throw new Error(`Sign-in failed: ${error?.message ?? 'no user'}`);
     }
     userId = data.user.id;
+    const { data: profile, error: profileError } = await client
+      .from('profiles')
+      .select('business_id')
+      .eq('user_id', userId)
+      .single();
+    if (profileError || !profile?.business_id) {
+      throw new Error(`Business lookup failed: ${profileError?.message ?? 'no business'}`);
+    }
+    businessId = profile.business_id;
   }, 30_000);
 
   afterAll(async () => {
@@ -65,28 +75,28 @@ describeMaybe('sale_items live integration', () => {
         .from('sale_items')
         .delete()
         .in('sale_id', createdSaleIds)
-        .eq('user_id', userId);
+        .eq('business_id', businessId);
       await client
         .from('sales')
         .delete()
         .in('id', createdSaleIds)
-        .eq('user_id', userId);
+        .eq('business_id', businessId);
     }
     await client.auth.signOut();
   });
 
-  it('inserts a sale + sale_item without business_id and validates payload', async () => {
+  it('inserts a business-scoped sale and sale item', async () => {
     const now = new Date().toISOString();
 
     // 1. Insert a sale row using ONLY columns the schema actually has.
     const { data: sale, error: saleErr } = await client
       .from('sales')
       .insert({
-        user_id: userId,
+        business_id: businessId,
         sale_date: now,
         customer_name: '[test] vitest live',
+        subtotal: 10,
         total: 10,
-        cost_total: 6,
         amount_paid: 10,
         discount: 0,
         payment_method: 'cash',
@@ -98,12 +108,11 @@ describeMaybe('sale_items live integration', () => {
     expect(sale?.id).toBeTruthy();
     if (sale?.id) createdSaleIds.push(sale.id);
 
-    // 2. Validate the sale_item payload up front. We send a multi-tenant
-    // shape (with business_id, cost_price, line_total) to prove the
-    // normalizer + validator handle it.
+    // Validate the compatibility payload used by SalesPage. It includes both
+    // legacy aliases and the current business-scoped columns.
     const rawPayload = {
       user_id: userId,
-      business_id: 'should-be-dropped-by-schema-tolerant-insert',
+      business_id: businessId,
       sale_id: sale!.id,
       product_name: '[test] vitest item',
       quantity: 1,
@@ -117,13 +126,11 @@ describeMaybe('sale_items live integration', () => {
     }
     expect(validation.ok).toBe(true);
 
-    // 3. Insert the sale_item directly (mirrors what insertSaleItemRecord
-    // does, minus the optional-column fallback). business_id will fail
-    // the insert if we don't drop it.
+    // Insert the current production shape after dropping legacy aliases.
     const normalized = normalizeSaleItemPayload(rawPayload);
-    delete normalized.business_id; // single-tenant schema doesn't have it
-    delete normalized.cost_price;
-    delete normalized.line_total;
+    delete normalized.user_id;
+    delete normalized.unit_cost;
+    delete normalized.total;
 
     const { data: item, error: itemErr } = await client
       .from('sale_items')
@@ -133,7 +140,8 @@ describeMaybe('sale_items live integration', () => {
 
     expect(itemErr, itemErr?.message ?? '').toBeNull();
     expect(item).toBeTruthy();
-    expect(Number(item!.unit_cost)).toBe(6);
+    expect(item!.business_id).toBe(businessId);
+    expect(Number(item!.cost_price)).toBe(6);
     expect(Number(item!.unit_price)).toBe(10);
     expect(Number(item!.quantity)).toBe(1);
   }, 30_000);

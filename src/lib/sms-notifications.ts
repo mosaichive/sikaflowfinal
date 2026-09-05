@@ -68,25 +68,10 @@ export function isPhoneSendable(phone: string | null | undefined): boolean {
 
 export async function notifyTeamInvite(
   inviteId: string,
-  phone: string,
-  inviteUrl: string,
   toast?: ToastFn,
 ) {
-  if (!inviteId || !phone || !inviteUrl) return;
-  const normalized = normalizeGhanaPhone(phone);
-  if (!isValidE164(normalized)) {
-    toast?.({
-      title: 'Invitation created, but SMS could not be sent.',
-      description: 'The phone number does not look valid.',
-      variant: 'destructive',
-    });
-    return;
-  }
-  const res = await invoke('send-team-invite-sms', {
-    invite_id: inviteId,
-    phone: normalized,
-    invite_url: inviteUrl,
-  });
+  if (!inviteId) return;
+  const res = await invoke('send-team-invite-sms', { invite_id: inviteId });
   if (!res.ok && toast && !SILENT_REASONS.has(res.reason ?? '')) {
     toast({
       title: 'Invitation created, but SMS could not be sent.',

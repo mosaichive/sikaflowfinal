@@ -4,6 +4,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,15 +34,25 @@ Deno.serve(async (req) => {
     );
     const { data: ures } = await userClient.auth.getUser();
     if (!ures?.user) return json({ ok: false, reason: 'unauthorized' }, 401);
+    const callerId = ures.user.id;
 
     const body = await req.json().catch(() => ({}));
     const productId = String(body?.product_id ?? '').trim();
-    if (!productId) return json({ ok: false, reason: 'missing_product_id' }, 400);
+    if (!/^[0-9a-f-]{36}$/i.test(productId)) return json({ ok: false, reason: 'invalid_product_id' }, 400);
+
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'low_stock_sms',
+      entity: `${callerId}|${productId}`,
+      limit: 5,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
 
     const admin = adminClient();
     const { data: product } = await admin
       .from('products')
-      .select('id, user_id, name, stock, low_stock_threshold')
+      .select('id, business_id, name, stock, low_stock_threshold')
       .eq('id', productId)
       .maybeSingle();
     if (!product) return json({ ok: false, reason: 'product_not_found' });
@@ -51,11 +62,32 @@ Deno.serve(async (req) => {
     if (!threshold || threshold <= 0) return json({ ok: false, reason: 'no_threshold' });
     if (stock > threshold) return json({ ok: false, reason: 'above_threshold' });
 
-    const ownerId = product.user_id as string;
+    const businessId = product.business_id as string;
+    const { data: business } = await admin
+      .from('businesses')
+      .select('id, owner_user_id, name')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (!business?.owner_user_id) return json({ ok: false, reason: 'business_not_found' }, 404);
+
+    if (callerId !== business.owner_user_id) {
+      const { data: membership } = await admin
+        .from('staff_members')
+        .select('permissions')
+        .eq('business_id', businessId)
+        .eq('staff_user_id', callerId)
+        .eq('active', true)
+        .maybeSingle();
+      const permissions = membership?.permissions as { role?: string; modules?: string[] } | null;
+      const allowed = permissions?.role === 'admin' || permissions?.role === 'manager' ||
+        (Array.isArray(permissions?.modules) && permissions.modules.includes('inventory'));
+      if (!allowed) return json({ ok: false, reason: 'forbidden' }, 403);
+    }
+
     const { data: profile } = await admin
       .from('profiles')
       .select('business_name, phone, sms_notify_low_stock')
-      .eq('id', ownerId)
+      .eq('user_id', business.owner_user_id)
       .maybeSingle();
     if (profile && profile.sms_notify_low_stock === false) {
       return json({ ok: false, reason: 'disabled' });
@@ -66,7 +98,7 @@ Deno.serve(async (req) => {
     const { data: recent } = await admin
       .from('sms_logs')
       .select('id')
-      .eq('business_id', ownerId)
+      .eq('business_id', businessId)
       .eq('notification_type', 'low_stock')
       .eq('reference_id', product.id)
       .eq('status', 'sent')
@@ -84,7 +116,7 @@ Deno.serve(async (req) => {
     const { data: staff } = await admin
       .from('staff_members')
       .select('staff_user_id, permissions, active')
-      .eq('business_owner_id', ownerId)
+      .eq('business_id', businessId)
       .eq('active', true);
     const staffIds = (staff ?? [])
       .filter((s: any) => {
@@ -95,8 +127,8 @@ Deno.serve(async (req) => {
     if (staffIds.length > 0) {
       const { data: staffProfiles } = await admin
         .from('profiles')
-        .select('id, phone')
-        .in('id', staffIds);
+        .select('user_id, phone')
+        .in('user_id', staffIds);
       for (const sp of staffProfiles ?? []) {
         if (!sp.phone) continue;
         const n = normalizePhone(sp.phone);
@@ -106,7 +138,7 @@ Deno.serve(async (req) => {
 
     if (recipients.size === 0) return json({ ok: false, reason: 'no_recipients' });
 
-    const businessName = profile?.business_name?.trim() || 'your business';
+    const businessName = profile?.business_name?.trim() || business.name?.trim() || 'your business';
     const message = `Low stock alert: ${product.name} has only ${stock} left in ${businessName}. Please restock soon.`;
 
     let sentCount = 0;
@@ -115,7 +147,7 @@ Deno.serve(async (req) => {
         const provider = await sendAtSms(phone, message);
         sentCount++;
         await logSms({
-          business_id: ownerId,
+          business_id: businessId,
           recipient_phone: phone,
           notification_type: 'low_stock',
           message,
@@ -125,9 +157,9 @@ Deno.serve(async (req) => {
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        console.error('[send-low-stock-alert] send failed', { phone, errMsg });
+        console.error('[send-low-stock-alert] send failed', err instanceof Error ? err.name : 'unknown_error');
         await logSms({
-          business_id: ownerId,
+          business_id: businessId,
           recipient_phone: phone,
           notification_type: 'low_stock',
           message,

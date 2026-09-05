@@ -3,6 +3,7 @@
 // which signs the user in so they can continue immediately.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizePhone, hashCode } from '../_shared/at-sms.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,11 +23,19 @@ function validatePassword(pw: string): string | null {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { phone: rawPhone, otp, new_password, redirect_to } = await req.json();
+    const { phone: rawPhone, otp, new_password } = await req.json();
     const phone = normalizePhone(rawPhone);
     if (!phone || !otp || !new_password) return json({ error: 'Phone, code and new password required' }, 400);
     const pwErr = validatePassword(String(new_password));
     if (pwErr) return json({ error: pwErr }, 400);
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'password_reset_verify',
+      entity: phone,
+      limit: 8,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ error: 'Invalid or expired code.' }, 429);
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -82,21 +91,9 @@ Deno.serve(async (req) => {
       return json({ error: 'Could not update password.' }, 500);
     }
 
-    // Generate a magic link so the user is signed in after the reset.
-    const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: profile.email,
-      options: { redirectTo: redirect_to || undefined },
-    });
-    if (linkErr || !link?.properties?.action_link) {
-      console.error('generateLink failed', linkErr);
-      // Password is set; user can sign in manually.
-      return json({ success: true });
-    }
-
-    return json({ success: true, action_link: link.properties.action_link });
+    return json({ success: true });
   } catch (err) {
-    console.error('password-reset-verify-otp error:', err);
-    return json({ error: (err as Error).message || 'Internal error' }, 500);
+    console.error('[password-reset-verify-otp] error', err instanceof Error ? err.name : 'unknown_error');
+    return json({ error: 'Could not reset the password.' }, 500);
   }
 });

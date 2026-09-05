@@ -2,6 +2,7 @@
 // Public endpoint with strict input validation and per-IP rate limiting.
 // SMS is fire-and-forget; provider errors are never returned to the caller.
 import { notifySuperAdmin } from "../_shared/super-admin-sms.ts";
+import { consumeRateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +22,6 @@ const TYPE_LABELS: Record<string, string> = {
 
 const MAX_SENDER_LEN = 80;
 const MAX_PREVIEW_LEN = 120;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 10;
-
-const rateBuckets = new Map<string, { count: number; reset: number }>();
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -37,43 +34,26 @@ function clean(s: unknown, max: number): string {
   return String(s ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
 }
 
-function clientKey(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for") || "";
-  const ip = fwd.split(",")[0].trim() || req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
-  return ip;
-}
-
-function rateLimited(key: string): boolean {
-  const now = Date.now();
-  const bucket = rateBuckets.get(key);
-  if (!bucket || bucket.reset < now) {
-    rateBuckets.set(key, { count: 1, reset: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > RATE_LIMIT_MAX;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false }, 405);
 
-  const key = clientKey(req);
-  if (rateLimited(key)) {
-    console.warn("[notify-admin-event] rate_limited", { key });
+  const withinLimit = await consumeRateLimit({ req, action: "notify_admin_event", limit: 10, windowSeconds: 60 });
+  if (!withinLimit) {
+    console.warn("[notify-admin-event] rate_limited");
     return json({ ok: false, reason: "rate_limited" }, 429);
   }
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch {
-    console.warn("[notify-admin-event] bad_json", { key });
+    console.warn("[notify-admin-event] bad_json");
     return json({ ok: false, reason: "bad_json" }, 400);
   }
 
   const rawType = clean(body.type, 40).toLowerCase().replace(/[^a-z_]/g, "");
   const label = TYPE_LABELS[rawType];
   if (!label) {
-    console.warn("[notify-admin-event] invalid_type", { key, rawType });
+    console.warn("[notify-admin-event] invalid_type", { rawType });
     return json({ ok: false, reason: "invalid_type" }, 400);
   }
 
@@ -82,11 +62,11 @@ Deno.serve(async (req) => {
   // Optional caller-supplied preview snippet — strictly sanitised & truncated.
   const previewRaw = clean(body.preview ?? body.subject ?? "", 500);
   if (body.preview !== undefined && previewRaw.length === 0) {
-    console.warn("[notify-admin-event] empty_message", { key });
+    console.warn("[notify-admin-event] empty_message");
     return json({ ok: false, reason: "empty_message" }, 400);
   }
   if (previewRaw.length > MAX_PREVIEW_LEN * 3) {
-    console.warn("[notify-admin-event] oversized_message", { key });
+    console.warn("[notify-admin-event] oversized_message");
     return json({ ok: false, reason: "oversized_message" }, 413);
   }
   const preview = previewRaw.slice(0, MAX_PREVIEW_LEN);

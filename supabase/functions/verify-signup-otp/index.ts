@@ -2,6 +2,7 @@
 // On success: sets profiles.phone_verified = true (and stores phone if not yet set).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizePhone, hashCode } from '../_shared/at-sms.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +34,14 @@ Deno.serve(async (req) => {
     const { phone: rawPhone, otp } = await req.json();
     const phone = normalizePhone(rawPhone);
     if (!phone || !otp) return json({ error: 'Phone and OTP required' }, 400);
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'signup_otp_verify',
+      entity: `${user.id}|${phone}`,
+      limit: 8,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ error: 'Too many attempts. Request a new code.' }, 429);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const code_hash = await hashCode(String(otp));
@@ -82,7 +91,7 @@ Deno.serve(async (req) => {
 
     return json({ success: true });
   } catch (err) {
-    console.error('verify-signup-otp error:', err);
-    return json({ error: (err as Error).message || 'Internal error' }, 500);
+    console.error('[verify-signup-otp] error', err instanceof Error ? err.name : 'unknown_error');
+    return json({ error: 'Could not verify the code.' }, 500);
   }
 });

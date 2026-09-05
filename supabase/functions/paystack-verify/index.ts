@@ -1,7 +1,8 @@
 // Verify a Paystack reference and activate the user's plan if it succeeded.
 // Idempotent — safe to call repeatedly while polling.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { activatePayment, PAYSTACK_BASE } from "../_shared/paystack.ts";
+import { consumeRateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,8 +38,16 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "unauthorized" }, 401);
 
     const body = await req.json() as { reference?: string };
-    const reference = body.reference;
-    if (!reference) return json({ error: "reference_required" }, 400);
+    const reference = String(body.reference ?? "").trim();
+    if (!/^[A-Za-z0-9_-]{10,120}$/.test(reference)) return json({ error: "reference_required" }, 400);
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: "paystack_verify",
+      entity: `${user.id}|${reference}`,
+      limit: 20,
+      windowSeconds: 3600,
+    });
+    if (!withinLimit) return json({ error: "rate_limited" }, 429);
 
     const admin = createClient(supabaseUrl, serviceKey);
 
@@ -67,7 +76,7 @@ Deno.serve(async (req) => {
     const verifyData = await verifyRes.json();
 
     if (!verifyRes.ok || !verifyData?.status) {
-      return json({ status: "pending", error: "verify_call_failed", detail: verifyData?.message }, 200);
+      return json({ status: "pending", error: "verify_call_failed" }, 200);
     }
 
     const gatewayStatus = String(verifyData?.data?.status ?? "").toLowerCase();
@@ -88,7 +97,7 @@ Deno.serve(async (req) => {
 
     return json({ status: "pending", gateway_status: gatewayStatus });
   } catch (error) {
-    console.error("[paystack-verify] error", error);
-    return json({ error: String((error as Error)?.message ?? error) }, 500);
+    console.error("[paystack-verify] error", error instanceof Error ? error.name : "unknown_error");
+    return json({ error: "request_failed" }, 500);
   }
 });

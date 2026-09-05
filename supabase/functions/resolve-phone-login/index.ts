@@ -6,6 +6,7 @@
 // password is wrong — preventing account enumeration.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizePhone } from '../_shared/at-sms.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,14 @@ Deno.serve(async (req) => {
     if (!phone || !/^\+\d{9,15}$/.test(phone) || !password) {
       return json({ error: GENERIC_ERROR }, 400);
     }
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'phone_login',
+      entity: phone,
+      limit: 8,
+      windowSeconds: 900,
+    });
+    if (!withinLimit) return json({ error: GENERIC_ERROR }, 429);
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const { data: profile } = await admin
@@ -51,7 +60,7 @@ Deno.serve(async (req) => {
       refresh_token: session.session.refresh_token,
     });
   } catch (err) {
-    console.error('[resolve-phone-login] error', err);
+    console.error('[resolve-phone-login] error', err instanceof Error ? err.name : 'unknown_error');
     return json({ error: GENERIC_ERROR }, 400);
   }
 });

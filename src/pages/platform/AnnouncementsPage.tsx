@@ -14,12 +14,10 @@ import { Trash2 } from 'lucide-react';
 type Row = {
   id: string;
   title: string;
-  message: string;
-  priority: string;
+  body: string;
+  level: string;
   audience: string;
-  publish_at: string;
-  target_user_id: string | null;
-  target_plan: string | null;
+  starts_at: string;
   created_at: string;
 };
 
@@ -29,21 +27,20 @@ export default function AnnouncementsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [priority, setPriority] = useState('normal');
-  const [audience, setAudience] = useState('all');
-  const [targetPlan, setTargetPlan] = useState<string>('');
+  const [priority, setPriority] = useState('info');
+  const [audience, setAudience] = useState('all_tenants');
   const [publishAt, setPublishAt] = useState(new Date().toISOString().slice(0, 16));
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('platform_announcements').select('*').order('created_at', { ascending: false });
     setRows((data as Row[]) ?? []);
   }, []);
 
   useEffect(() => {
     void load();
     const ch = supabase.channel('platform-anns')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcements' }, () => void load())
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
   }, [load]);
@@ -51,16 +48,15 @@ export default function AnnouncementsPage() {
   const create = async () => {
     if (!title.trim()) return toast({ title: 'Title required', variant: 'destructive' });
     setSubmitting(true);
-    const payload: any = {
+    const payload = {
       title: title.trim(),
-      message: message.trim(),
-      priority,
+      body: message.trim(),
+      level: priority,
       audience,
-      publish_at: new Date(publishAt).toISOString(),
+      starts_at: new Date(publishAt).toISOString(),
       created_by: user?.id,
-      target_plan: audience === 'plan' && targetPlan ? targetPlan : null,
     };
-    const { error } = await supabase.from('announcements').insert(payload);
+    const { error } = await supabase.from('platform_announcements').insert(payload);
     setSubmitting(false);
     if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
     setTitle(''); setMessage('');
@@ -70,7 +66,7 @@ export default function AnnouncementsPage() {
 
   const remove = async (id: string) => {
     if (!confirm('Delete this announcement?')) return;
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    const { error } = await supabase.from('platform_announcements').delete().eq('id', id);
     if (error) return toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     await load();
   };
@@ -99,8 +95,8 @@ export default function AnnouncementsPage() {
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="info">Normal</SelectItem>
+                  <SelectItem value="warning">High</SelectItem>
                   <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
@@ -110,8 +106,10 @@ export default function AnnouncementsPage() {
               <Select value={audience} onValueChange={setAudience}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All tenants</SelectItem>
-                  <SelectItem value="plan">Specific plan</SelectItem>
+                  <SelectItem value="all_tenants">All tenants</SelectItem>
+                  <SelectItem value="trial">Trial users</SelectItem>
+                  <SelectItem value="paid">Paid subscribers</SelectItem>
+                  <SelectItem value="expired">Expired subscribers</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -120,20 +118,6 @@ export default function AnnouncementsPage() {
               <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
             </div>
           </div>
-          {audience === 'plan' && (
-            <div>
-              <Label className="text-xs">Target plan</Label>
-              <Select value={targetPlan} onValueChange={setTargetPlan}>
-                <SelectTrigger><SelectValue placeholder="Pick a plan" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="trial">Trial</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="lifetime">Lifetime</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <Button onClick={create} disabled={submitting}>{submitting ? 'Publishing…' : 'Publish'}</Button>
         </CardContent>
       </Card>
@@ -146,12 +130,12 @@ export default function AnnouncementsPage() {
             <div key={row.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] uppercase">{row.priority}</Badge>
-                  <span className="text-[10px] text-muted-foreground">→ {row.audience}{row.target_plan ? ` (${row.target_plan})` : ''}</span>
+                  <Badge variant="outline" className="text-[10px] uppercase">{row.level}</Badge>
+                  <span className="text-[10px] text-muted-foreground">→ {row.audience}</span>
                 </div>
                 <p className="text-sm font-semibold truncate">{row.title}</p>
-                {row.message && <p className="text-xs text-muted-foreground line-clamp-2">{row.message}</p>}
-                <p className="mt-1 text-[10px] text-muted-foreground">{new Date(row.publish_at).toLocaleString()}</p>
+                {row.body && <p className="text-xs text-muted-foreground line-clamp-2">{row.body}</p>}
+                <p className="mt-1 text-[10px] text-muted-foreground">{new Date(row.starts_at).toLocaleString()}</p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => remove(row.id)}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />

@@ -2,6 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 const PRODUCT_IMAGE_PRIMARY_BUCKET = 'product-images';
 const PRODUCT_IMAGE_FALLBACK_BUCKET = 'business-logos';
+const PRODUCT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+const PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function getStorageErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -46,6 +48,8 @@ export async function uploadProductImage({
   productId: string;
   file: File;
 }) {
+  if (!PRODUCT_IMAGE_TYPES.has(file.type)) throw new Error('Product images must be JPG, PNG, or WebP.');
+  if (file.size > PRODUCT_IMAGE_MAX_BYTES) throw new Error('Product images must be 4MB or smaller.');
   const extension = getProductImageExtension(file);
   const path = `${businessId}/products/${productId}-${Date.now()}.${extension}`;
 

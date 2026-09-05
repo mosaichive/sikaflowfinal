@@ -21,12 +21,18 @@ export function getStoredPrintSize(): SaleDocumentSize {
   try {
     const v = localStorage.getItem(SIZE_STORAGE_KEY) as SaleDocumentSize | null;
     if (v && v in SALE_DOC_SIZE_LABELS) return v;
-  } catch {}
+  } catch {
+    // Storage may be unavailable in privacy-restricted browser contexts.
+  }
   return 'a4';
 }
 
 export function setStoredPrintSize(size: SaleDocumentSize) {
-  try { localStorage.setItem(SIZE_STORAGE_KEY, size); } catch {}
+  try {
+    localStorage.setItem(SIZE_STORAGE_KEY, size);
+  } catch {
+    // Printing still works when the preference cannot be persisted.
+  }
 }
 
 type SizeSpec = {

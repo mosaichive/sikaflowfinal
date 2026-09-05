@@ -80,9 +80,9 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
 
     const loadAnnouncementBadge = async () => {
       const { data: announcements } = await supabase
-        .from('announcements')
+        .from('platform_announcements')
         .select('id')
-        .lte('publish_at', new Date().toISOString());
+        .lte('starts_at', new Date().toISOString());
 
       if (cancelled) return;
 
@@ -102,7 +102,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
 
     const channel = supabase
       .channel(`app-layout-announcements-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => { void loadAnnouncementBadge(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcements' }, () => { void loadAnnouncementBadge(); })
       .subscribe();
 
     const onStorage = () => { void loadAnnouncementBadge(); };

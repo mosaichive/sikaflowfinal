@@ -92,7 +92,7 @@ export function OrderSettingsDialog() {
   };
 
   const togglePaymentMethod = (m: string, checked: boolean) => {
-    let next = new Set(prefs.store_payment_methods || []);
+    const next = new Set(prefs.store_payment_methods || []);
     if (checked) next.add(m); else next.delete(m);
     if (next.size === 0) next.add('cash_on_delivery'); // always keep at least one
     void patch({ store_payment_methods: Array.from(next) });

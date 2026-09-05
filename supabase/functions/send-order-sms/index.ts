@@ -3,6 +3,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
+const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return '';
@@ -82,7 +83,16 @@ Deno.serve(async (req) => {
     const orderId = String(body?.order_id ?? '').trim();
     const eventRaw = String(body?.event ?? '').trim().toLowerCase();
     const event = eventRaw === 'created' ? 'created' : 'status';
-    if (!orderId) return json({ ok: false, reason: 'missing_order_id' }, 400);
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) return json({ ok: false, reason: 'invalid_order_id' }, 400);
+
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'order_sms',
+      entity: `${callerId}|${orderId}`,
+      limit: 10,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
 
     const admin = adminClient();
     const { data: order } = await admin
@@ -93,17 +103,30 @@ Deno.serve(async (req) => {
     if (!order) return json({ ok: false, reason: 'order_not_found' });
 
     const businessId = order.business_id as string;
+    const { data: business } = await admin
+      .from('businesses')
+      .select('id, owner_user_id, name')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (!business?.owner_user_id) return json({ ok: false, reason: 'business_not_found' }, 404);
 
-    if (callerId !== businessId) {
+    if (callerId !== business.owner_user_id) {
       const { data: membership } = await admin
-        .from('staff_members').select('id, active')
-        .eq('business_owner_id', businessId).eq('staff_user_id', callerId).eq('active', true).maybeSingle();
-      if (!membership) return json({ ok: false, reason: 'forbidden' }, 403);
+        .from('staff_members')
+        .select('permissions')
+        .eq('business_id', businessId)
+        .eq('staff_user_id', callerId)
+        .eq('active', true)
+        .maybeSingle();
+      const permissions = membership?.permissions as { role?: string; modules?: string[] } | null;
+      const allowed = permissions?.role === 'admin' || permissions?.role === 'manager' ||
+        (Array.isArray(permissions?.modules) && permissions.modules.includes('orders'));
+      if (!allowed) return json({ ok: false, reason: 'forbidden' }, 403);
     }
 
     const { data: profile } = await admin
       .from('profiles').select('business_name, sms_notify_order_status')
-      .eq('id', businessId).maybeSingle();
+      .eq('user_id', business.owner_user_id).maybeSingle();
     if (profile?.sms_notify_order_status === false) return json({ ok: false, reason: 'disabled' });
 
     const phone = normalizePhone(String(order.customer_phone ?? ''));
@@ -111,7 +134,7 @@ Deno.serve(async (req) => {
 
     const trackingUrl = `${PUBLIC_BASE_URL}/track/${order.tracking_code}`;
     const message = statusMessage(order.status as string, {
-      businessName: profile?.business_name?.trim() || 'the store',
+      businessName: profile?.business_name?.trim() || business.name?.trim() || 'the store',
       trackingUrl,
       carrierName: order.carrier_name as string | null,
       carrierPhone: order.carrier_phone as string | null,
@@ -139,7 +162,8 @@ Deno.serve(async (req) => {
         notification_type: event === 'created' ? 'order_confirmation' : 'order_status',
         message, status: 'failed', error_message: errMsg, reference_id: order.id,
       });
-      return json({ ok: false, reason: 'send_failed', error: errMsg });
+      console.error('[send-order-sms] send failed', err instanceof Error ? err.name : 'unknown_error');
+      return json({ ok: false, reason: 'send_failed' });
     }
   } catch (err) {
     console.error('[send-order-sms] unexpected', err);

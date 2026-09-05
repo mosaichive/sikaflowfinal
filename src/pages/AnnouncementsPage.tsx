@@ -11,22 +11,22 @@ import { logSupabaseError } from '@/lib/workspace';
 type AnnouncementRow = {
   id: string;
   title: string;
-  message: string;
-  priority: 'normal' | 'high' | 'critical';
+  body: string;
+  level: 'info' | 'warning' | 'critical';
   audience: string;
-  publish_at: string;
+  starts_at: string;
   created_at: string;
 };
 
-function getLevelIcon(p: AnnouncementRow['priority']) {
+function getLevelIcon(p: AnnouncementRow['level']) {
   if (p === 'critical') return AlertTriangle;
-  if (p === 'high') return Megaphone;
+  if (p === 'warning') return Megaphone;
   return Info;
 }
 
-function getLevelTone(p: AnnouncementRow['priority']) {
+function getLevelTone(p: AnnouncementRow['level']) {
   if (p === 'critical') return { border: 'border-destructive/30', badge: 'destructive' as const, icon: 'text-destructive' };
-  if (p === 'high') return { border: 'border-amber-500/30', badge: 'secondary' as const, icon: 'text-amber-500' };
+  if (p === 'warning') return { border: 'border-amber-500/30', badge: 'secondary' as const, icon: 'text-amber-500' };
   return { border: 'border-primary/20', badge: 'outline' as const, icon: 'text-primary' };
 }
 
@@ -43,10 +43,10 @@ export default function AnnouncementsPage() {
       return;
     }
     const { data, error } = await supabase
-      .from('announcements')
-      .select('id,title,message,priority,audience,publish_at,created_at')
-      .lte('publish_at', new Date().toISOString())
-      .order('publish_at', { ascending: false });
+      .from('platform_announcements')
+      .select('id,title,body,level,audience,starts_at,created_at')
+      .lte('starts_at', new Date().toISOString())
+      .order('starts_at', { ascending: false });
 
     if (error) {
       logSupabaseError('tenantAnnouncements.load', error, { userId: user.id });
@@ -58,7 +58,7 @@ export default function AnnouncementsPage() {
     void load();
     const channel = supabase
       .channel(`tenant-announcements-${user?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_announcements' }, () => { void load(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [load, user?.id]);
@@ -103,8 +103,8 @@ export default function AnnouncementsPage() {
           <CardContent className="space-y-4 p-4">
             {rows.length > 0 ? (
               rows.map((row) => {
-                const Icon = getLevelIcon(row.priority);
-                const tone = getLevelTone(row.priority);
+                const Icon = getLevelIcon(row.level);
+                const tone = getLevelTone(row.level);
                 const isRead = readIds.has(row.id);
                 return (
                   <article key={row.id} className={`rounded-2xl border bg-card/50 p-4 transition-colors ${tone.border}`}>
@@ -116,14 +116,14 @@ export default function AnnouncementsPage() {
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-semibold text-foreground">{row.title}</p>
-                            <Badge variant={tone.badge}>{row.priority}</Badge>
+                            <Badge variant={tone.badge}>{row.level}</Badge>
                             <Badge variant={isRead ? 'secondary' : 'default'}>{isRead ? 'Read' : 'New'}</Badge>
                           </div>
-                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{row.message}</p>
+                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{row.body}</p>
                         </div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
-                        <p>{new Date(row.publish_at || row.created_at).toLocaleDateString('en-GH')}</p>
+                        <p>{new Date(row.starts_at || row.created_at).toLocaleDateString('en-GH')}</p>
                         <p className="mt-1 uppercase tracking-[0.14em]">{(row.audience || 'all').replace(/_/g, ' ')}</p>
                       </div>
                     </div>

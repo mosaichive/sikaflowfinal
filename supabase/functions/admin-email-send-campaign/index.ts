@@ -18,8 +18,9 @@ import { sendBatchAuto } from "../_shared/resend-direct.ts";
 
 // Email is delivered directly through api.resend.com using RESEND_API_KEY.
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const CAMPAIGN_CRON_SECRET = Deno.env.get("CAMPAIGN_CRON_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://kuditrack.online";
+const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://sikaflowsystem.vercel.app";
 
 const SENDER_DOMAIN = Deno.env.get("SENDER_DOMAIN") ?? "mail.kuditrack.online";
 
@@ -198,14 +199,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-  if (!RESEND_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "email provider not configured" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
@@ -214,6 +212,19 @@ Deno.serve(async (req) => {
 
     // Cron-triggered runner: send campaigns with scheduled_at <= now.
     if (action === "run_scheduled") {
+      const suppliedSecret = req.headers.get("x-cron-secret") ?? "";
+      if (!CAMPAIGN_CRON_SECRET || suppliedSecret !== CAMPAIGN_CRON_SECRET) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!RESEND_API_KEY) {
+        return new Response(JSON.stringify({ error: "email_provider_unavailable" }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const admin = serviceClient();
       const { data: due } = await admin
         .from("email_campaigns")
@@ -239,6 +250,13 @@ Deno.serve(async (req) => {
     const guard = await requireSuperAdmin(req);
     if (guard instanceof Response) return guard;
     const { userId } = guard;
+
+    if (!RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: "email_provider_unavailable" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (action === "test") {
       const admin = serviceClient();

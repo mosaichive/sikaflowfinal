@@ -30,8 +30,56 @@ verify_jwt = false
 [functions.exchange-rates]
 verify_jwt = false
 
-[functions.referrals-schema-check]
+[functions.claim-referral]
 verify_jwt = true
 
 [functions.admin-delete-user]
+verify_jwt = true
+
+[functions.manage-subscription]
+verify_jwt = true
+
+[functions.manage-business-user]
+verify_jwt = true
+
+[functions.send-team-invite-sms]
+verify_jwt = true
+
+[functions.send-signup-otp]
+verify_jwt = true
+
+[functions.verify-signup-otp]
+verify_jwt = true
+
+[functions.password-reset-send-otp]
+verify_jwt = false
+
+[functions.password-reset-verify-otp]
+verify_jwt = false
+
+[functions.notify-admin-event]
+verify_jwt = false
+
+[functions.admin-send-sms]
+verify_jwt = true
+
+[functions.paystack-init]
+verify_jwt = true
+
+[functions.paystack-verify]
+verify_jwt = true
+
+[functions.ai-assistant]
+verify_jwt = true
+
+[functions.send-order-sms]
+verify_jwt = true
+
+[functions.send-sale-thanks-sms]
+verify_jwt = true
+
+[functions.send-low-stock-alert]
+verify_jwt = true
+
+[functions.admin-email-audience-preview]
 verify_jwt = true

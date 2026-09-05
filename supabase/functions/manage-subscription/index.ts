@@ -1,7 +1,7 @@
 // Super Admin actions on a tenant subscription.
 // Authenticates the caller and verifies they have the super_admin role
 // before performing any privileged operation.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { requireSuperAdmin, serviceClient } from "../_shared/email-bulk.ts";
 import {
   PLAN_CONFIG,
   activateSubscriptionForPayment,
@@ -49,34 +49,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return json({ error: "missing_auth" }, 401);
-    }
-
-    // 1. Verify caller via anon client + their JWT
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return json({ error: "unauthorized" }, 401);
-
-    // 2. Service role for privileged work
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
-    // 3. Confirm super admin
-    const { data: roleRow } = await admin
-      .from("user_roles")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("role", "super_admin")
-      .maybeSingle();
-    if (!roleRow) return json({ error: "forbidden" }, 403);
+    const guard = await requireSuperAdmin(req);
+    if (guard instanceof Response) return guard;
+    const admin = serviceClient();
 
     const body = (await req.json()) as Body;
     if (!body?.action) return json({ error: "missing_action" }, 400);
@@ -86,8 +61,8 @@ Deno.serve(async (req) => {
         action,
         target_business_id: body.business_id ?? null,
         details,
-        performed_by: user.id,
-        performed_by_email: user.email,
+        performed_by: guard.userId,
+        performed_by_email: guard.email,
       });
     };
 
@@ -195,7 +170,7 @@ Deno.serve(async (req) => {
             billing_cycle: PLAN_CONFIG[planToActivate].billingCycle,
             amount_paid_ghs: pay.amount_paid_ghs ?? pay.amount_ghs,
             review_reason: null,
-            confirmed_by: user.id,
+            confirmed_by: guard.userId,
             confirmed_at: confirmedAt,
             activated_at: confirmedAt,
             expires_at: end,
@@ -236,8 +211,8 @@ Deno.serve(async (req) => {
             status: "confirmed",
             message: body.note ?? "Payment approved manually after review",
             payload: {
-              performed_by: user.id,
-              performed_by_email: user.email ?? null,
+              performed_by: guard.userId,
+              performed_by_email: guard.email,
               activated_plan: planToActivate,
               expires_at: end,
             },
@@ -266,7 +241,7 @@ Deno.serve(async (req) => {
           });
           if (activation.status === "confirmed") {
             await admin.from("payments").update({
-              confirmed_by: user.id,
+              confirmed_by: guard.userId,
             }).eq("id", body.payment_id);
           }
           result = { status: activation.status, expiresAt: activation.expiresAt ?? null };
@@ -279,7 +254,7 @@ Deno.serve(async (req) => {
         if (!body.payment_id) return json({ error: "bad_params" }, 400);
         await admin.from("payments").update({
           status: "rejected",
-          confirmed_by: user.id,
+          confirmed_by: guard.userId,
           confirmed_at: new Date().toISOString(),
           note: body.note ?? "",
         }).eq("id", body.payment_id);
@@ -292,7 +267,7 @@ Deno.serve(async (req) => {
             eventType: "payment_rejected",
             status: "rejected",
             message: body.note ?? "Payment rejected by super admin",
-            payload: { performed_by: user.id, performed_by_email: user.email ?? null },
+            payload: { performed_by: guard.userId, performed_by_email: guard.email },
           });
         }
         await log("reject_payment", { payment_id: body.payment_id, note: body.note ?? null });

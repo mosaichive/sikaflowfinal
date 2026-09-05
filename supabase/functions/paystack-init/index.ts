@@ -1,7 +1,8 @@
 // Initialize a Paystack transaction for a subscription plan.
 // Creates a pending row in subscription_payments and returns the
 // Paystack authorization URL for redirect.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { consumeRateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,14 +44,23 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "unauthorized" }, 401);
 
-    const body = await req.json() as { plan?: string; cycle?: 'monthly' | 'annual'; callback_url?: string };
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: "paystack_initialize",
+      entity: user.id,
+      limit: 5,
+      windowSeconds: 3600,
+    });
+    if (!withinLimit) return json({ error: "rate_limited" }, 429);
+
+    const body = await req.json() as { plan?: string; cycle?: 'monthly' | 'annual' };
     const plan = (body.plan ?? '').toLowerCase();
     const cycle = body.cycle === 'annual' ? 'annual' : 'monthly';
 
     const admin = createClient(supabaseUrl, serviceKey);
 
     let amount = 0;
-    let effectivePlan = plan;
+    const effectivePlan = plan;
     if (LEGACY_PRICES[plan] !== undefined) {
       amount = LEGACY_PRICES[plan];
     } else if (NEW_TIERS.has(plan)) {
@@ -83,7 +93,12 @@ Deno.serve(async (req) => {
       })
       .select("*")
       .single();
-    if (insertError) return json({ error: "db_insert_failed", detail: insertError.message }, 500);
+    if (insertError) {
+      console.error("[paystack-init] payment insert failed", insertError.code || "unknown");
+      return json({ error: "db_insert_failed" }, 500);
+    }
+
+    const publicUrl = (Deno.env.get("APP_PUBLIC_URL") || "https://sikaflowsystem.vercel.app").replace(/\/+$/, "");
 
     const initRes = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: "POST",
@@ -96,7 +111,7 @@ Deno.serve(async (req) => {
         amount: amount * 100,
         currency: "GHS",
         reference,
-        callback_url: body.callback_url,
+        callback_url: `${publicUrl}/billing`,
         metadata: {
           user_id: user.id,
           plan,
@@ -116,7 +131,7 @@ Deno.serve(async (req) => {
           provider_response: initData,
         })
         .eq("id", paymentRow.id);
-      return json({ error: "paystack_init_failed", detail: initData }, 400);
+      return json({ error: "paystack_init_failed" }, 400);
     }
 
     return json({
@@ -126,7 +141,7 @@ Deno.serve(async (req) => {
       reference,
     });
   } catch (error) {
-    console.error("[paystack-init] error", error);
-    return json({ error: String((error as Error)?.message ?? error) }, 500);
+    console.error("[paystack-init] error", error instanceof Error ? error.name : "unknown_error");
+    return json({ error: "request_failed" }, 500);
   }
 });

@@ -4,6 +4,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizePhone, sendAtSms } from '../_shared/at-sms.ts';
 import { adminClient, logSms } from '../_shared/sms-log.ts';
+import { consumeRateLimit } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,54 +36,72 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const inviteId = String(body?.invite_id ?? '').trim();
-    const inviteUrl = String(body?.invite_url ?? '').trim();
-    const rawPhone = String(body?.phone ?? '').trim();
-    if (!inviteId || !inviteUrl || !rawPhone) {
-      return json({ ok: false, reason: 'missing_fields' }, 400);
-    }
+    if (!/^[0-9a-f-]{36}$/i.test(inviteId)) return json({ ok: false, reason: 'invalid_invite' }, 400);
 
-    const phone = normalizePhone(rawPhone);
-    if (!/^\+\d{9,15}$/.test(phone)) {
-      return json({ ok: false, reason: 'invalid_phone' });
-    }
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'team_invite_sms',
+      entity: `${callerId}|${inviteId}`,
+      limit: 3,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ ok: false, reason: 'rate_limited' }, 429);
 
     const admin = adminClient();
     const { data: invite } = await admin
       .from('staff_invites')
-      .select('id, business_owner_id, email')
+      .select('id, business_owner_id, phone, token, status, expires_at')
       .eq('id', inviteId)
       .maybeSingle();
     if (!invite) return json({ ok: false, reason: 'invite_not_found' });
+    if (invite.status !== 'pending' || new Date(invite.expires_at).getTime() <= Date.now()) {
+      return json({ ok: false, reason: 'invite_unavailable' }, 409);
+    }
 
-    // Caller must be the owner OR an active staff member of that business
+    const phone = normalizePhone(String(invite.phone ?? ''));
+    if (!/^\+\d{9,15}$/.test(phone)) return json({ ok: false, reason: 'no_valid_phone' }, 400);
+
     const ownerId = invite.business_owner_id as string;
+    const { data: business } = await admin
+      .from('businesses')
+      .select('id, name, owner_user_id')
+      .eq('owner_user_id', ownerId)
+      .limit(1)
+      .maybeSingle();
+    if (!business) return json({ ok: false, reason: 'business_not_found' }, 404);
+
     if (callerId !== ownerId) {
       const { data: membership } = await admin
         .from('staff_members')
-        .select('id')
-        .eq('business_owner_id', ownerId)
+        .select('permissions')
+        .eq('business_id', business.id)
         .eq('staff_user_id', callerId)
         .eq('active', true)
         .maybeSingle();
-      if (!membership) return json({ ok: false, reason: 'forbidden' }, 403);
+      const permissions = membership?.permissions as { role?: string; modules?: string[] } | null;
+      const canManageTeam = permissions?.role === 'admin' || permissions?.role === 'owner' ||
+        (Array.isArray(permissions?.modules) && permissions.modules.includes('staff'));
+      if (!canManageTeam) return json({ ok: false, reason: 'forbidden' }, 403);
     }
 
     const { data: profile } = await admin
       .from('profiles')
       .select('business_name, sms_notify_team_invite')
-      .eq('id', ownerId)
+      .eq('user_id', ownerId)
       .maybeSingle();
     if (profile && profile.sms_notify_team_invite === false) {
       return json({ ok: false, reason: 'disabled' });
     }
 
-    const businessName = profile?.business_name?.trim() || 'KudiTrack';
+    const businessName = profile?.business_name?.trim() || business.name?.trim() || 'KudiTrack';
+    const publicUrl = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
+    const inviteUrl = `${publicUrl}/invite/${invite.token}`;
     const message = `You have been invited to join ${businessName} on KudiTrack. Use this link to accept your invitation: ${inviteUrl}`;
 
     try {
       const provider = await sendAtSms(phone, message);
       await logSms({
-        business_id: ownerId,
+        business_id: business.id,
         recipient_phone: phone,
         notification_type: 'team_invite',
         message,
@@ -93,9 +112,9 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[send-team-invite-sms] send failed', errMsg);
+      console.error('[send-team-invite-sms] send failed', err instanceof Error ? err.name : 'unknown_error');
       await logSms({
-        business_id: ownerId,
+        business_id: business.id,
         recipient_phone: phone,
         notification_type: 'team_invite',
         message,
@@ -103,7 +122,7 @@ Deno.serve(async (req) => {
         error_message: errMsg,
         reference_id: invite.id,
       });
-      return json({ ok: false, reason: 'send_failed', error: errMsg });
+      return json({ ok: false, reason: 'send_failed' });
     }
   } catch (err) {
     console.error('[send-team-invite-sms] unexpected', err);

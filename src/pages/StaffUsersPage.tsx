@@ -105,7 +105,7 @@ export default function StaffUsersPage() {
       if (form.mode === 'password') {
         const fullName = form.full_name.trim();
         if (!fullName) throw new Error('Full name is required for password invite');
-        if (!form.password || form.password.length < 8) throw new Error('Temporary password must be at least 8 characters');
+        if (!form.password || form.password.length < 12) throw new Error('Temporary password must be at least 12 characters');
 
         const { data, error } = await supabase.functions.invoke('manage-business-user', {
           body: {
@@ -125,12 +125,17 @@ export default function StaffUsersPage() {
           description: `${fullName} can now log in with the temporary password you set.`,
         });
       } else {
+        const phone = form.phone.trim();
+        const normalizedPhone = phone && isPhoneSendable(phone) ? normalizeGhanaPhone(phone) : null;
+        if (phone && !normalizedPhone) throw new Error('Enter a valid phone number before sending an SMS invite');
+
         const { data, error } = await (supabase as any)
           .from('staff_invites')
           .insert({
             business_owner_id: user.id,
             email,
             display_name: form.full_name.trim() || null,
+            phone: normalizedPhone,
             permissions: { role: form.role, modules: form.modules },
           })
           .select('id, token')
@@ -139,18 +144,7 @@ export default function StaffUsersPage() {
         await copyLink(data.token);
         toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
 
-        const phone = form.phone.trim();
-        if (phone) {
-          if (!isPhoneSendable(phone)) {
-            toast({
-              title: 'Invitation created, but SMS could not be sent.',
-              description: 'The phone number does not look valid.',
-              variant: 'destructive',
-            });
-          } else {
-            void notifyTeamInvite(data.id, normalizeGhanaPhone(phone), inviteLink(data.token), toast);
-          }
-        }
+        if (normalizedPhone) void notifyTeamInvite(data.id, toast);
       }
 
       setForm({ email: '', full_name: '', phone: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
@@ -184,29 +178,46 @@ export default function StaffUsersPage() {
 
   const toggleActive = async (m: MemberRow) => {
     setBusyId(m.id);
-    const { error } = await (supabase as any).from('staff_members').update({ active: !m.active }).eq('id', m.id);
+    const { data, error } = await supabase.functions.invoke('manage-business-user', {
+      body: {
+        action: 'update',
+        user_id: m.staff_user_id,
+        full_name: m.display_name,
+        role: m.permissions?.role || defaultRole,
+        modules: m.permissions?.modules || [],
+        active: !m.active,
+      },
+    });
     setBusyId(null);
-    if (error) toast({ title: 'Could not update', description: error.message, variant: 'destructive' });
+    if (error || (data as any)?.error) toast({ title: 'Could not update', description: (data as any)?.error || error?.message, variant: 'destructive' });
     else { toast({ title: m.active ? 'Member suspended' : 'Member reactivated' }); void load(); }
   };
 
   const removeMember = async (m: MemberRow) => {
     if (!confirm(`Remove ${m.display_name || m.email} from your team?`)) return;
     setBusyId(m.id);
-    const { error } = await (supabase as any).from('staff_members').delete().eq('id', m.id);
+    const { data, error } = await supabase.functions.invoke('manage-business-user', {
+      body: { action: 'remove', user_id: m.staff_user_id },
+    });
     setBusyId(null);
-    if (error) toast({ title: 'Could not remove', description: error.message, variant: 'destructive' });
+    if (error || (data as any)?.error) toast({ title: 'Could not remove', description: (data as any)?.error || error?.message, variant: 'destructive' });
     else { toast({ title: 'Member removed' }); void load(); }
   };
 
   const saveEdit = async (m: MemberRow) => {
     setBusyId(m.id);
-    const { error } = await (supabase as any)
-      .from('staff_members')
-      .update({ permissions: m.permissions, display_name: m.display_name })
-      .eq('id', m.id);
+    const { data, error } = await supabase.functions.invoke('manage-business-user', {
+      body: {
+        action: 'update',
+        user_id: m.staff_user_id,
+        full_name: m.display_name,
+        role: m.permissions?.role || defaultRole,
+        modules: m.permissions?.modules || [],
+        active: m.active,
+      },
+    });
     setBusyId(null);
-    if (error) toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+    if (error || (data as any)?.error) toast({ title: 'Could not save', description: (data as any)?.error || error?.message, variant: 'destructive' });
     else { toast({ title: 'Permissions updated' }); setEditing(null); void load(); }
   };
 

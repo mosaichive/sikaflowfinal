@@ -1,6 +1,7 @@
 // Send a 6-digit SMS OTP via Africa's Talking for phone verification (logged-in user).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAtSms, normalizePhone, hashCode, SmsConfigError, SmsDeliveryError } from '../_shared/at-sms.ts';
+import { consumeRateLimit, redactPhone } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,15 @@ Deno.serve(async (req) => {
       return json({ error: 'Please enter a valid phone number (e.g. 0244123456 or +233244123456).' }, 400);
     }
 
+    const withinLimit = await consumeRateLimit({
+      req,
+      action: 'signup_otp_send',
+      entity: `${user.id}|${phone}`,
+      limit: 3,
+      windowSeconds: 600,
+    });
+    if (!withinLimit) return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -48,13 +58,14 @@ Deno.serve(async (req) => {
       return json({ error: 'Too many code requests. Please wait 10 minutes before trying again.' }, 429);
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const random = crypto.getRandomValues(new Uint32Array(1))[0];
+    const code = String(100000 + (random % 900000));
     const code_hash = await hashCode(code);
 
     try {
       await sendAtSms(phone, `Your KudiTrack verification code is ${code}. It expires in 10 minutes.`);
     } catch (err) {
-      console.error('[send-signup-otp] sms failed', { phone, userId: user.id, err });
+      console.error('[send-signup-otp] sms failed', { phone: redactPhone(phone), userId: user.id, kind: err instanceof Error ? err.name : 'unknown_error' });
       if (err instanceof SmsConfigError) {
         return json({ error: err.message, kind: 'config' }, 503);
       }
@@ -71,9 +82,9 @@ Deno.serve(async (req) => {
       purpose: 'signup',
     });
 
-    return json({ success: true, phone });
+    return json({ success: true });
   } catch (err) {
-    console.error('[send-signup-otp] internal error', err);
-    return json({ error: (err as Error).message || 'Internal error' }, 500);
+    console.error('[send-signup-otp] internal error', err instanceof Error ? err.name : 'unknown_error');
+    return json({ error: 'Could not send the verification code. Please try again.' }, 500);
   }
 });
