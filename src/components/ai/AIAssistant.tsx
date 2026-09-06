@@ -11,6 +11,7 @@ import {
   Trash2,
   Wifi,
   WifiOff,
+  Cpu,
   HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -349,16 +350,28 @@ export function AIAssistant() {
             </div>
             <div className="flex items-center gap-1.5">
               <Badge
-                variant={assistant.online ? 'secondary' : 'destructive'}
+                variant={assistant.assistantMode === 'offline' ? 'destructive' : 'secondary'}
                 className="gap-1 text-[10px]"
                 title={
-                  assistant.online
-                    ? 'Connected — the full AI assistant is available'
-                    : 'Offline — on-device mode. Records save locally and sync when you reconnect.'
+                  assistant.assistantMode === 'cloud'
+                    ? 'Connected to the configured AI provider using server-verified business data.'
+                    : assistant.assistantMode === 'offline'
+                      ? 'Offline — records save locally and sync when you reconnect.'
+                      : 'Using KudiTrack’s private on-device command assistant.'
                 }
               >
-                {assistant.online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                {assistant.online ? 'Online' : 'Offline'}
+                {assistant.assistantMode === 'cloud' ? (
+                  <Wifi className="h-3 w-3" />
+                ) : assistant.assistantMode === 'offline' ? (
+                  <WifiOff className="h-3 w-3" />
+                ) : (
+                  <Cpu className="h-3 w-3" />
+                )}
+                {assistant.assistantMode === 'cloud'
+                  ? 'Cloud AI'
+                  : assistant.assistantMode === 'offline'
+                    ? 'Offline'
+                    : 'On device'}
               </Badge>
               <Button
                 variant="ghost"

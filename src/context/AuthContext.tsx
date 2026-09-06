@@ -5,6 +5,7 @@ import { clearPendingReferralToken, getOrCreateReferralDeviceId, getPendingRefer
 import { runSaleItemsSchemaCheck } from '@/lib/sale-items-schema';
 import { ALL_MODULES, type ModuleKey } from '@/lib/permissions';
 import { resolveStaffModules } from '@/lib/staff-permissions';
+import { deleteMeta, getMeta, setMeta } from '@/lib/offline-db';
 
 export type AppRole = 'admin' | 'manager' | 'staff' | 'super_admin' | 'salesperson' | 'cashier' | 'distributor' | 'business_owner';
 
@@ -105,6 +106,8 @@ const emptyProfile: ProfileData = {
 };
 
 const STAFF_MEMBERSHIP_POLL_MS = 3000;
+const offlineAuthKey = (userId: string, kind: 'role' | 'profile' | 'staff') =>
+  `workspace_auth:${userId}:${kind}`;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -132,15 +135,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [staffMembership, setStaffMembership] = useState<StaffMembership | null>(null);
 
   const fetchStaffMembership = useCallback(async (userId: string) => {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from('staff_members')
       .select('business_owner_id, permissions, active')
       .eq('staff_user_id', userId)
       .eq('active', true)
       .maybeSingle();
 
+    if (error) {
+      const cached = await getMeta<StaffMembership>(offlineAuthKey(userId, 'staff'));
+      setStaffMembership((current) => (areStaffMembershipsEqual(current, cached) ? current : cached));
+      return cached;
+    }
+
     if (!data) {
       setStaffMembership((current) => (current === null ? current : null));
+      await deleteMeta(offlineAuthKey(userId, 'staff'));
       return null;
     }
     const perms = (data.permissions || {}) as { role?: string; modules?: unknown };
@@ -152,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active: data.active,
     };
     setStaffMembership((current) => (areStaffMembershipsEqual(current, membership) ? current : membership));
+    await setMeta(offlineAuthKey(userId, 'staff'), membership);
     return membership;
   }, []);
 
@@ -232,14 +243,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.warn('Unable to load user role. Check Supabase auth and RLS policies.', error.message);
-      setRole(null);
-      return null;
+      const cached = await getMeta<AppRole>(offlineAuthKey(userId, 'role'));
+      const offlineRole = cached === 'super_admin' ? null : cached;
+      setRole(offlineRole);
+      return offlineRole;
     }
 
     const roles = ((data || []) as Array<{ role: AppRole }>).map((row) => row.role);
     const priority: AppRole[] = ['super_admin', 'admin', 'business_owner', 'manager', 'salesperson', 'cashier', 'distributor', 'staff'];
     const nextRole = priority.find((candidate) => roles.includes(candidate)) || null;
     setRole(nextRole);
+    // Platform administration is deliberately online-only and must be
+    // re-authorized with MFA, so never persist that role for offline use.
+    if (nextRole && nextRole !== 'super_admin') await setMeta(offlineAuthKey(userId, 'role'), nextRole);
+    else await deleteMeta(offlineAuthKey(userId, 'role'));
     return nextRole;
   }, []);
 
@@ -302,12 +319,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.warn('Unable to load user profile. Check Supabase auth and RLS policies.', error.message);
-      setProfile(emptyProfile);
-      return { found: false, error: true };
+      const cached = await getMeta<ProfileData>(offlineAuthKey(uid, 'profile'));
+      setProfile(cached ?? emptyProfile);
+      return { found: Boolean(cached), error: true };
     }
 
     const row = data as any;
-    setProfile(row ? {
+    const nextProfile = row ? {
       display_name: row.display_name || '',
       avatar_url: row.avatar_url || '',
       title: row.title || '',
@@ -317,7 +335,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone_verified: Boolean(row.phone_verified),
       phone_verified_at: row.phone_verified_at || null,
       last_verified_phone: row.last_verified_phone || null,
-    } : emptyProfile);
+    } : emptyProfile;
+    setProfile(nextProfile);
+    if (row) await setMeta(offlineAuthKey(uid, 'profile'), nextProfile);
+    else await deleteMeta(offlineAuthKey(uid, 'profile'));
     return { found: !!data, error: false };
   }, [user?.id]);
 

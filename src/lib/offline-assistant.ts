@@ -28,7 +28,7 @@ const QUESTION_START = /^(how|what|which|when|who|whom|do|does|did|is|are|any|ca
 const CUSTOMER_INTENT = /\b(add|new|save|register|create)\s+(a\s+)?customer\b/i;
 const RESTOCK_INTENT = /\b(restock|add\s+stock|received?\s+stock|stock\s+(came|has\s+come)\s+in|bought\s+stock)\b/i;
 const SALE_INTENT = /\b(sold|sell|sale)\b/i;
-const EXPENSE_INTENT = /\b(spent|spend|expense|paid\s+for|paid\s+\d|payment\s+for|bought)\b/i;
+const EXPENSE_INTENT = /\b(spent|spend|expense|paid\s+for|paid\s+\d+(?:\.\d+)?|payment\s+for|bought)\b/i;
 const INCOME_INTENT = /\b(received|receive|got\s+paid|income|earned|someone\s+paid\s+me)\b/i;
 const CREDIT_RE = /\b(on\s+credit|credit|hasn'?t\s+paid|not\s+paid|will\s+pay\s+later|pays?\s+later|owes?(\s+me)?|debt|pay\s+later)\b/i;
 
@@ -176,7 +176,7 @@ function parseSale(original: string, ctx: OfflineParseContext): OfflineParseResu
     items.push({ product_name: String(best.product.name), quantity, unit_price: price });
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 || problems.length > 0) {
     return {
       kind: 'reply',
       reply:
@@ -205,9 +205,7 @@ function parseSale(original: string, ctx: OfflineParseContext): OfflineParseResu
   return {
     kind: 'action',
     action,
-    reply: problems.length
-      ? `${problems.join(' ')} I kept the items I recognised — check the card below, edit if needed, then confirm.`
-      : "Here's what I understood (offline mode). Check the items, tap Edit to change anything, then confirm — it saves on this device and syncs automatically.",
+    reply: "Here's what I understood (offline mode). Check the items, edit anything that needs changing, then confirm — it saves on this device and syncs automatically.",
   };
 }
 
@@ -352,6 +350,22 @@ function parseQuery(text: string, ctx: OfflineParseContext): OfflineParseResult 
     };
   }
 
+  if (/stock|inventory|left|remain/.test(lower)) {
+    const query = text
+      .replace(/\b(how|what|is|are|many|much|do|does|we|i|have|of|in|stock|inventory|left|remain(?:ing)?|units?|please|show|tell|me)\b/gi, ' ')
+      .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const candidates = matchProductCandidates(ctx.products, query);
+    const best = candidates[0];
+    if (best && best.score >= MATCH_THRESHOLD && !isAmbiguousMatch(candidates)) {
+      return {
+        kind: 'reply',
+        reply: `${best.product.name} has ${num(best.product.quantity ?? best.product.stock)} unit(s) in stock, based on the data saved on this device.`,
+      };
+    }
+  }
+
   if (/today/.test(lower) && /(how\s+much|total|made|make|sales?|sold|sell|revenue|earn)/.test(lower)) {
     const todayKey = new Date().toDateString();
     const todays = (ctx.localSales ?? []).filter((record) => {
@@ -375,6 +389,13 @@ function parseQuery(text: string, ctx: OfflineParseContext): OfflineParseResult 
     return {
       kind: 'reply',
       reply: `You have ${ctx.products.length} product(s) in your catalogue, based on the data saved on this device.`,
+    };
+  }
+
+  if (/how\s+many\s+customers|customer\s+count/.test(lower)) {
+    return {
+      kind: 'reply',
+      reply: `You have ${(ctx.customers ?? []).length} customer(s), based on the data saved on this device.`,
     };
   }
 

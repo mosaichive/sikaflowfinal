@@ -4,14 +4,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useBusiness } from '@/context/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
 import { getActiveCurrencyCode } from '@/lib/currency';
-import { ALL_MODULES } from '@/lib/permissions';
 import { loadProductsCompat } from '@/lib/workspace';
 import { offlineStorageAvailable, readCachedRecords, readLocalSales, STORE_CUSTOMERS } from '@/lib/offline-db';
 import { parseOfflineCommand } from '@/lib/offline-assistant';
 import {
   ACTION_LABEL,
   ACTION_MODULE,
-  buildAssistantContext,
   buildProductClarifications,
   applyProductChoice,
   executeAssistantAction,
@@ -20,6 +18,9 @@ import {
 } from '@/lib/ai-assistant';
 
 const uid = () => Math.random().toString(36).slice(2);
+const DURABLE_ACTIONS = new Set<AssistantAction['type']>([
+  'record_sale', 'record_expense', 'record_income', 'add_customer',
+]);
 
 const GREETING: AssistantMessage = {
   id: 'greeting',
@@ -38,8 +39,8 @@ function isNetworkInvokeError(error: any) {
 }
 
 export function useAIAssistant() {
-  const { user, displayName, effectiveBusinessOwnerId, hasModule, staffMembership } = useAuth();
-  const { businessId, business } = useBusiness();
+  const { user, displayName, effectiveBusinessOwnerId, hasModule } = useAuth();
+  const { businessId } = useBusiness();
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<AssistantMessage[]>([GREETING]);
@@ -47,6 +48,7 @@ export function useAIAssistant() {
   const [executingId, setExecutingId] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const [providerAvailable, setProviderAvailable] = useState<boolean | null>(null);
   const recognitionRef = useRef<any>(null);
   const onlineRef = useRef(online);
   onlineRef.current = online;
@@ -61,11 +63,6 @@ export function useAIAssistant() {
       window.removeEventListener('offline', goOffline);
     };
   }, []);
-
-  const allowedModules = useMemo(
-    () => ALL_MODULES.map((m) => m.key).filter((key) => hasModule(key)),
-    [hasModule, staffMembership],
-  );
 
   const voiceSupported = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -83,8 +80,8 @@ export function useAIAssistant() {
     async (text: string) => {
       const [products, customers, localSales] = await Promise.all([
         loadProductsCompat(false, businessId).catch(() => [] as any[]),
-        readCachedRecords(STORE_CUSTOMERS).catch(() => [] as any[]),
-        readLocalSales().catch(() => []),
+        readCachedRecords(STORE_CUSTOMERS, businessId).catch(() => [] as any[]),
+        readLocalSales({ businessId, actorId: user?.id }).catch(() => []),
       ]);
 
       const result = parseOfflineCommand(text, {
@@ -115,7 +112,7 @@ export function useAIAssistant() {
         },
       ]);
     },
-    [businessId, hasModule],
+    [businessId, hasModule, user?.id],
   );
 
   const send = useCallback(
@@ -146,18 +143,9 @@ export function useAIAssistant() {
           return;
         }
 
-        const context = await buildAssistantContext({
-          ownerId,
-          businessId,
-          businessName: business?.name || '',
-          currency: getActiveCurrencyCode(),
-          modules: allowedModules,
-        });
-
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: {
             messages: history.map((m) => ({ role: m.role, content: m.content })),
-            context,
           },
         });
 
@@ -166,6 +154,7 @@ export function useAIAssistant() {
 
         // Provider disabled server-side: use the on-device command parser so recording still works.
         if (data?.provider_disabled && offlineStorageAvailable()) {
+          setProviderAvailable(false);
           try {
             await runOffline(trimmed);
             return;
@@ -175,6 +164,7 @@ export function useAIAssistant() {
         }
 
         const action: AssistantAction | null = data?.action ?? null;
+        setProviderAvailable(true);
         const blocked = action && !hasModule(ACTION_MODULE[action.type]);
         const catalogue =
           action && !blocked ? await loadProductsCompat(false, businessId).catch(() => [] as any[]) : [];
@@ -196,6 +186,7 @@ export function useAIAssistant() {
       } catch (err: any) {
         // Network-level failures fall back to the on-device parser so the user can keep working.
         if (isNetworkInvokeError(err) && offlineStorageAvailable()) {
+          setProviderAvailable(false);
           try {
             await runOffline(trimmed);
             return;
@@ -217,7 +208,7 @@ export function useAIAssistant() {
         setThinking(false);
       }
     },
-    [allowedModules, business?.name, businessId, hasModule, messages, ownerId, runOffline, thinking, user],
+    [businessId, hasModule, messages, ownerId, runOffline, thinking, user],
   );
 
   const confirmAction = useCallback(
@@ -245,6 +236,7 @@ export function useAIAssistant() {
           allowSalesWithoutStock = Boolean((profile as any)?.allow_sales_without_stock);
         }
 
+        const durable = DURABLE_ACTIONS.has(action.type);
         const result = await executeAssistantAction(action, {
           userId: user.id,
           ownerId,
@@ -252,7 +244,7 @@ export function useAIAssistant() {
           displayName: displayName || user.email || 'Team member',
           products: products as any[],
           allowSalesWithoutStock,
-          offline,
+          offline: offline || durable,
         });
 
         if (!result.ok) {
@@ -268,7 +260,7 @@ export function useAIAssistant() {
             content: `${result.message} Anything else?`,
           }),
         );
-        toast({ title: offline ? 'Saved on device' : 'Saved', description: result.message });
+        toast({ title: offline || durable ? 'Saved securely' : 'Saved', description: result.message });
       } catch (err: any) {
         toast({ title: 'Could not save', description: err?.message || 'Please try again.', variant: 'destructive' });
       } finally {
@@ -378,6 +370,7 @@ export function useAIAssistant() {
     listening,
     voiceSupported,
     online,
+    assistantMode: !online ? 'offline' as const : providerAvailable === true ? 'cloud' as const : 'on_device' as const,
     send,
     confirmAction,
     cancelAction,

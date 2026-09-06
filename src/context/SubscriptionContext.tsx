@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { planHasFeature, type AnyPlan, type FeatureKey, type PlanTier, isLegacyPlan } from '@/lib/plan-features';
+import { deleteMeta, getMeta, setMeta } from '@/lib/offline-db';
 
 export type PlanKey = AnyPlan;
 export type SubStatus = 'trial' | 'active' | 'overdue' | 'expired' | 'suspended' | 'canceled' | 'lifetime';
@@ -31,6 +32,12 @@ interface SubContextType {
 }
 
 const SubContext = createContext<SubContextType | undefined>(undefined);
+const offlineSubscriptionKey = (userId: string) => `workspace_subscription:${userId}`;
+
+interface CachedSubscriptionState {
+  subscription: Subscription | null;
+  isSuperAdmin: boolean;
+}
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, staffMembership } = useAuth();
@@ -50,23 +57,37 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: superRow } = await supabase
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('role', 'super_admin' as any)
-      .maybeSingle();
-    setIsSuperAdmin(!!superRow);
-
     const targetId = subscriptionOwnerId ?? user.id;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, subscription_plan, subscription_status, subscription_start_date, subscription_end_date, trial_start_date, trial_end_date')
-      .eq('id', targetId)
-      .maybeSingle();
+    const [superResult, profileResult] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'super_admin' as any)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('id, subscription_plan, subscription_status, subscription_start_date, subscription_end_date, trial_start_date, trial_end_date')
+        .eq('id', targetId)
+        .maybeSingle(),
+    ]);
+
+    if (superResult.error || profileResult.error) {
+      const cached = await getMeta<CachedSubscriptionState>(offlineSubscriptionKey(user.id));
+      setSubscription(cached?.subscription ?? null);
+      // Platform administration is always online and requires a fresh MFA-backed check.
+      setIsSuperAdmin(false);
+      setLoading(false);
+      return;
+    }
+
+    const isPlatformAdmin = Boolean(superResult.data);
+    const profile = profileResult.data;
+    setIsSuperAdmin(isPlatformAdmin);
 
     if (!profile) {
       setSubscription(null);
+      await deleteMeta(offlineSubscriptionKey(user.id));
       setLoading(false);
       return;
     }
@@ -75,7 +96,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     const statusRaw = (profile.subscription_status as string) ?? 'trial';
     const plan = (planRaw === 'trial' ? 'free_trial' : planRaw) as PlanKey;
 
-    setSubscription({
+    const nextSubscription: Subscription = {
       id: profile.id,
       plan,
       status: statusRaw as SubStatus,
@@ -84,7 +105,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       trial_end_date: profile.trial_end_date,
       current_period_start: profile.subscription_start_date,
       current_period_end: profile.subscription_end_date,
-    });
+    };
+    setSubscription(nextSubscription);
+    await setMeta(offlineSubscriptionKey(user.id), {
+      subscription: nextSubscription,
+      isSuperAdmin: false,
+    } satisfies CachedSubscriptionState);
     setLoading(false);
   }, [user, authLoading, subscriptionOwnerId]);
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { deleteMeta, getMeta, setMeta } from '@/lib/offline-db';
 
 export interface Business {
   allow_sales_without_stock?: boolean;
@@ -49,6 +50,7 @@ const BUSINESS_PROFILE_SELECT =
 
 const STABLE_BUSINESS_PROFILE_SELECT =
   'id, business_name, business_type, phone, location, logo_url, onboarding_completed, email';
+const offlineBusinessKey = (userId: string) => `workspace_business:${userId}`;
 
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const { user, staffMembership } = useAuth();
@@ -113,22 +115,27 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
       if (profileError) {
         console.warn('Unable to load business profile. Check Supabase auth and RLS policies.', profileError.message);
+        const cached = await getMeta<Business>(offlineBusinessKey(user.id));
+        if (loadSeq === loadSeqRef.current) setBusiness(cached);
+        return;
       }
 
       if (loadSeq !== loadSeqRef.current) return;
 
       if (!profile) {
         setBusiness(null);
+        await deleteMeta(offlineBusinessKey(user.id));
         return;
       }
 
       const p = profile as any;
       if (!p.business_name) {
         setBusiness(null);
+        await deleteMeta(offlineBusinessKey(user.id));
         return;
       }
 
-      setBusiness({
+      const nextBusiness: Business = {
         id: ownerUserId,
         name: p.business_name,
         slug: null,
@@ -143,7 +150,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         email_verified: true,
         phone_verified: false,
         allow_sales_without_stock: Boolean(p.allow_sales_without_stock),
-      });
+      };
+      setBusiness(nextBusiness);
+      await setMeta(offlineBusinessKey(user.id), nextBusiness);
     } finally {
       if (loadSeq === loadSeqRef.current) {
         setLoading(false);

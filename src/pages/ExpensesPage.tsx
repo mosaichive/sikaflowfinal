@@ -16,9 +16,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Receipt, X, Paperclip, Trash2, WalletCards } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getErrorMessage, insertExpenseRecord, loadRowsForBusinessCompat, logSupabaseError } from '@/lib/workspace';
+import { cacheRecords, readCachedRecords, replaceCachedRecords, STORE_EXPENSES } from '@/lib/offline-db';
+import { enqueueOperation, OFFLINE_SYNC_COMPLETE_EVENT } from '@/lib/offline-sync';
 
 type ExpenseRow = {
   id: string;
+  business_id?: string;
   category: string;
   amount: number | string;
   expense_date: string;
@@ -87,9 +90,10 @@ export default function ExpensesPage() {
         context: 'expenses.load',
       });
       setExpenses(data);
+      await replaceCachedRecords(STORE_EXPENSES, businessId, data);
     } catch (error) {
       logSupabaseError('expenses.load', error, { businessId, userId: user.id });
-      setExpenses([]);
+      setExpenses(await readCachedRecords<ExpenseRow>(STORE_EXPENSES, businessId));
     }
   }, [businessId, effectiveBusinessOwnerId, user]);
 
@@ -102,7 +106,10 @@ export default function ExpensesPage() {
         void fetchExpenses();
       })
       .subscribe();
+    const onOfflineSync = () => { void fetchExpenses(); };
+    window.addEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
     return () => {
+      window.removeEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
       void supabase.removeChannel(ch);
     };
   }, [businessId, fetchExpenses, user]);
@@ -183,6 +190,54 @@ export default function ExpensesPage() {
 
     setLoading(true);
     setRowErrors({});
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (drafts.some((row) => row.receipt)) {
+        setLoading(false);
+        toast({
+          title: 'Receipt needs a connection',
+          description: 'Remove the receipt to save now, or reconnect so the file can upload securely.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const localRows: ExpenseRow[] = [];
+      for (const row of drafts) {
+        const id = await enqueueOperation({
+          kind: 'expense',
+          ownerId: effectiveBusinessOwnerId ?? user.id,
+          businessId,
+          amount: Number(row.amount),
+          label: `Expense — ${row.category}`,
+          payload: {
+            amount: Number(row.amount),
+            category: row.category,
+            description: row.description.trim(),
+            expense_date: row.expense_date,
+            payment_method: row.payment_method,
+            recorded_by_name: displayName || user.email || 'Team member',
+          },
+        });
+        localRows.push({
+          id, business_id: businessId, category: row.category,
+          description: row.description.trim(), amount: Number(row.amount),
+          expense_date: row.expense_date, payment_method: row.payment_method,
+          attachment_path: null, attachment_name: null,
+          recorded_by_name: displayName || user.email || 'Team member',
+        });
+      }
+      await cacheRecords(STORE_EXPENSES, localRows);
+      setExpenses((current) => [...localRows, ...current]);
+      setLoading(false);
+      toast({
+        title: localRows.length > 1 ? `${localRows.length} expenses saved on this device` : 'Expense saved on this device',
+        description: 'They will sync automatically when you reconnect.',
+      });
+      resetDrafts();
+      setOpen(false);
+      return;
+    }
+
     const failures: { index: number; message: string }[] = [];
     let successCount = 0;
 

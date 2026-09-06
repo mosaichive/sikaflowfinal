@@ -59,6 +59,13 @@ describe('offline assistant parser — multi-item sales', () => {
     expect(result.reply.toLowerCase()).toContain("couldn't find");
   });
 
+  it('never creates a partial sale when one of several products is unknown', () => {
+    const result = parseOfflineCommand('sold 2 t shirts and 1 laptop', ctx);
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') return;
+    expect(result.reply.toLowerCase()).toContain('laptop');
+  });
+
   it('captures the customer phone number without corrupting quantities', () => {
     const result = parseOfflineCommand('sold 2 t shirts at 90 to Ama 0244123456', ctx);
     expect(result.kind).toBe('action');
@@ -86,6 +93,15 @@ describe('offline assistant parser — expenses, income, customers', () => {
     expect(result.action.amount).toBe(500);
   });
 
+  it('detects mobile money and bank transfer payment language', () => {
+    const expense = parseOfflineCommand('paid 150 for transport via momo', ctx);
+    const income = parseOfflineCommand('earned GHS 1,200 commission by bank transfer', ctx);
+    expect(expense.kind).toBe('action');
+    expect(income.kind).toBe('action');
+    if (expense.kind === 'action') expect(expense.action.payment_method).toBe('momo');
+    if (income.kind === 'action') expect(income.action.payment_method).toBe('bank_transfer');
+  });
+
   it('parses add customer with phone', () => {
     const result = parseOfflineCommand('add customer Kofi Mensah 0244123456', ctx);
     expect(result.kind).toBe('action');
@@ -102,6 +118,24 @@ describe('offline assistant parser — queries and limitations', () => {
     expect(result.kind).toBe('reply');
     if (result.kind !== 'reply') return;
     expect(result.reply).toContain('Sandals');
+  });
+
+  it('answers stock for a specific cached product', () => {
+    const result = parseOfflineCommand('how many t shirts do I have in stock?', ctx);
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') return;
+    expect(result.reply).toContain('T-Shirt');
+    expect(result.reply).toContain('85');
+  });
+
+  it('answers customer count from the private device cache', () => {
+    const result = parseOfflineCommand('how many customers do I have?', {
+      ...ctx,
+      customers: [{ id: 'c1' }, { id: 'c2' }],
+    });
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') return;
+    expect(result.reply).toContain('2 customer');
   });
 
   it('summarises offline sales made today', () => {

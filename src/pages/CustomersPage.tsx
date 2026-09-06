@@ -18,13 +18,18 @@ import { getCreditStatus } from '@/lib/sales-inventory';
 import { Eye, Plus, Users, Search, Pencil, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/AuthContext';
+import { useBusiness } from '@/context/BusinessContext';
+import { cacheRecords, readCachedRecords, replaceCachedRecords, STORE_CUSTOMERS } from '@/lib/offline-db';
+import { enqueueOperation, OFFLINE_SYNC_COMPLETE_EVENT } from '@/lib/offline-sync';
 
 type CustomerRow = {
   id: string;
+  business_id?: string;
   name: string;
   phone: string | null;
   email: string | null;
-  note: string | null;
+  notes: string | null;
 };
 
 type CustomerSale = {
@@ -43,6 +48,8 @@ type CustomerSale = {
 const emptyForm = { name: '', phone: '', email: '', notes: '' };
 
 export default function CustomersPage() {
+  const { user, effectiveBusinessOwnerId } = useAuth();
+  const { businessId } = useBusiness();
   const { toast } = useToast();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [sales, setSales] = useState<CustomerSale[]>([]);
@@ -59,19 +66,30 @@ export default function CustomersPage() {
       supabase.from('customers').select('*').order('name'),
       supabase.from('sales').select('id,sale_date,customer_name,total,amount_paid,balance,payment_status,due_date,payment_method,status').order('sale_date', { ascending: false }),
     ]);
-    setCustomers((custRes.data || []) as CustomerRow[]);
+    const liveCustomers = (custRes.data || []) as CustomerRow[];
+    if (!custRes.error && businessId) {
+      setCustomers(liveCustomers);
+      await replaceCachedRecords(STORE_CUSTOMERS, businessId, liveCustomers);
+    } else {
+      setCustomers(await readCachedRecords<CustomerRow>(STORE_CUSTOMERS, businessId));
+    }
     setSales((salesRes.data || []) as CustomerSale[]);
-  }, []);
+  }, [businessId]);
 
   useEffect(() => {
     void fetchCustomers();
     const ch = supabase
-      .channel('customers-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => { void fetchCustomers(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => { void fetchCustomers(); })
+      .channel(`customers-page-${businessId || 'none'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers', filter: businessId ? `business_id=eq.${businessId}` : undefined }, () => { void fetchCustomers(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: businessId ? `business_id=eq.${businessId}` : undefined }, () => { void fetchCustomers(); })
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [fetchCustomers]);
+    const onOfflineSync = () => { void fetchCustomers(); };
+    window.addEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
+    return () => {
+      window.removeEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
+      void supabase.removeChannel(ch);
+    };
+  }, [businessId, fetchCustomers]);
 
   const customerRows = useMemo(() => {
     const prepared = customers.map((customer) => {
@@ -104,7 +122,7 @@ export default function CustomersPage() {
 
   const openEdit = (c: CustomerRow) => {
     setEditingId(c.id);
-    setForm({ name: c.name, phone: c.phone || '', email: c.email || '', notes: c.note || '' });
+    setForm({ name: c.name, phone: c.phone || '', email: c.email || '', notes: c.notes || '' });
     setOpen(true);
   };
 
@@ -112,21 +130,37 @@ export default function CustomersPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('You must be signed in.');
+      if (!user || !businessId) throw new Error('You must be signed in to a business.');
       const payload = {
         name: form.name,
         phone: form.phone || null,
         email: form.email || null,
-        note: form.notes || null,
+        notes: form.notes || null,
       };
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (editingId) throw new Error('Reconnect before editing an existing customer.');
+        const localId = await enqueueOperation({
+          kind: 'customer',
+          ownerId: effectiveBusinessOwnerId ?? user.id,
+          businessId,
+          label: `New customer: ${form.name}`,
+          payload,
+        });
+        const localRow: CustomerRow = { id: localId, business_id: businessId, ...payload };
+        await cacheRecords(STORE_CUSTOMERS, [localRow]);
+        setCustomers((previous) => [...previous, localRow].sort((a, b) => a.name.localeCompare(b.name)));
+        toast({ title: 'Customer saved on this device', description: 'It will sync when you reconnect.' });
+        setForm(emptyForm);
+        setOpen(false);
+        return;
+      }
       if (editingId) {
         const { data, error } = await supabase.from('customers').update(payload).eq('id', editingId).select().single();
         if (error) throw error;
         setCustomers((prev) => prev.map((c) => (c.id === editingId ? (data as CustomerRow) : c)));
         toast({ title: 'Customer updated' });
       } else {
-        const { data, error } = await supabase.from('customers').insert({ ...payload, user_id: user.id }).select().single();
+        const { data, error } = await supabase.from('customers').insert({ ...payload, business_id: businessId }).select().single();
         if (error) throw error;
         setCustomers((prev) => [...prev, data as CustomerRow].sort((a, b) => a.name.localeCompare(b.name)));
         toast({ title: 'Customer added' });
@@ -287,7 +321,7 @@ export default function CustomersPage() {
                 <div className="grid gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 md:grid-cols-2">
                   <div><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Phone</p><p className="mt-1 text-sm">{activeCustomer.phone || '—'}</p></div>
                   <div><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Email</p><p className="mt-1 text-sm">{activeCustomer.email || '—'}</p></div>
-                  <div className="md:col-span-2"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Notes</p><p className="mt-1 text-sm">{activeCustomer.note || '—'}</p></div>
+                  <div className="md:col-span-2"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Notes</p><p className="mt-1 text-sm">{activeCustomer.notes || '—'}</p></div>
                 </div>
                 {activeCustomer.history.length > 0 ? (
                   <div className="overflow-hidden rounded-2xl border border-border">

@@ -30,6 +30,7 @@ const RPC_BY_KIND: Record<QueueKind, string> = {
 const MAX_ATTEMPTS = 8;
 const BASE_BACKOFF_MS = 4_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
+export const OFFLINE_SYNC_COMPLETE_EVENT = 'kuditrack:offline-sync-complete';
 
 export type SyncProgress = {
   /** Items in the current upload pass. */
@@ -92,6 +93,7 @@ const listeners = new Set<Listener>();
 let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
 let runningPass: Promise<void> | null = null;
+let activeScope: { actorId: string; businessId: string } | null = null;
 
 function emit() {
   for (const listener of listeners) listener(state);
@@ -103,7 +105,7 @@ function setState(patch: Partial<SyncState>) {
 }
 
 async function refreshFromStore() {
-  const items = await readQueue();
+  const items = activeScope ? await readQueue(activeScope) : [];
   setState({
     items,
     pending: items.filter((i) => i.status === 'pending' || i.status === 'syncing').length,
@@ -120,6 +122,12 @@ export function subscribeToSync(listener: Listener) {
   listeners.add(listener);
   listener(state);
   return () => listeners.delete(listener);
+}
+
+export function setOfflineSyncScope(actorId?: string | null, businessId?: string | null) {
+  activeScope = actorId && businessId ? { actorId, businessId } : null;
+  void refreshFromStore();
+  if (activeScope) void syncNow();
 }
 
 function backoffFor(attempts: number) {
@@ -142,17 +150,22 @@ export async function enqueueOperation(input: {
   amount?: number;
   clientTxnId?: string;
 }) {
+  if (!input.businessId) throw new Error('A business is required before work can be saved offline.');
+  const { data: authData } = await supabase.auth.getSession();
+  if (!authData.session?.user) throw new Error('Sign in before saving work offline.');
   const deviceId = await getDeviceId();
   const id = input.clientTxnId ?? newTxnId();
   const item: QueueItem = {
     id,
     kind: input.kind,
     ownerId: input.ownerId,
-    businessId: input.businessId ?? null,
+    actorId: authData.session.user.id,
+    businessId: input.businessId,
     deviceId,
     payload: {
       ...input.payload,
       owner_id: input.ownerId,
+      business_id: input.businessId,
       client_txn_id: id,
       client_device_id: deviceId,
       created_offline: true,
@@ -176,7 +189,12 @@ async function processItem(item: QueueItem) {
   await putQueueItem({ ...item, status: 'syncing' });
 
   const { data, error } = await supabase.rpc(RPC_BY_KIND[item.kind] as any, {
-    _payload: item.payload as any,
+    _payload: {
+      ...item.payload,
+      business_id: item.businessId,
+      client_txn_id: item.id,
+      client_device_id: item.deviceId,
+    } as any,
   });
 
   if (error) {
@@ -213,6 +231,11 @@ async function processItem(item: QueueItem) {
   await deleteQueueItem(item.id);
   await setMeta('last_synced_at', Date.now());
   rememberSynced({ id: item.id, label: item.label, amount: Number(item.amount ?? 0), at: Date.now() });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(OFFLINE_SYNC_COMPLETE_EVENT, {
+      detail: { kind: item.kind, businessId: item.businessId, serverId: result.sale_id ?? result.customer_id ?? result.expense_id ?? result.income_id ?? null },
+    }));
+  }
 }
 
 /** Drain the queue. Concurrent calls share one in-flight pass. */
@@ -223,11 +246,12 @@ export async function syncNow(): Promise<void> {
   const pass = (async () => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) return; // Signed out — keep the queue for later.
+    if (!activeScope || session.session.user.id !== activeScope.actorId) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
     setState({ syncing: true });
     try {
-      const queue = await readQueue();
+      const queue = await readQueue(activeScope);
       const now = Date.now();
       const due = queue.filter(
         (item) =>
@@ -276,7 +300,7 @@ export async function syncNow(): Promise<void> {
 
 /** Push a failed/conflicted item back into the queue for another attempt. */
 export async function retryItem(id: string) {
-  const queue = await readQueue();
+  const queue = activeScope ? await readQueue(activeScope) : [];
   const item = queue.find((i) => i.id === id);
   if (!item) return;
   await putQueueItem({ ...item, status: 'pending', attempts: 0, nextAttemptAt: 0, lastError: null });
@@ -291,7 +315,7 @@ export async function discardItem(id: string) {
 }
 
 export async function retryAll() {
-  const queue = await readQueue();
+  const queue = activeScope ? await readQueue(activeScope) : [];
   for (const item of queue) {
     if (item.status === 'failed' || item.status === 'conflict') {
       await putQueueItem({ ...item, status: 'pending', attempts: 0, nextAttemptAt: 0, lastError: null });

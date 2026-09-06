@@ -36,6 +36,7 @@ import {
 } from '@/lib/workspace';
 import { recordSaleOffline } from '@/lib/offline-sale';
 import { readLocalSales } from '@/lib/offline-db';
+import { OFFLINE_SYNC_COMPLETE_EVENT } from '@/lib/offline-sync';
 
 
 
@@ -150,12 +151,17 @@ export default function SalesPage() {
 
   useEffect(() => {
     fetchData();
-    const channel = supabase.channel('sales-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, fetchSales)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchAllProducts)
+    const channel = supabase.channel(`sales-page-${businessId || 'none'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: businessId ? `business_id=eq.${businessId}` : undefined }, fetchSales)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: businessId ? `business_id=eq.${businessId}` : undefined }, fetchAllProducts)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    const onOfflineSync = () => { void fetchData(); };
+    window.addEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
+    return () => {
+      window.removeEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
+      void supabase.removeChannel(channel);
+    };
+  }, [businessId, user?.id]);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -187,7 +193,7 @@ export default function SalesPage() {
     // till never looks empty just because the connection dropped.
     let offlineRows: any[] = [];
     try {
-      const local = await readLocalSales();
+      const local = await readLocalSales({ businessId, actorId: user?.id });
       offlineRows = local
         .filter((record) => !record.serverId)
         .map((record) => {
@@ -485,13 +491,13 @@ export default function SalesPage() {
         const { data: existing } = await supabase
           .from('customers')
           .select('id')
-          .eq('user_id', ownerId)
+          .eq('business_id', businessId)
           .ilike('name', customerName)
           .maybeSingle();
         if (!existing) {
           const { error: custErr } = await supabase
             .from('customers')
-            .insert({ user_id: ownerId, name: customerName, phone: customerPhone || null });
+            .insert({ business_id: businessId, user_id: ownerId, name: customerName, phone: customerPhone || null });
           if (custErr) {
             console.warn('[SalesPage] auto-create customer failed', custErr);
           }

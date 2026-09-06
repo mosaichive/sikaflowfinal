@@ -3,7 +3,9 @@ import {
   insertSaleRecord,
   insertSaleItemRecord,
   insertExpenseRecord,
+  insertOtherIncomeRecord,
   insertRestockRecord,
+  createProductRecord,
   loadProductsCompat,
 } from '@/lib/workspace';
 import { recomputeProductStock } from '@/lib/sale-items-schema';
@@ -377,13 +379,13 @@ async function recordSale(action: AssistantAction, ctx: AssistantExecutionContex
     const { data: existing } = await supabase
       .from('customers')
       .select('id')
-      .eq('user_id', ctx.ownerId)
+      .eq('business_id', ctx.businessId)
       .ilike('name', customerName)
       .maybeSingle();
     if (!existing) {
       await supabase
         .from('customers')
-        .insert({ user_id: ctx.ownerId, name: customerName, phone: action.customer_phone || null });
+        .insert({ business_id: ctx.businessId, name: customerName, phone: action.customer_phone || null });
     }
   }
 
@@ -471,19 +473,28 @@ async function recordIncome(action: AssistantAction, ctx: AssistantExecutionCont
     return { ok: true, message: 'Income saved on this device — it will sync when you reconnect.' };
   }
 
-  const { error } = await supabase.from('other_income' as any).insert({
-    user_id: ctx.ownerId,
-    source: category,
-    category,
-    amount,
-    income_date: resolveDate(action.date),
-    payment_method: normalizePaymentMethod(action.payment_method),
-    description: action.note || category,
-    note: action.note || category,
-    recorded_by: ctx.userId,
-    recorded_by_name: ctx.displayName,
+  await insertOtherIncomeRecord({
+    businessPayload: {
+      business_id: ctx.businessId,
+      category,
+      amount,
+      income_date: resolveDate(action.date),
+      payment_method: normalizePaymentMethod(action.payment_method),
+      description: action.note || category,
+      recorded_by: ctx.userId,
+      recorded_by_name: ctx.displayName,
+    },
+    legacyPayload: {
+      user_id: ctx.ownerId,
+      source: category,
+      amount,
+      income_date: resolveDate(action.date),
+      payment_method: normalizePaymentMethod(action.payment_method),
+      note: action.note || category,
+      recorded_by: ctx.userId,
+      recorded_by_name: ctx.displayName,
+    },
   });
-  if (error) throw error;
 
   return { ok: true, message: 'Other income recorded.' };
 }
@@ -506,10 +517,10 @@ async function addCustomer(action: AssistantAction, ctx: AssistantExecutionConte
   }
 
   const { error } = await supabase.from('customers').insert({
-    user_id: ctx.ownerId,
+    business_id: ctx.businessId,
     name,
     phone: action.customer_phone || null,
-    note: action.note || null,
+    notes: action.note || null,
   });
   if (error) throw error;
 
@@ -572,92 +583,16 @@ async function addProduct(action: AssistantAction, ctx: AssistantExecutionContex
   const price = num(action.unit_price ?? action.amount);
   if (price <= 0) return { ok: false, message: 'I need a selling price for the product.' };
 
-  const { error } = await supabase.from('products').insert({
+  await createProductRecord({
     user_id: ctx.ownerId,
+    business_id: ctx.businessId,
     name,
-    price,
-    cost: 0,
-    stock: num(action.quantity),
+    sku: `AI-${Date.now().toString(36).toUpperCase()}`,
+    selling_price: price,
+    cost_price: 0,
+    quantity: num(action.quantity),
     category: action.category || 'General',
   });
-  if (error) throw error;
 
   return { ok: true, message: `${name} added to your products.` };
-}
-
-/* ----------------------------------------------------------------- context */
-
-/** Builds the read-only business snapshot the assistant reasons over. */
-export async function buildAssistantContext(params: {
-  ownerId: string;
-  businessId: string;
-  businessName: string;
-  currency: string;
-  modules: string[];
-}) {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-  const [productsRes, salesRes, expensesRes, incomeRes, customersRes] = await Promise.allSettled([
-    loadProductsCompat(false, params.businessId),
-    supabase.from('sales').select('id, total, cost_total, amount_paid, sale_date, customer_name').gte('sale_date', startOfMonth),
-    supabase.from('expenses').select('amount, category, expense_date').gte('expense_date', startOfMonth),
-    supabase.from('other_income').select('amount, income_date').gte('income_date', startOfMonth),
-    supabase.from('customers').select('id, name').limit(200),
-  ]);
-
-  const products = productsRes.status === 'fulfilled' ? (productsRes.value as any[]) : [];
-  const sales = salesRes.status === 'fulfilled' ? ((salesRes.value as any).data ?? []) : [];
-  const expenses = expensesRes.status === 'fulfilled' ? ((expensesRes.value as any).data ?? []) : [];
-  const income = incomeRes.status === 'fulfilled' ? ((incomeRes.value as any).data ?? []) : [];
-  const customers = customersRes.status === 'fulfilled' ? ((customersRes.value as any).data ?? []) : [];
-
-  const todaySales = sales.filter((s: any) => s.sale_date >= startOfToday);
-  const sum = (rows: any[], key: string) => rows.reduce((total, row) => total + num(row[key]), 0);
-
-  const monthRevenue = sum(sales, 'total');
-  const monthCogs = sum(sales, 'cost_total');
-  const monthExpenses = sum(expenses, 'amount');
-  const monthIncome = sum(income, 'amount');
-
-  const lowStock = products
-    .filter((p: any) => num(p.quantity ?? p.stock) <= num(p.low_stock_threshold ?? p.reorder_level))
-    .slice(0, 20)
-    .map((p: any) => ({ name: p.name, stock: num(p.quantity ?? p.stock) }));
-
-  return {
-    today: now.toISOString().slice(0, 10),
-    currency: params.currency,
-    businessName: params.businessName,
-    modules: params.modules,
-    expenseCategories: [...EXPENSE_CATEGORIES],
-    incomeCategories: [...OTHER_INCOME_CATEGORIES],
-    products: products.map((p: any) => ({
-      name: p.name,
-      sku: p.sku || '',
-      price: num(p.selling_price ?? p.price),
-      cost: num(p.cost_price ?? p.cost),
-      stock: num(p.quantity ?? p.stock),
-    })),
-    snapshot: {
-      today: {
-        sales_count: todaySales.length,
-        revenue: sum(todaySales, 'total'),
-        profit_estimate: sum(todaySales, 'total') - sum(todaySales, 'cost_total'),
-      },
-      this_month: {
-        sales_count: sales.length,
-        revenue: monthRevenue,
-        cost_of_goods_sold: monthCogs,
-        other_income: monthIncome,
-        expenses: monthExpenses,
-        profit_estimate: monthRevenue - monthCogs - monthExpenses + monthIncome,
-      },
-      product_count: products.length,
-      customer_count: customers.length,
-      low_stock: lowStock,
-      recent_customers: customers.slice(0, 15).map((c: any) => c.name),
-    },
-  };
 }

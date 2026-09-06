@@ -16,10 +16,17 @@ export async function consumeRateLimit(options: {
   req: Request;
   action: string;
   entity?: string;
+  keyScope?: 'client' | 'entity' | 'client_entity';
   limit: number;
   windowSeconds: number;
 }): Promise<boolean> {
-  const keyHash = await sha256(`${clientFingerprint(options.req)}|${options.entity || ''}`);
+  const scope = options.keyScope ?? 'client_entity';
+  const identity = scope === 'entity'
+    ? `entity:${options.entity || 'missing'}`
+    : scope === 'client'
+      ? `client:${clientFingerprint(options.req)}`
+      : `client:${clientFingerprint(options.req)}|entity:${options.entity || ''}`;
+  const keyHash = await sha256(identity);
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,

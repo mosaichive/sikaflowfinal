@@ -17,9 +17,12 @@ import { formatCurrency, OTHER_INCOME_CATEGORIES, PAYMENT_METHODS, SIKAFLOW_TOOL
 import { insertOtherIncomeRecord, loadRowsForBusinessCompat, logSupabaseError } from '@/lib/workspace';
 import { Banknote, Plus, Trash2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cacheRecords, readCachedRecords, replaceCachedRecords, STORE_INCOME } from '@/lib/offline-db';
+import { enqueueOperation, OFFLINE_SYNC_COMPLETE_EVENT } from '@/lib/offline-sync';
 
 type OtherIncomeRow = {
   id: string;
+  business_id?: string;
   category: string;
   amount: number | string;
   income_date: string;
@@ -63,9 +66,10 @@ export default function OtherIncomePage() {
         context: 'otherIncome.load',
       });
       setRows(data);
+      await replaceCachedRecords(STORE_INCOME, businessId, data);
     } catch (error) {
       logSupabaseError('otherIncome.load', error, { businessId });
-      setRows([]);
+      setRows(await readCachedRecords<OtherIncomeRow>(STORE_INCOME, businessId));
     }
   }, [businessId, effectiveBusinessOwnerId, user]);
 
@@ -76,7 +80,10 @@ export default function OtherIncomePage() {
       .channel(`other-income-page:${businessId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'other_income', filter: `business_id=eq.${businessId}` }, () => { void fetchRows(); })
       .subscribe();
+    const onOfflineSync = () => { void fetchRows(); };
+    window.addEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
     return () => {
+      window.removeEventListener(OFFLINE_SYNC_COMPLETE_EVENT, onOfflineSync);
       void supabase.removeChannel(channel);
     };
   }, [businessId, fetchRows]);
@@ -100,6 +107,43 @@ export default function OtherIncomePage() {
     setLoading(true);
 
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (attachment) {
+          throw new Error('Remove the attachment to save now, or reconnect so the file can upload securely.');
+        }
+        const id = await enqueueOperation({
+          kind: 'income',
+          ownerId: effectiveBusinessOwnerId ?? user.id,
+          businessId,
+          amount: amountValue,
+          label: `Income — ${form.category}`,
+          payload: {
+            amount: amountValue,
+            category: form.category,
+            description: form.description,
+            income_date: form.income_date,
+            payment_method: form.payment_method,
+            recorded_by_name: displayName || user.email || 'Team member',
+          },
+        });
+        const localRow: OtherIncomeRow = {
+          id, business_id: businessId, category: form.category, amount: amountValue,
+          income_date: form.income_date, payment_method: form.payment_method,
+          description: form.description, attachment_name: null, attachment_path: null,
+          recorded_by_name: displayName || user.email || 'Team member',
+        };
+        await cacheRecords(STORE_INCOME, [localRow]);
+        setRows((current) => [localRow, ...current]);
+        toast({ title: 'Income saved on this device', description: 'It will sync automatically when you reconnect.' });
+        setForm({
+          category: OTHER_INCOME_CATEGORIES[0], amount: '',
+          income_date: new Date().toISOString().slice(0, 10),
+          payment_method: PAYMENT_METHODS[0].value, description: '',
+        });
+        setOpen(false);
+        return;
+      }
+
       let attachmentPath: string | null = null;
       let attachmentName: string | null = null;
 

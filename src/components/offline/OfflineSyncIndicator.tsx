@@ -18,7 +18,7 @@ function relativeTime(ts: number | null) {
   return new Date(ts).toLocaleDateString();
 }
 
-export function OfflineSyncIndicator() {
+export function OfflineSyncIndicator({ actorId, businessId }: { actorId?: string | null; businessId?: string | null }) {
   const [open, setOpen] = useState(false);
   const {
     online,
@@ -34,7 +34,7 @@ export function OfflineSyncIndicator() {
     retryItem,
     retryAll,
     discardItem,
-  } = useOfflineSync();
+  } = useOfflineSync(actorId, businessId);
 
   const uploaded = progress ? progress.done : 0;
   const uploadTotal = progress ? progress.total : 0;

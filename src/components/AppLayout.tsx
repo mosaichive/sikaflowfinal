@@ -138,7 +138,7 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
             </div>
             <HeaderAdsTicker />
             <div className="flex shrink-0 items-center gap-2 md:gap-3">
-              <OfflineSyncIndicator />
+              <OfflineSyncIndicator actorId={user?.id} businessId={businessId} />
               <button
                 onClick={() => navigate('/announcements')}
 

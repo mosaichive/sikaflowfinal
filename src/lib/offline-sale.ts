@@ -1,5 +1,6 @@
 import { enqueueOperation } from '@/lib/offline-sync';
 import { saveLocalSale } from '@/lib/offline-db';
+import { supabase } from '@/integrations/supabase/client';
 
 export type OfflineSaleLine = {
   product_id: string;
@@ -37,6 +38,7 @@ export type OfflineSaleInput = {
  * sales.client_txn_id.
  */
 export async function recordSaleOffline(input: OfflineSaleInput) {
+  const { data: authData } = await supabase.auth.getSession();
   const customerTxnId =
     input.customerName && input.customerName.toLowerCase() !== 'walk-in'
       ? `cust_${crypto.randomUUID()}`
@@ -96,6 +98,7 @@ export async function recordSaleOffline(input: OfflineSaleInput) {
   await saveLocalSale({
     id: clientTxnId,
     ownerId: input.ownerId,
+    actorId: authData.session?.user.id,
     businessId: input.businessId,
     serverId: null,
     createdAt: Date.now(),
