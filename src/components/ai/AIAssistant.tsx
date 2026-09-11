@@ -308,7 +308,7 @@ export function AIAssistant() {
     }
     // Dictation appends to whatever is already typed; sending stays manual.
     voiceBaseRef.current = input.trim();
-    assistant.startListening((text) => {
+    void assistant.startListening((text) => {
       setInput([voiceBaseRef.current, text].filter(Boolean).join(' '));
     });
   };
@@ -448,16 +448,42 @@ export function AIAssistant() {
               type="button"
               variant={assistant.listening ? 'destructive' : 'secondary'}
               size="icon"
-              className="h-10 w-10 shrink-0 rounded-full"
-              aria-label={assistant.listening ? 'Stop listening' : 'Speak your request'}
+              className={cn('h-10 w-10 shrink-0 rounded-full', assistant.listening && 'animate-pulse')}
+              aria-label={
+                assistant.requestingMicrophone
+                  ? 'Requesting microphone access'
+                  : assistant.listening
+                    ? 'Stop listening'
+                    : 'Speak your request'
+              }
+              title={
+                assistant.requestingMicrophone
+                  ? 'Requesting microphone access'
+                  : assistant.listening
+                    ? 'Stop listening'
+                    : 'Speak your request'
+              }
               onClick={toggleListening}
+              disabled={assistant.requestingMicrophone}
             >
-              {assistant.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {assistant.requestingMicrophone ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : assistant.listening ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
             </Button>
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={assistant.listening ? 'Listening… tap Send when done' : 'Ask or tell me what happened…'}
+              placeholder={
+                assistant.requestingMicrophone
+                  ? 'Waiting for microphone permission…'
+                  : assistant.listening
+                    ? 'Listening… tap Send when done'
+                    : 'Ask or tell me what happened…'
+              }
               className="h-10 rounded-full"
               disabled={assistant.thinking}
             />

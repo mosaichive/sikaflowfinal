@@ -7,6 +7,7 @@ import { getActiveCurrencyCode } from '@/lib/currency';
 import { loadProductsCompat } from '@/lib/workspace';
 import { offlineStorageAvailable, readCachedRecords, readLocalSales, STORE_CUSTOMERS } from '@/lib/offline-db';
 import { parseOfflineCommand } from '@/lib/offline-assistant';
+import { describeMicrophoneAccessError, describeVoiceRecognitionError } from '@/lib/voice-input';
 import {
   ACTION_LABEL,
   ACTION_MODULE,
@@ -47,9 +48,11 @@ export function useAIAssistant() {
   const [thinking, setThinking] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [requestingMicrophone, setRequestingMicrophone] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [providerAvailable, setProviderAvailable] = useState<boolean | null>(null);
   const recognitionRef = useRef<any>(null);
+  const voiceRequestRef = useRef(0);
   const onlineRef = useRef(online);
   onlineRef.current = online;
 
@@ -301,8 +304,12 @@ export function useAIAssistant() {
   }, []);
 
   const stopListening = useCallback(() => {
+    voiceRequestRef.current += 1;
+    setRequestingMicrophone(false);
+    const recognition = recognitionRef.current;
+    if (recognition) recognition.kudiTrackStopped = true;
     try {
-      recognitionRef.current?.stop();
+      recognition?.stop();
     } catch {
       /* ignore */
     }
@@ -314,7 +321,7 @@ export function useAIAssistant() {
    * NEVER auto-sent — the user reviews it and taps Send.
    */
   const startListening = useCallback(
-    (onTranscript: (text: string) => void) => {
+    async (onTranscript: (text: string) => void) => {
       if (!voiceSupported) {
         toast({
           title: 'Voice not supported',
@@ -323,6 +330,38 @@ export function useAIAssistant() {
         });
         return;
       }
+      if (!window.isSecureContext) {
+        toast({
+          title: 'Microphone requires a secure connection',
+          description: 'Open KudiTrack over HTTPS and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (listening || requestingMicrophone) return;
+
+      const requestId = voiceRequestRef.current + 1;
+      voiceRequestRef.current = requestId;
+      setRequestingMicrophone(true);
+
+      if (navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (error) {
+          if (voiceRequestRef.current !== requestId) return;
+          const feedback = describeMicrophoneAccessError(String((error as { name?: string })?.name ?? ''));
+          setRequestingMicrophone(false);
+          toast({
+            title: feedback.title,
+            description: feedback.description,
+            variant: feedback.destructive ? 'destructive' : undefined,
+          });
+          return;
+        }
+      }
+
+      if (voiceRequestRef.current !== requestId) return;
       const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new Ctor();
       recognition.lang = 'en-GH';
@@ -331,6 +370,13 @@ export function useAIAssistant() {
       recognition.maxAlternatives = 1;
 
       let finalTranscript = '';
+      let receivedTranscript = false;
+      let handledError = false;
+      recognition.onstart = () => {
+        if (recognitionRef.current !== recognition) return;
+        setRequestingMicrophone(false);
+        setListening(true);
+      };
       recognition.onresult = (event: any) => {
         let interim = '';
         const results = event?.results;
@@ -341,22 +387,50 @@ export function useAIAssistant() {
           else interim += transcript;
         }
         const combined = [finalTranscript, interim.trim()].filter(Boolean).join(' ').trim();
-        if (combined) onTranscript(combined);
+        if (combined) {
+          receivedTranscript = true;
+          onTranscript(combined);
+        }
       };
-      recognition.onerror = () => {
-        setListening(false);
-        toast({ title: 'Could not hear you', description: 'Try again or type your request.', variant: 'destructive' });
+      recognition.onerror = (event: { error?: string }) => {
+        handledError = true;
+        if (recognitionRef.current === recognition) {
+          recognitionRef.current = null;
+          setRequestingMicrophone(false);
+          setListening(false);
+        }
+        if (recognition.kudiTrackStopped && event.error === 'aborted') return;
+        const feedback = describeVoiceRecognitionError(String(event.error ?? ''));
+        if (!feedback) return;
+        toast({
+          title: feedback.title,
+          description: feedback.description,
+          variant: feedback.destructive ? 'destructive' : undefined,
+        });
       };
-      recognition.onend = () => setListening(false);
+      recognition.onend = () => {
+        if (recognitionRef.current === recognition) {
+          recognitionRef.current = null;
+          setRequestingMicrophone(false);
+          setListening(false);
+        }
+        if (!recognition.kudiTrackStopped && !receivedTranscript && !handledError) {
+          const feedback = describeVoiceRecognitionError('no-speech')!;
+          toast({ title: feedback.title, description: feedback.description });
+        }
+      };
       recognitionRef.current = recognition;
-      setListening(true);
       try {
         recognition.start();
-      } catch {
+      } catch (error) {
+        recognitionRef.current = null;
+        setRequestingMicrophone(false);
         setListening(false);
+        const feedback = describeMicrophoneAccessError(String((error as { name?: string })?.name ?? ''));
+        toast({ title: feedback.title, description: feedback.description, variant: 'destructive' });
       }
     },
-    [toast, voiceSupported],
+    [listening, requestingMicrophone, toast, voiceSupported],
   );
 
   const reset = useCallback(() => setMessages([GREETING]), []);
@@ -368,6 +442,7 @@ export function useAIAssistant() {
     thinking,
     executingId,
     listening,
+    requestingMicrophone,
     voiceSupported,
     online,
     assistantMode: !online ? 'offline' as const : providerAvailable === true ? 'cloud' as const : 'on_device' as const,
