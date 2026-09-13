@@ -21,4 +21,4 @@ Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /phone-login
 
-Sitemap: https://kuditrack.online/sitemap.xml
+Sitemap: https://www.kuditrack.online/sitemap.xml

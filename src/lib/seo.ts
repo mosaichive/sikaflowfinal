@@ -1,4 +1,4 @@
-export const SITE_URL = 'https://kuditrack.online';
+export const SITE_URL = 'https://www.kuditrack.online';
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/kuditrack-demo-poster.png`;
 export const DEFAULT_KEYWORDS = [
   'kudi track',
