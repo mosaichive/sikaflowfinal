@@ -3,9 +3,9 @@ import { absoluteUrl, DEFAULT_KEYWORDS, DEFAULT_SEO, getMarketingSeo } from '@/l
 
 describe('seo helpers', () => {
   it('builds canonical absolute URLs', () => {
-    expect(absoluteUrl('/features')).toBe('https://www.kuditrack.online/features');
-    expect(absoluteUrl('contact')).toBe('https://www.kuditrack.online/contact');
-    expect(absoluteUrl('/')).toBe('https://www.kuditrack.online/');
+    expect(absoluteUrl('/features')).toBe('https://kuditrack.online/features');
+    expect(absoluteUrl('contact')).toBe('https://kuditrack.online/contact');
+    expect(absoluteUrl('/')).toBe('https://kuditrack.online/');
   });
 
   it('returns route-specific marketing SEO', () => {

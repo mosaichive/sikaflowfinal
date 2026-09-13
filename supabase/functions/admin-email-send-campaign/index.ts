@@ -20,7 +20,7 @@ import { sendBatchAuto } from "../_shared/resend-direct.ts";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const CAMPAIGN_CRON_SECRET = Deno.env.get("CAMPAIGN_CRON_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://sikaflowsystem.vercel.app";
+const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://kuditrack.online";
 
 const SENDER_DOMAIN = Deno.env.get("SENDER_DOMAIN") ?? "mail.kuditrack.online";
 

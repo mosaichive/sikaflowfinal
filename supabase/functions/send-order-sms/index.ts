@@ -17,7 +17,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
+const PUBLIC_BASE_URL = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return '';

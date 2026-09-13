@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
         if (createError || !created.user) return json(400, { error: 'could_not_create_team_member' });
         newUserId = created.user.id;
       } else {
-        const appUrl = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
+        const appUrl = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
         const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
           data: { display_name: fullName, phone },
           redirectTo: `${appUrl}/auth/callback`,

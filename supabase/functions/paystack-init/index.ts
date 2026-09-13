@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       return json({ error: "db_insert_failed" }, 500);
     }
 
-    const publicUrl = (Deno.env.get("APP_PUBLIC_URL") || "https://sikaflowsystem.vercel.app").replace(/\/+$/, "");
+    const publicUrl = (Deno.env.get("APP_PUBLIC_URL") || "https://kuditrack.online").replace(/\/+$/, "");
 
     const initRes = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: "POST",

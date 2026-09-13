@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     }
 
     const businessName = profile?.business_name?.trim() || business.name?.trim() || 'KudiTrack';
-    const publicUrl = (Deno.env.get('APP_PUBLIC_URL') || 'https://sikaflowsystem.vercel.app').replace(/\/+$/, '');
+    const publicUrl = (Deno.env.get('APP_PUBLIC_URL') || 'https://kuditrack.online').replace(/\/+$/, '');
     const inviteUrl = `${publicUrl}/invite/${invite.token}`;
     const message = `You have been invited to join ${businessName} on KudiTrack. Use this link to accept your invitation: ${inviteUrl}`;
 
