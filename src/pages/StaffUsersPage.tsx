@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { EmptyState } from '@/components/EmptyState';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
@@ -296,7 +296,10 @@ export default function StaffUsersPage() {
                 <Button><UserPlus className="mr-2 h-4 w-4" /> Invite Team Member</Button>
               </DialogTrigger>
               <DialogContent className="max-w-xl">
-                <DialogHeader><DialogTitle>Invite Team Member</DialogTitle></DialogHeader>
+                <DialogHeader>
+                  <DialogTitle>Invite Team Member</DialogTitle>
+                  <DialogDescription>Choose how they join and which workspace sections they can use.</DialogDescription>
+                </DialogHeader>
                 <form className="space-y-4" onSubmit={createInvite}>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
@@ -511,7 +514,10 @@ export default function StaffUsersPage() {
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle>Edit permissions</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Edit permissions</DialogTitle>
+            <DialogDescription>Update this member's role, assigned sections, or account status.</DialogDescription>
+          </DialogHeader>
           {editing && (
             <div className="space-y-4">
               <div className="space-y-2">
