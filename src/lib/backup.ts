@@ -194,7 +194,7 @@ export async function buildBackup(ownerId: string): Promise<BackupFile> {
     investments,
     bank_accounts: bankAccounts,
     // Staff assignments only — never credentials.
-    staff: staff.map((row: any) => ({
+    staff: staff.filter((row: any) => !row.removed_at).map((row: any) => ({
       display_name: row.display_name,
       email: row.email,
       permissions: row.permissions,

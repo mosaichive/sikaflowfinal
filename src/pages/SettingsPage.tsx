@@ -80,7 +80,7 @@ const roleBadgeVariant = (role: string) => {
 };
 
 export default function SettingsPage() {
-  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, isStaffMember, refreshProfile } = useAuth();
+  const { user, role, displayName, avatarUrl, profileTitle, profilePhone, profileBio, isAdmin, isStaffMember, hasModule, refreshProfile } = useAuth();
   const { business, businessId, refresh: refreshBusiness } = useBusiness();
   const { isDark, toggle } = useTheme();
   const { toast } = useToast();
@@ -91,8 +91,9 @@ export default function SettingsPage() {
   const businessName = business?.name || 'Your Business';
   const resetConfirmText = useMemo(() => `RESET ${businessName.toUpperCase()}`, [businessName]);
 
-  // Team members who aren't admins should land on Profile by default.
-  const staffOnlyProfile = isStaffMember && !isAdmin;
+  // Every team member can manage their own profile. Business-wide settings
+  // are only shown when the owner assigned the Settings section.
+  const staffOnlyProfile = isStaffMember && !hasModule('settings');
   const { currency: activeCurrency } = useCurrency();
   const settingsCategoryItems = staffOnlyProfile
     ? [{ title: 'Profile', section: 'profile' as const, icon: User, description: 'Manage your photo, name, phone and account details.' }]

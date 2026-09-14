@@ -244,12 +244,12 @@ const App = () => (
                 <Route path="/other-income" element={<ProtectedRoute><RequireModule module="other_income"><OtherIncomePage /></RequireModule></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute><RequireModule module="expenses"><ExpensesPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute><RequireModule module="reports"><ReportsPage /></RequireModule></ProtectedRoute>} />
-                <Route path="/staff" element={<ProtectedRoute adminOnly><RequireModule module="staff"><StaffUsersPage /></RequireModule></ProtectedRoute>} />
+                <Route path="/staff" element={<ProtectedRoute><RequireModule module="staff"><StaffUsersPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/announcements" element={<ProtectedRoute allowReadOnly allowOnboarding><RequireModule module="announcements"><TenantAnnouncementsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/support" element={<ProtectedRoute allowReadOnly allowOnboarding><SupportPage /></ProtectedRoute>} />
                 <Route path="/savings" element={<ProtectedRoute><RequireModule module="savings"><SavingsPage /></RequireModule></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute allowReadOnly allowOnboarding><SettingsPage /></ProtectedRoute>} />
-                <Route path="/billing" element={<ProtectedRoute adminOnly allowReadOnly><BillingPage /></ProtectedRoute>} />
+                <Route path="/billing" element={<ProtectedRoute adminOnly allowReadOnly><RequireModule module="settings"><BillingPage /></RequireModule></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>

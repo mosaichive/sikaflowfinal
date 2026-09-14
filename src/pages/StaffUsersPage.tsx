@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,7 +23,7 @@ import { normalizeGhanaPhone } from '@/lib/phone-otp';
 
 type MemberRow = {
   id: string;
-  staff_user_id: string;
+  staff_user_id: string | null;
   display_name: string | null;
   email: string | null;
   active: boolean;
@@ -41,7 +42,7 @@ type InviteRow = {
 };
 
 export default function StaffUsersPage() {
-  const { user, isAdmin, displayName } = useAuth();
+  const { user, isAdmin, isStaffMember, hasModule, effectiveBusinessOwnerId, displayName } = useAuth();
   const { toast } = useToast();
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
@@ -51,31 +52,41 @@ export default function StaffUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const defaultRole = 'salesperson';
-  const [form, setForm] = useState<{ email: string; full_name: string; phone: string; role: string; modules: ModuleKey[]; mode: 'link' | 'password'; password: string }>(
+  const [form, setForm] = useState<{ email: string; full_name: string; phone: string; role: string; modules: ModuleKey[]; mode: 'link' | 'email' | 'password'; password: string }>(
     { email: '', full_name: '', phone: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' },
   );
+  const canManageTeam = isStaffMember ? hasModule('staff') : isAdmin;
+  const isBusinessOwner = Boolean(user?.id && user.id === effectiveBusinessOwnerId);
 
   const load = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || !effectiveBusinessOwnerId) return;
     const [m, i] = await Promise.all([
-      (supabase as any).from('staff_members').select('id, staff_user_id, display_name, email, active, permissions').eq('business_owner_id', user.id).order('created_at', { ascending: false }),
-      (supabase as any).from('staff_invites').select('id, email, display_name, token, status, expires_at, accepted_at, permissions').eq('business_owner_id', user.id).order('created_at', { ascending: false }),
+      (supabase as any).from('staff_members').select('id, staff_user_id, display_name, email, active, permissions').eq('business_owner_id', effectiveBusinessOwnerId).is('removed_at', null).order('created_at', { ascending: false }),
+      (supabase as any).from('staff_invites').select('id, email, display_name, token, status, expires_at, accepted_at, permissions').eq('business_owner_id', effectiveBusinessOwnerId).order('created_at', { ascending: false }),
     ]);
+    if (m.error || i.error) {
+      toast({
+        title: 'Could not load team',
+        description: m.error?.message || i.error?.message,
+        variant: 'destructive',
+      });
+      return;
+    }
     setMembers((m.data || []) as MemberRow[]);
     setInvites((i.data || []) as InviteRow[]);
-  }, [user?.id]);
+  }, [effectiveBusinessOwnerId, toast, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveBusinessOwnerId) return;
     const ch = supabase
-      .channel(`team-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members', filter: `business_owner_id=eq.${user.id}` }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_invites', filter: `business_owner_id=eq.${user.id}` }, () => { void load(); })
+      .channel(`team-${effectiveBusinessOwnerId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members', filter: `business_owner_id=eq.${effectiveBusinessOwnerId}` }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_invites', filter: `business_owner_id=eq.${effectiveBusinessOwnerId}` }, () => { void load(); })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
-  }, [user?.id, load]);
+  }, [effectiveBusinessOwnerId, load]);
 
   const inviteLink = (token: string) => `${window.location.origin}/invite/${token}`;
 
@@ -101,6 +112,9 @@ export default function StaffUsersPage() {
     try {
       const email = form.email.trim().toLowerCase();
       if (!email) throw new Error('Email is required');
+      const phone = form.phone.trim();
+      const normalizedPhone = phone && isPhoneSendable(phone) ? normalizeGhanaPhone(phone) : null;
+      if (phone && !normalizedPhone) throw new Error('Enter a valid phone number');
 
       if (form.mode === 'password') {
         const fullName = form.full_name.trim();
@@ -113,6 +127,7 @@ export default function StaffUsersPage() {
             mode: 'password',
             email,
             full_name: fullName,
+            phone: normalizedPhone,
             role: form.role,
             modules: form.modules,
             password: form.password,
@@ -125,26 +140,41 @@ export default function StaffUsersPage() {
           description: `${fullName} can now log in with the temporary password you set.`,
         });
       } else {
-        const phone = form.phone.trim();
-        const normalizedPhone = phone && isPhoneSendable(phone) ? normalizeGhanaPhone(phone) : null;
-        if (phone && !normalizedPhone) throw new Error('Enter a valid phone number before sending an SMS invite');
-
-        const { data, error } = await (supabase as any)
-          .from('staff_invites')
-          .insert({
-            business_owner_id: user.id,
+        const { data, error } = await supabase.functions.invoke('manage-business-user', {
+          body: {
+            action: 'invite',
+            mode: form.mode,
             email,
-            display_name: form.full_name.trim() || null,
+            full_name: form.full_name.trim() || null,
             phone: normalizedPhone,
-            permissions: { role: form.role, modules: form.modules },
-          })
-          .select('id, token')
-          .single();
-        if (error) throw error;
-        await copyLink(data.token);
-        toast({ title: 'Invite created', description: 'Link copied to clipboard.' });
+            role: form.role,
+            modules: form.modules,
+          },
+        });
+        if (error) throw new Error(await getFunctionErrorMessage(error, 'Failed to create invitation'));
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const inviteId = String((data as any)?.invite_id || '');
+        const inviteToken = String((data as any)?.token || '');
+        if (!inviteId || !inviteToken) throw new Error('The invitation was not confirmed by the server');
 
-        if (normalizedPhone) void notifyTeamInvite(data.id, toast);
+        if (form.mode === 'link') {
+          await copyLink(inviteToken);
+        } else {
+          const delivery = String((data as any)?.email_delivery || 'failed');
+          if (delivery === 'sent') {
+            toast({ title: 'Invitation email sent', description: 'The link expires in 7 days.' });
+          } else {
+            await navigator.clipboard.writeText(inviteLink(inviteToken)).catch(() => undefined);
+            toast({
+              title: 'Invite link created',
+              description: delivery === 'existing_account'
+                ? 'This person already has an account. Send them the copied invite link.'
+                : 'Email delivery was unavailable, so the invite link was copied instead.',
+            });
+          }
+        }
+
+        if (normalizedPhone) void notifyTeamInvite(inviteId, toast);
       }
 
       setForm({ email: '', full_name: '', phone: '', role: defaultRole, modules: modulesForRole(defaultRole), mode: 'link', password: '' });
@@ -159,66 +189,90 @@ export default function StaffUsersPage() {
 
   const revokeInvite = async (id: string) => {
     setBusyId(id);
-    const { error } = await (supabase as any).from('staff_invites').delete().eq('id', id);
+    const { data, error } = await supabase.functions.invoke('manage-business-user', {
+      body: { action: 'revoke_invite', invite_id: id },
+    });
     setBusyId(null);
-    if (error) toast({ title: 'Could not revoke', description: error.message, variant: 'destructive' });
+    if (error || (data as any)?.error) toast({ title: 'Could not revoke', description: (data as any)?.error || await getFunctionErrorMessage(error), variant: 'destructive' });
     else { toast({ title: 'Invite revoked' }); void load(); }
   };
 
   const resendInvite = async (row: InviteRow) => {
     setBusyId(row.id);
-    const { error } = await (supabase as any)
-      .from('staff_invites')
-      .update({ expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: 'pending' })
-      .eq('id', row.id);
+    const { data, error } = await supabase.functions.invoke('manage-business-user', {
+      body: { action: 'refresh_invite', invite_id: row.id },
+    });
     setBusyId(null);
-    if (error) toast({ title: 'Could not refresh', description: error.message, variant: 'destructive' });
-    else { toast({ title: 'Invite refreshed', description: 'Expires in 7 days.' }); void copyLink(row.token); void load(); }
+    if (error || (data as any)?.error) toast({ title: 'Could not refresh', description: (data as any)?.error || await getFunctionErrorMessage(error), variant: 'destructive' });
+    else {
+      toast({ title: 'Invite refreshed', description: 'A new link was copied and expires in 7 days.' });
+      void copyLink(String((data as any)?.token || row.token));
+      void load();
+    }
   };
 
   const toggleActive = async (m: MemberRow) => {
     setBusyId(m.id);
-    const { data, error } = await supabase.functions.invoke('manage-business-user', {
-      body: {
-        action: 'update',
-        user_id: m.staff_user_id,
-        full_name: m.display_name,
-        role: m.permissions?.role || defaultRole,
-        modules: m.permissions?.modules || [],
-        active: !m.active,
-      },
-    });
-    setBusyId(null);
-    if (error || (data as any)?.error) toast({ title: 'Could not update', description: (data as any)?.error || error?.message, variant: 'destructive' });
-    else { toast({ title: m.active ? 'Member suspended' : 'Member reactivated' }); void load(); }
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business-user', {
+        body: {
+          action: 'update',
+          member_id: m.id,
+          full_name: m.display_name,
+          role: m.permissions?.role || defaultRole,
+          modules: m.permissions?.modules || [],
+          active: !m.active,
+        },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || await getFunctionErrorMessage(error));
+      toast({ title: m.active ? 'Member suspended' : 'Member reactivated' });
+      void load();
+    } catch (error) {
+      toast({ title: 'Could not update', description: await getFunctionErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const removeMember = async (m: MemberRow) => {
     if (!confirm(`Remove ${m.display_name || m.email} from your team?`)) return;
     setBusyId(m.id);
-    const { data, error } = await supabase.functions.invoke('manage-business-user', {
-      body: { action: 'remove', user_id: m.staff_user_id },
-    });
-    setBusyId(null);
-    if (error || (data as any)?.error) toast({ title: 'Could not remove', description: (data as any)?.error || error?.message, variant: 'destructive' });
-    else { toast({ title: 'Member removed' }); void load(); }
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business-user', {
+        body: { action: 'remove', member_id: m.id },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || await getFunctionErrorMessage(error));
+      toast({ title: 'Member removed', description: 'Their account and business history were preserved.' });
+      void load();
+    } catch (error) {
+      toast({ title: 'Could not remove', description: await getFunctionErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const saveEdit = async (m: MemberRow) => {
     setBusyId(m.id);
-    const { data, error } = await supabase.functions.invoke('manage-business-user', {
-      body: {
-        action: 'update',
-        user_id: m.staff_user_id,
-        full_name: m.display_name,
-        role: m.permissions?.role || defaultRole,
-        modules: m.permissions?.modules || [],
-        active: m.active,
-      },
-    });
-    setBusyId(null);
-    if (error || (data as any)?.error) toast({ title: 'Could not save', description: (data as any)?.error || error?.message, variant: 'destructive' });
-    else { toast({ title: 'Permissions updated' }); setEditing(null); void load(); }
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business-user', {
+        body: {
+          action: 'update',
+          member_id: m.id,
+          full_name: m.display_name,
+          role: m.permissions?.role || defaultRole,
+          modules: m.permissions?.modules || [],
+          active: m.active,
+        },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || await getFunctionErrorMessage(error));
+      toast({ title: 'Permissions updated' });
+      setEditing(null);
+      void load();
+    } catch (error) {
+      toast({ title: 'Could not save', description: await getFunctionErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const now = Date.now();
@@ -236,7 +290,7 @@ export default function StaffUsersPage() {
               Invite teammates by link, assign roles, and pick exactly which modules they can access.
             </p>
           </div>
-          {isAdmin && (
+          {canManageTeam && (
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
               <DialogTrigger asChild>
                 <Button><UserPlus className="mr-2 h-4 w-4" /> Invite Team Member</Button>
@@ -263,7 +317,9 @@ export default function StaffUsersPage() {
                       onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                     />
                     <p className="text-xs text-muted-foreground">
-                      If provided, we'll text the invite link to this number too.
+                      {form.mode === 'password'
+                        ? 'Saved as their contact number.'
+                        : "If provided, we'll text the invite link to this number too."}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -271,35 +327,37 @@ export default function StaffUsersPage() {
                     <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v, modules: modulesForRole(v) }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {TEAM_ROLES.map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}
+                        {TEAM_ROLES.filter((r) => isBusinessOwner || r.value !== 'admin').map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Invite method</Label>
-                    <Select value={form.mode} onValueChange={(v: 'link' | 'password') => setForm((f) => ({ ...f, mode: v }))}>
+                    <Select value={form.mode} onValueChange={(v: 'link' | 'email' | 'password') => setForm((f) => ({ ...f, mode: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="link">Send invite link (they set their own password)</SelectItem>
+                        <SelectItem value="email">Send invitation email</SelectItem>
                         <SelectItem value="password">Create account with a temporary password</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       {form.mode === 'password'
                         ? 'They can log in immediately with this password and should change it on first sign-in.'
-                        : 'Share the generated link. They will accept the invite and create their own password.'}
+                        : form.mode === 'email'
+                          ? 'We will email a secure invite. Existing KudiTrack users can use the generated link.'
+                          : 'Share the generated link. They will accept the invite and create their own password.'}
                     </p>
                   </div>
                   {form.mode === 'password' ? (
                     <div className="space-y-2">
                       <Label>Temporary password</Label>
-                      <Input
-                        type="text"
-                        minLength={8}
+                      <PasswordInput
+                        minLength={12}
                         required
                         value={form.password}
                         onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                        placeholder="At least 8 characters"
+                        placeholder="At least 12 characters"
                       />
                     </div>
                   ) : null}
@@ -309,7 +367,7 @@ export default function StaffUsersPage() {
                   </div>
                   <DialogFooter>
                     <Button type="submit" disabled={submitting}>
-                      {submitting ? 'Creating...' : form.mode === 'password' ? 'Create team member' : 'Create invite link'}
+                      {submitting ? 'Creating...' : form.mode === 'password' ? 'Create team member' : form.mode === 'email' ? 'Send invitation email' : 'Create invite link'}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -339,7 +397,7 @@ export default function StaffUsersPage() {
                           <TableHead>Role</TableHead>
                           <TableHead>Modules</TableHead>
                           <TableHead>Status</TableHead>
-                          {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                          {canManageTeam && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -357,17 +415,21 @@ export default function StaffUsersPage() {
                             <TableCell>
                               <Badge variant={m.active ? 'default' : 'outline'}>{m.active ? 'Active' : 'Suspended'}</Badge>
                             </TableCell>
-                            {isAdmin && (
+                            {canManageTeam && (
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => setEditing({ ...m, permissions: { role: m.permissions?.role || 'staff', modules: m.permissions?.modules || [] } })}>
-                                  <Settings2 className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" disabled={busyId === m.id} onClick={() => void toggleActive(m)}>
-                                  <Power className={`h-4 w-4 ${m.active ? 'text-amber-500' : 'text-emerald-500'}`} />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="text-destructive" disabled={busyId === m.id} onClick={() => void removeMember(m)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {(isBusinessOwner || m.permissions?.role !== 'admin') && (
+                                  <>
+                                    <Button variant="ghost" size="icon" aria-label="Edit member" title="Edit member" onClick={() => setEditing({ ...m, permissions: { role: m.permissions?.role || 'staff', modules: m.permissions?.modules || [] } })}>
+                                      <Settings2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" aria-label={m.active ? 'Suspend member' : 'Reactivate member'} title={m.active ? 'Suspend member' : 'Reactivate member'} disabled={busyId === m.id} onClick={() => void toggleActive(m)}>
+                                      <Power className={`h-4 w-4 ${m.active ? 'text-amber-500' : 'text-emerald-500'}`} />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" aria-label="Remove member" title="Remove member" className="text-destructive" disabled={busyId === m.id} onClick={() => void removeMember(m)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
                               </TableCell>
                             )}
                           </TableRow>
@@ -380,7 +442,7 @@ export default function StaffUsersPage() {
                     icon={<Users className="h-7 w-7 text-muted-foreground" />}
                     title="No team members yet"
                     description="Invite your first teammate to start collaborating."
-                    action={isAdmin ? <Button onClick={() => setInviteOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Invite Team Member</Button> : undefined}
+                    action={canManageTeam ? <Button onClick={() => setInviteOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Invite Team Member</Button> : undefined}
                   />
                 )}
               </CardContent>
@@ -403,7 +465,7 @@ export default function StaffUsersPage() {
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
                             <TableHead>{tab.key === 'accepted' ? 'Accepted' : 'Expires'}</TableHead>
-                            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                            {canManageTeam && <TableHead className="text-right">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -414,7 +476,7 @@ export default function StaffUsersPage() {
                               <TableCell className="text-xs text-muted-foreground">
                                 {new Date(tab.key === 'accepted' ? (inv.accepted_at || inv.expires_at) : inv.expires_at).toLocaleString()}
                               </TableCell>
-                              {isAdmin && (
+                              {canManageTeam && (
                                 <TableCell className="text-right">
                                   {tab.key === 'pending' && (
                                     <>
@@ -464,7 +526,7 @@ export default function StaffUsersPage() {
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {TEAM_ROLES.map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}
+                    {TEAM_ROLES.filter((r) => isBusinessOwner || r.value !== 'admin').map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>

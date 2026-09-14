@@ -1,6 +1,6 @@
 // Module-level permissions for team members.
-// Owners + admins always have all modules; other roles have a default set
-// that can be customised per-member by the owner.
+// Owners have all modules. Team roles provide defaults that the owner can
+// customise per member, including for delegated admins.
 
 export type ModuleKey =
   | 'dashboard'

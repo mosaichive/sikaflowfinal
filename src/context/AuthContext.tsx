@@ -477,10 +477,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveBusinessOwnerId = staffMembership ? staffMembership.business_owner_id : (user?.id ?? null);
 
   const hasModule = useCallback((m: ModuleKey) => {
-    if (isSuperAdmin || isAdmin) return true;
-    // Owners (no staff membership) get everything; staff get only their listed modules.
-    if (!staffMembership) return true;
-    return staffMembership.modules.includes(m);
+    // Every team member, including delegated admins, is limited to the exact
+    // sections selected by the business owner. Platform and business owners
+    // do not have a staff membership and retain full tenant access.
+    if (staffMembership) return staffMembership.modules.includes(m);
+    return isSuperAdmin || isAdmin || !staffMembership;
   }, [isAdmin, isSuperAdmin, staffMembership]);
 
   return (

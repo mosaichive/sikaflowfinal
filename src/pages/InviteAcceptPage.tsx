@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ALL_MODULES, type ModuleKey } from '@/lib/permissions';
+import { getFirstAssignedModulePath } from '@/lib/module-navigation';
 
 type InvitePreview = {
   found: boolean;
@@ -79,7 +80,8 @@ export default function InviteAcceptPage() {
       title: `Welcome to ${(data as any)?.business_name || 'the team'}!`,
       description: `You're signed in as ${(data as any)?.role || 'staff'}.`,
     });
-    navigate('/dashboard', { replace: true });
+    const assignedModules = (data as { modules?: ModuleKey[] } | null)?.modules;
+    navigate(getFirstAssignedModulePath(assignedModules) || '/dashboard', { replace: true });
     return true;
   }, [token, fullName, position, refreshProfile, toast, navigate]);
 

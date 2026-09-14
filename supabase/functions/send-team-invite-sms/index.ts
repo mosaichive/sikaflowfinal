@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const { data: invite } = await admin
       .from('staff_invites')
-      .select('id, business_owner_id, phone, token, status, expires_at')
+      .select('id, business_owner_id, business_id, phone, token, status, expires_at')
       .eq('id', inviteId)
       .maybeSingle();
     if (!invite) return json({ ok: false, reason: 'invite_not_found' });
@@ -62,12 +62,14 @@ Deno.serve(async (req) => {
     if (!/^\+\d{9,15}$/.test(phone)) return json({ ok: false, reason: 'no_valid_phone' }, 400);
 
     const ownerId = invite.business_owner_id as string;
-    const { data: business } = await admin
+    let businessQuery = admin
       .from('businesses')
       .select('id, name, owner_user_id')
-      .eq('owner_user_id', ownerId)
-      .limit(1)
-      .maybeSingle();
+      .eq('owner_user_id', ownerId);
+    businessQuery = invite.business_id
+      ? businessQuery.eq('id', invite.business_id)
+      : businessQuery.order('created_at', { ascending: true }).limit(1);
+    const { data: business } = await businessQuery.maybeSingle();
     if (!business) return json({ ok: false, reason: 'business_not_found' }, 404);
 
     if (callerId !== ownerId) {
@@ -77,10 +79,12 @@ Deno.serve(async (req) => {
         .eq('business_id', business.id)
         .eq('staff_user_id', callerId)
         .eq('active', true)
+        .is('removed_at', null)
         .maybeSingle();
       const permissions = membership?.permissions as { role?: string; modules?: string[] } | null;
-      const canManageTeam = permissions?.role === 'admin' || permissions?.role === 'owner' ||
-        (Array.isArray(permissions?.modules) && permissions.modules.includes('staff'));
+      const canManageTeam = Array.isArray(permissions?.modules)
+        ? permissions.modules.includes('staff')
+        : permissions?.role === 'admin' || permissions?.role === 'owner';
       if (!canManageTeam) return json({ ok: false, reason: 'forbidden' }, 403);
     }
 

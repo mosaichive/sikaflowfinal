@@ -3009,6 +3009,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           accepted_user_id: string | null
+          business_id: string | null
           business_owner_id: string
           created_at: string
           display_name: string | null
@@ -3024,6 +3025,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           accepted_user_id?: string | null
+          business_id?: string | null
           business_owner_id: string
           created_at?: string
           display_name?: string | null
@@ -3039,6 +3041,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           accepted_user_id?: string | null
+          business_id?: string | null
           business_owner_id?: string
           created_at?: string
           display_name?: string | null
@@ -3051,7 +3054,15 @@ export type Database = {
           token?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_invites_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_members: {
         Row: {
@@ -3063,6 +3074,7 @@ export type Database = {
           email: string | null
           id: string
           permissions: Json
+          removed_at: string | null
           staff_user_id: string | null
           updated_at: string
         }
@@ -3075,6 +3087,7 @@ export type Database = {
           email?: string | null
           id?: string
           permissions?: Json
+          removed_at?: string | null
           staff_user_id?: string | null
           updated_at?: string
         }
@@ -3087,6 +3100,7 @@ export type Database = {
           email?: string | null
           id?: string
           permissions?: Json
+          removed_at?: string | null
           staff_user_id?: string | null
           updated_at?: string
         }

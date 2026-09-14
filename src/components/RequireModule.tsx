@@ -9,8 +9,8 @@ interface Props {
 }
 
 /**
- * Gate a route by module permission. Owners/admins/super_admins always pass.
- * Team members must have the module listed in their staff_members permissions.
+ * Gate a route by module permission. Owners and platform admins always pass.
+ * Team members use their explicit module list, including delegated admins.
  */
 export function RequireModule({ module, children }: Props) {
   const { hasModule, loading, isStaffMember, staffMembership } = useAuth();
