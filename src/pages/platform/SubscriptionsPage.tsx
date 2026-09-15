@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 
 type Row = {
   id: string;
+  user_id: string;
+  business_id: string;
   business_name: string | null;
   email: string | null;
   subscription_plan: string;
@@ -37,18 +39,40 @@ export default function SubscriptionsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [pricing, setPricing] = useState<PricingPlan[]>([]);
-  const [planChange, setPlanChange] = useState<{ id: string; name: string } | null>(null);
+  const [planChange, setPlanChange] = useState<{ businessId: string; name: string } | null>(null);
   const [newPlan, setNewPlan] = useState<string>('business');
   const [cycle, setCycle] = useState<'monthly' | 'annual'>('monthly');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id,business_name,email,subscription_plan,subscription_status,subscription_end_date,trial_end_date')
-      .order('updated_at', { ascending: false });
-    setRows((data as Row[]) ?? []);
-  }, []);
+    const [profilesResult, businessesResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id,user_id,business_id,business_name,email,subscription_plan,subscription_status,subscription_end_date,trial_end_date')
+        .not('business_id', 'is', null)
+        .order('updated_at', { ascending: false }),
+      supabase.from('businesses').select('id,owner_user_id'),
+    ]);
+    if (profilesResult.error || businessesResult.error) {
+      toast({
+        title: 'Failed to load subscriptions',
+        description: profilesResult.error?.message || businessesResult.error?.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const ownerByBusiness = new Map(
+      (businessesResult.data ?? []).map((business) => [business.id, business.owner_user_id]),
+    );
+    const rowByBusiness = new Map<string, Row>();
+    for (const row of (profilesResult.data as Row[]) ?? []) {
+      const current = rowByBusiness.get(row.business_id);
+      const isOwner = ownerByBusiness.get(row.business_id) === row.user_id;
+      if (!current || isOwner) rowByBusiness.set(row.business_id, row);
+    }
+    setRows(Array.from(rowByBusiness.values()));
+  }, [toast]);
 
   const loadPricing = useCallback(async () => {
     const { data } = await supabase
@@ -82,48 +106,32 @@ export default function SubscriptionsPage() {
   const setPlan = async () => {
     if (!planChange) return;
     setBusy(true);
-    const now = new Date();
-    const payload: any = { subscription_plan: newPlan };
-
     const tierMatch = pricing.find((p) => p.tier === newPlan);
     const legacyMatch = LEGACY_PLANS.find((l) => l.value === newPlan);
-
-    if (tierMatch) {
-      const days = cycle === 'annual' ? 365 : 30;
-      payload.subscription_status = 'active';
-      payload.subscription_start_date = now.toISOString();
-      payload.subscription_end_date = new Date(now.getTime() + days * 86400000).toISOString();
-      payload.trial_end_date = null;
-    } else if (legacyMatch) {
-      if (newPlan === 'trial') {
-        payload.subscription_status = 'trial';
-        payload.trial_end_date = new Date(now.getTime() + (legacyMatch.days ?? 15) * 86400000).toISOString();
-      } else if (newPlan === 'lifetime') {
-        payload.subscription_status = 'lifetime';
-        payload.subscription_start_date = now.toISOString();
-        payload.subscription_end_date = null;
-      } else {
-        const days = legacyMatch.days ?? 30;
-        payload.subscription_status = 'active';
-        payload.subscription_start_date = now.toISOString();
-        payload.subscription_end_date = new Date(now.getTime() + days * 86400000).toISOString();
-      }
-    }
-
-    const { error } = await supabase.from('profiles').update(payload).eq('id', planChange.id);
-
-    if (!error) {
-      // Best-effort audit entry — never blocks the change.
-      const amount = tierMatch ? priceFor(newPlan, cycle) : (legacyMatch?.price ?? 0);
-      await supabase.from('audit_log').insert({
-        user_id: planChange.id,
-        action: 'super_admin_change_plan',
-        details: `Plan set to ${newPlan}${tierMatch ? ` (${cycle}, GH₵${amount})` : ''}`,
-      } as any).then(() => undefined, () => undefined);
-    }
+    const { data, error } = await supabase.functions.invoke('manage-subscription', {
+      body: {
+        action: 'set_plan',
+        business_id: planChange.businessId,
+        plan: newPlan === 'trial' ? 'free_trial' : newPlan,
+        billing_cycle: tierMatch ? cycle : undefined,
+        period_days: legacyMatch?.days ?? undefined,
+      },
+    });
 
     setBusy(false);
-    if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
+    if (error || (data as { error?: string } | null)?.error) {
+      let message = (data as { error?: string } | null)?.error || error?.message || 'Could not update the plan';
+      const response = (error as { context?: Response } | null)?.context;
+      if (response) {
+        try {
+          const payload = await response.clone().json() as { error?: string };
+          message = payload.error || message;
+        } catch {
+          // The generic function error remains useful when the response is not JSON.
+        }
+      }
+      return toast({ title: 'Failed', description: message, variant: 'destructive' });
+    }
     toast({ title: 'Plan updated', description: `${planChange.name} → ${newPlan}${tierMatch ? ` (${cycle})` : ''}` });
     setPlanChange(null);
     await load();
@@ -166,7 +174,7 @@ export default function SubscriptionsPage() {
                       <td className="px-3 py-2 text-[11px] text-muted-foreground">{renew ? new Date(renew).toLocaleDateString() : '—'}</td>
                       <td className="px-3 py-2 text-right">
                         <Button size="sm" variant="outline" onClick={() => {
-                          setPlanChange({ id: r.id, name: r.business_name ?? r.email ?? '' });
+                          setPlanChange({ businessId: r.business_id, name: r.business_name ?? r.email ?? '' });
                           setNewPlan(r.subscription_plan);
                           setCycle('monthly');
                         }}>

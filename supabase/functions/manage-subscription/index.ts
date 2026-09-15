@@ -32,7 +32,8 @@ interface Body {
   payment_id?: string;
   // params per action
   days?: number;
-  plan?: "free_trial" | "monthly" | "annual" | "lifetime";
+  plan?: "free_trial" | "monthly" | "annual" | "lifetime" | "starter" | "business" | "business_plus";
+  billing_cycle?: "monthly" | "annual";
   status?: "trial" | "active" | "overdue" | "expired" | "suspended" | "canceled" | "lifetime";
   period_days?: number;
   note?: string;
@@ -44,6 +45,42 @@ const PLAN_PRICES: Record<string, number> = {
   annual: PLAN_CONFIG.annual.amountGhs,
   lifetime: 0,
 };
+
+const TIERED_PLANS = new Set(["starter", "business", "business_plus"]);
+
+async function resolvePlanChange(admin: ReturnType<typeof serviceClient>, body: Body) {
+  if (!body.plan) return null;
+
+  const billingCycle = body.billing_cycle === "annual" ? "annual" : "monthly";
+  if (TIERED_PLANS.has(body.plan)) {
+    const { data, error } = await admin
+      .from("pricing_plans")
+      .select("price_monthly,price_annual")
+      .eq("tier", body.plan)
+      .maybeSingle();
+    if (error) throw new Error(`pricing_lookup_failed:${error.code ?? "unknown"}`);
+    if (!data) return null;
+    return {
+      plan: body.plan,
+      billingCycle,
+      days: billingCycle === "annual" ? 365 : 30,
+      price: Number(billingCycle === "annual" ? data.price_annual : data.price_monthly) || 0,
+    };
+  }
+
+  if (!(body.plan in PLAN_PRICES)) return null;
+  const defaultDays = body.plan === "annual" ? 365 : body.plan === "monthly" ? 30 : body.plan === "free_trial" ? 15 : 0;
+  const requestedDays = body.period_days;
+  if (requestedDays !== undefined && (!Number.isInteger(requestedDays) || requestedDays < 1 || requestedDays > 3650)) {
+    throw new Error("invalid_period_days");
+  }
+  return {
+    plan: body.plan,
+    billingCycle: body.plan === "annual" ? "annual" : "monthly",
+    days: requestedDays ?? defaultDays,
+    price: PLAN_PRICES[body.plan] ?? 0,
+  };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -85,20 +122,19 @@ Deno.serve(async (req) => {
 
       case "set_plan": {
         if (!body.business_id || !body.plan) return json({ error: "bad_params" }, 400);
-        const days = body.period_days ?? (body.plan === "annual" ? 365 : body.plan === "monthly" ? 30 : 0);
+        const resolved = await resolvePlanChange(admin, body);
+        if (!resolved) return json({ error: "invalid_plan" }, 400);
+        const days = resolved.days;
         const start = new Date();
         const end = days > 0 ? new Date(start.getTime() + days * 86400000) : null;
-        const status = body.plan === "lifetime" ? "lifetime" : body.plan === "free_trial" ? "trial" : "active";
-        await admin.from("subscriptions").update({
-          plan: body.plan,
-          status,
-          price_ghs: PLAN_PRICES[body.plan] ?? 0,
-          current_period_start: start.toISOString(),
-          current_period_end: end?.toISOString() ?? null,
-          next_renewal_date: end?.toISOString() ?? null,
-          trial_start_date: body.plan === "free_trial" ? start.toISOString() : null,
-          trial_end_date: body.plan === "free_trial" ? end?.toISOString() ?? null : null,
-        }).eq("business_id", body.business_id);
+        const { data: result, error } = await admin.rpc("admin_set_business_subscription", {
+          p_business_id: body.business_id,
+          p_plan: resolved.plan,
+          p_price_ghs: resolved.price,
+          p_period_start: start.toISOString(),
+          p_period_end: end?.toISOString() ?? null,
+        });
+        if (error) throw new Error(`subscription_update_failed:${error.message}`);
         if (body.plan === "annual" && end) {
           await syncAnnualReferralCycle(admin, {
             businessId: body.business_id,
@@ -107,8 +143,14 @@ Deno.serve(async (req) => {
             forceReset: true,
           });
         }
-        await log("set_plan", { plan: body.plan, period_days: days });
-        return json({ success: true });
+        await log("set_plan", {
+          plan: body.plan,
+          billing_cycle: resolved.billingCycle,
+          period_days: days,
+          price_ghs: resolved.price,
+          result,
+        });
+        return json({ success: true, subscription: result });
       }
 
       case "suspend": {
