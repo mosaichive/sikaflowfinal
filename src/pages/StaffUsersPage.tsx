@@ -295,12 +295,12 @@ export default function StaffUsersPage() {
               <DialogTrigger asChild>
                 <Button><UserPlus className="mr-2 h-4 w-4" /> Invite Team Member</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-xl">
-                <DialogHeader>
+              <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)] sm:w-full">
+                <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12 sm:px-6">
                   <DialogTitle>Invite Team Member</DialogTitle>
                   <DialogDescription>Choose how they join and which workspace sections they can use.</DialogDescription>
                 </DialogHeader>
-                <form className="space-y-4" onSubmit={createInvite}>
+                <form className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6" onSubmit={createInvite}>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Email</Label>
@@ -368,8 +368,8 @@ export default function StaffUsersPage() {
                     <Label>Module access</Label>
                     <PermissionsEditor value={form.modules} onChange={(modules) => setForm((f) => ({ ...f, modules }))} />
                   </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={submitting}>
+                  <DialogFooter className="sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:-mx-6 sm:px-6">
+                    <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
                       {submitting ? 'Creating...' : form.mode === 'password' ? 'Create team member' : form.mode === 'email' ? 'Send invitation email' : 'Create invite link'}
                     </Button>
                   </DialogFooter>
