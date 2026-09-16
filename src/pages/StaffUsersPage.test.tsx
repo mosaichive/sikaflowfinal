@@ -1,5 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
-import { fireEvent, screen, waitFor } from '@testing-library/dom';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import StaffUsersPage from '@/pages/StaffUsersPage';
