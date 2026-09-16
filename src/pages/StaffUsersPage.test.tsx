@@ -118,7 +118,8 @@ describe('team management restored memberships', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Invite Team Member/i }));
     const emailInput = document.querySelector('input[type="email"]');
     expect(emailInput).not.toBeNull();
-    fireEvent.change(emailInput!, { target: { value: 'member@example.test' } });
+    if (!emailInput) throw new Error('Email input not found');
+    fireEvent.change(emailInput, { target: { value: 'member@example.test' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create invite link' }));
 
     await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('manage-business-user', {
