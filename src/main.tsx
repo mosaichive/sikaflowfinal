@@ -10,6 +10,7 @@ registerSW({
   immediate: true,
   onRegisteredSW(_url, registration) {
     if (!registration) return;
+    if (navigator.onLine) void registration.update();
     window.setInterval(() => {
       if (navigator.onLine) void registration.update();
     }, 60 * 60 * 1000);
