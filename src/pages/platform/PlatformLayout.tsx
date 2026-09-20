@@ -8,7 +8,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, Coins, ContactRound, FileText, History, MessagesSquare, Menu } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 const NAV = [
   { to: '/super-admin', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -148,6 +148,7 @@ export default function PlatformLayout() {
                   <Logo className="h-9 w-9" />
                   <div>
                     <SheetTitle className="text-sm font-bold tracking-tight">KudiTrack</SheetTitle>
+                    <SheetDescription className="sr-only">Super Admin navigation</SheetDescription>
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Platform Admin</p>
                   </div>
                 </div>
