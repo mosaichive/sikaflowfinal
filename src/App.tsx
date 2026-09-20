@@ -46,6 +46,10 @@ const PlatformFeedbackPage = lazy(() => import("./pages/platform/FeedbackPage"))
 const PlatformAdApplicationsPage = lazy(() => import("./pages/platform/AdApplicationsPage"));
 const PlatformReviewsPage = lazy(() => import("./pages/platform/ReviewsPage"));
 const PlatformSmsPage = lazy(() => import("./pages/platform/SmsPage"));
+const PlatformBulkSmsPage = lazy(() => import("./pages/platform/BulkSmsPage"));
+const PlatformExternalContactsPage = lazy(() => import("./pages/platform/ExternalContactsPage"));
+const PlatformSmsTemplatesPage = lazy(() => import("./pages/platform/SmsTemplatesPage"));
+const PlatformBulkSmsHistoryPage = lazy(() => import("./pages/platform/BulkSmsHistoryPage"));
 const PlatformSecurityMfaPage = lazy(() => import("./pages/platform/SecurityMfaPage"));
 const SuperAdminLoginPage = lazy(() => import("./pages/platform/SuperAdminLoginPage"));
 const PlatformProfilePage = lazy(() => import("./pages/platform/ProfilePage"));
@@ -210,6 +214,10 @@ const App = () => (
                   <Route path="ad-applications" element={<PlatformAdApplicationsPage />} />
                   <Route path="reviews" element={<PlatformReviewsPage />} />
                   <Route path="sms" element={<PlatformSmsPage />} />
+                  <Route path="bulk-sms" element={<PlatformBulkSmsPage />} />
+                  <Route path="bulk-sms/history" element={<PlatformBulkSmsHistoryPage />} />
+                  <Route path="bulk-sms/templates" element={<PlatformSmsTemplatesPage />} />
+                  <Route path="external-contacts" element={<PlatformExternalContactsPage />} />
                   <Route path="security" element={<PlatformSecurityMfaPage />} />
                   <Route path="profile" element={<PlatformProfilePage />} />
                   <Route path="user-activity" element={<PlatformUserActivityPage />} />

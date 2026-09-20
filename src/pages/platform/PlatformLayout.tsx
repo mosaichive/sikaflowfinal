@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, Coins } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, Coins, ContactRound, FileText, History, MessagesSquare } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 
 const NAV = [
@@ -21,9 +21,13 @@ const NAV = [
   { to: '/super-admin/ads', label: 'Ads', icon: ImagePlus },
   { to: '/super-admin/ad-applications', label: 'Ad Applications', icon: Sparkles },
   { to: '/super-admin/reviews', label: 'Reviews', icon: Star },
-  { to: '/super-admin/email', label: 'Email & Newsletter', icon: Mail },
   { to: '/super-admin/currencies', label: 'Currencies', icon: Coins },
-  { to: '/super-admin/sms', label: 'SMS', icon: Send },
+  { to: '/super-admin/email', label: 'Email & Newsletter', icon: Mail, section: 'Communications' },
+  { to: '/super-admin/sms', label: 'Registered User SMS', icon: Send },
+  { to: '/super-admin/bulk-sms', label: 'Bulk SMS', icon: MessagesSquare, end: true },
+  { to: '/super-admin/external-contacts', label: 'External Contacts', icon: ContactRound },
+  { to: '/super-admin/bulk-sms/templates', label: 'SMS Templates', icon: FileText },
+  { to: '/super-admin/bulk-sms/history', label: 'Campaign History', icon: History },
   { to: '/super-admin/surveys', label: 'Surveys', icon: ClipboardList },
   { to: '/super-admin/survey-responses', label: 'Survey Responses', icon: MessageSquare },
   { to: '/super-admin/feedback', label: 'Feedback', icon: MessageSquare },
@@ -91,18 +95,20 @@ export default function PlatformLayout() {
         </div>
         <nav className="min-h-0 flex-1 p-3 space-y-1 overflow-y-auto overscroll-contain">
           {NAV.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                }`
-              }
-            >
-              <n.icon className="h-4 w-4" /> {n.label}
-            </NavLink>
+            <Fragment key={n.to}>
+              {'section' in n && n.section && <p className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase text-muted-foreground">{n.section}</p>}
+              <NavLink
+                to={n.to}
+                end={n.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                    isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`
+                }
+              >
+                <n.icon className="h-4 w-4" /> {n.label}
+              </NavLink>
+            </Fragment>
           ))}
         </nav>
         <div className="p-3 border-t border-border space-y-2">

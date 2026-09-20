@@ -63,6 +63,12 @@ verify_jwt = false
 [functions.admin-send-sms]
 verify_jwt = true
 
+[functions.admin-bulk-sms]
+verify_jwt = true
+
+[functions.africastalking-sms-status]
+verify_jwt = false
+
 [functions.paystack-init]
 verify_jwt = true
 
