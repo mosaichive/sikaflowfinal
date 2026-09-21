@@ -47,6 +47,13 @@ Deno.serve(async (req) => {
       .eq("id", profile.id);
   }
 
+  // Keep the external prospect directory in sync without touching registered
+  // user records. The global unsubscribe table remains the source of truth.
+  await admin
+    .from("external_email_contacts")
+    .update({ email_opt_out: true })
+    .eq("normalized_email_address", email);
+
   if (campaignId) {
     await admin
       .from("email_campaign_recipients")

@@ -198,7 +198,7 @@ export default function BulkSmsPage() {
               <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border p-6 hover:bg-muted/40">
                 {busy === 'file' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                 <span className="text-sm font-medium">{uploadedFileName || 'Choose CSV or XLSX file'}</span>
-                <span className="text-xs text-muted-foreground">Phone columns: phone, phone_number, mobile, or contact</span>
+                <span className="text-xs text-muted-foreground">Recognizes phone and email columns; each channel can be saved to its own external list.</span>
                 <input className="sr-only" type="file" accept=".csv,.xlsx" onChange={handleFile} />
               </label>
             </TabsContent>
@@ -223,8 +223,8 @@ export default function BulkSmsPage() {
           {source === 'upload' && uploadedRows.length > 0 && (
             <div className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium">Keep these contacts for future campaigns</p>
-                <p className="text-xs text-muted-foreground">Uploaded recipients stay in this campaign only until you save them to External Contacts.</p>
+                <p className="text-sm font-medium">Keep phone and email contacts for future campaigns</p>
+                <p className="text-xs text-muted-foreground">Phone numbers and email addresses are reviewed and saved to separate external lists.</p>
               </div>
               <Button
                 type="button"
@@ -233,7 +233,7 @@ export default function BulkSmsPage() {
                   state: { importRows: uploadedRows, importFile: uploadedFileName },
                 })}
               >
-                Save to contact list
+                Save phone & email contacts
               </Button>
             </div>
           )}

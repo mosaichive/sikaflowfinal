@@ -57,6 +57,12 @@ type Template = {
   is_system: boolean;
 };
 
+type ExternalEmailList = {
+  id: string;
+  name: string;
+  contact_count: number;
+};
+
 // Mirrors normalizeBody() in the send function: plain text becomes paragraphs.
 function renderPreviewBody(input: string): string {
   const body = (input ?? '').trim();
@@ -79,6 +85,7 @@ const AUDIENCE_OPTIONS = [
   { value: 'business', label: 'Business plan' },
   { value: 'business_plus', label: 'Business Plus plan' },
   { value: 'specific_emails', label: 'Specific email addresses' },
+  { value: 'external_email_list', label: 'External email contact list' },
 ];
 
 const PLACEHOLDERS = [
@@ -105,6 +112,7 @@ export default function EmailCenterPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [unsubs, setUnsubs] = useState<Array<{ email: string; created_at: string }>>([]);
   const [media, setMedia] = useState<Array<{ id: string; name: string; url: string; kind: string }>>([]);
+  const [externalEmailLists, setExternalEmailLists] = useState<ExternalEmailList[]>([]);
   const [loading, setLoading] = useState(true);
   const [editor, setEditor] = useState<Partial<Campaign> | null>(null);
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
@@ -116,16 +124,28 @@ export default function EmailCenterPage() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [c, t, u, m] = await Promise.all([
+    const [c, t, u, m, l] = await Promise.all([
       supabase.from('email_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('email_templates').select('*').order('is_system', { ascending: false }).order('name'),
       supabase.from('email_marketing_unsubscribes').select('email, created_at').order('created_at', { ascending: false }).limit(200),
       supabase.from('email_media_library').select('id, name, url, kind').order('created_at', { ascending: false }),
+      supabase.from('external_email_contact_lists').select('id, name').order('name'),
     ]);
     setCampaigns((c.data as any) ?? []);
     setTemplates((t.data as any) ?? []);
     setUnsubs((u.data as any) ?? []);
     setMedia((m.data as any) ?? []);
+    if (!l.error) {
+      const counts = await Promise.all((l.data ?? []).map(async (list: { id: string; name: string }) => {
+        const { count } = await supabase
+          .from('external_email_contacts')
+          .select('id', { count: 'exact', head: true })
+          .eq('list_id', list.id)
+          .eq('email_opt_out', false);
+        return { ...list, contact_count: count ?? 0 };
+      }));
+      setExternalEmailLists(counts);
+    }
     setLoading(false);
   }, []);
 
@@ -170,6 +190,9 @@ export default function EmailCenterPage() {
     if (c.reply_to?.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.reply_to.trim())) return 'Reply-to is not a valid address.';
     if (c.audience_type === 'specific_emails' && !specificEmailsText.trim()) {
       return 'Add at least one recipient email address.';
+    }
+    if (c.audience_type === 'external_email_list' && !c.audience_filter?.list_id) {
+      return 'Select an external email contact list.';
     }
     return null;
   };
@@ -334,8 +357,8 @@ export default function EmailCenterPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Mail className="h-6 w-6" /> Email & Newsletter</h1>
-          <p className="text-sm text-muted-foreground">Bulk email campaigns to your KudiTrack users.</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Mail className="h-6 w-6" /> Bulk Email & Newsletter</h1>
+          <p className="text-sm text-muted-foreground">Bulk email campaigns for registered users and separate external prospect lists.</p>
         </div>
         <Button onClick={() => openNew()}><Plus className="h-4 w-4 mr-1" /> New campaign</Button>
       </div>
@@ -399,6 +422,7 @@ export default function EmailCenterPage() {
               onScheduledAtChange={setScheduledAt}
               specificEmailsText={specificEmailsText}
               onSpecificEmailsChange={setSpecificEmailsText}
+              externalEmailLists={externalEmailLists}
               media={media}
               onInsertSnippet={insertIntoEditor}
             />
@@ -560,6 +584,7 @@ function ComposeEditor(props: {
   onScheduledAtChange: (v: string) => void;
   specificEmailsText: string;
   onSpecificEmailsChange: (v: string) => void;
+  externalEmailLists: ExternalEmailList[];
   media: Array<{ id: string; url: string; name: string; kind: string }>;
   onInsertSnippet: (s: string) => void;
 }) {
@@ -676,6 +701,29 @@ function ComposeEditor(props: {
               value={props.specificEmailsText}
               onChange={(e) => props.onSpecificEmailsChange(e.target.value)}
             />
+          )}
+          {c.audience_type === 'external_email_list' && (
+            <div className="space-y-2">
+              <Select
+                value={String(c.audience_filter?.list_id ?? '')}
+                onValueChange={(listId) => props.onChange({
+                  ...c,
+                  audience_filter: { ...(c.audience_filter || {}), list_id: listId },
+                })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select an external email list" /></SelectTrigger>
+                <SelectContent>
+                  {props.externalEmailLists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name} ({list.contact_count.toLocaleString()})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {props.externalEmailLists.length === 0 && (
+                <p className="text-xs text-muted-foreground">Import external email contacts before selecting this audience.</p>
+              )}
+            </div>
           )}
           <Button variant="outline" size="sm" onClick={props.onPreviewAudience}>Preview count</Button>
           {props.audienceCount !== null && (

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeRecipients, getSmsMetrics, matrixToContacts, normalizeSmsPhone, splitManualRecipients, suggestedContactListName } from './bulk-sms';
+import {
+  analyzeEmailRecipients,
+  analyzeRecipients,
+  getSmsMetrics,
+  matrixToContacts,
+  normalizeEmailAddress,
+  normalizeSmsPhone,
+  splitManualRecipients,
+  suggestedContactListName,
+} from './bulk-sms';
 
 describe('normalizeSmsPhone', () => {
   it.each([
@@ -59,9 +68,38 @@ describe('recipient parsing', () => {
     ]);
   });
 
-  it('requires a recognizable phone column', () => {
-    expect(() => matrixToContacts([['Name', 'Email'], ['Ama', 'ama@example.com']]))
-      .toThrow(/No phone column/);
+  it('extracts and deduplicates email addresses separately from phone numbers', () => {
+    const rows = matrixToContacts([
+      ['Business Name', 'Phone', 'Email Address', 'Contact Name'],
+      ['Kojo Stores', '0241234567 / 0551234567', 'Sales@Kojo.example; owner@kojo.example', 'Kojo Mensah'],
+    ]);
+
+    expect(analyzeRecipients(rows).map((row) => row.validity)).toEqual(['valid', 'valid']);
+    expect(analyzeEmailRecipients(rows)).toEqual([
+      expect.objectContaining({ email: 'Sales@Kojo.example', normalizedEmail: 'sales@kojo.example', validity: 'valid' }),
+      expect.objectContaining({ email: 'owner@kojo.example', normalizedEmail: 'owner@kojo.example', validity: 'valid' }),
+      expect.objectContaining({ email: 'Sales@Kojo.example', normalizedEmail: 'sales@kojo.example', validity: 'duplicate' }),
+      expect.objectContaining({ email: 'owner@kojo.example', normalizedEmail: 'owner@kojo.example', validity: 'duplicate' }),
+    ]);
+  });
+
+  it('keeps email-only rows for the external email audience', () => {
+    const rows = matrixToContacts([
+      ['Business Name', 'Business Email'],
+      ['Ama Foods', 'hello@amafoods.com'],
+    ]);
+
+    expect(rows).toEqual([{ phone: '', email: 'hello@amafoods.com', businessName: 'Ama Foods' }]);
+    expect(analyzeRecipients(rows)[0].validity).toBe('invalid');
+    expect(analyzeEmailRecipients(rows)[0]).toMatchObject({
+      normalizedEmail: 'hello@amafoods.com',
+      validity: 'valid',
+    });
+  });
+
+  it('requires a recognizable phone or email column', () => {
+    expect(() => matrixToContacts([['Name', 'Website'], ['Ama', 'https://example.com']]))
+      .toThrow(/No phone or email column/);
   });
 
   it('rejects workbook-shaped data with a readable error', () => {
@@ -73,6 +111,19 @@ describe('recipient parsing', () => {
     expect(suggestedContactListName('KudiTrack_Ghana_Prospect_Contacts.xlsx'))
       .toBe('KudiTrack Ghana Prospect Contacts');
     expect(suggestedContactListName('contacts.csv')).toBe('contacts');
+  });
+});
+
+describe('normalizeEmailAddress', () => {
+  it.each([
+    [' Owner@Example.COM ', 'owner@example.com'],
+    ['sales+ghana@example.co.uk', 'sales+ghana@example.co.uk'],
+  ])('normalizes %s', (input, expected) => {
+    expect(normalizeEmailAddress(input)).toBe(expected);
+  });
+
+  it.each(['', 'not-an-email', 'a@b', 'a..b@example.com'])('rejects %s', (input) => {
+    expect(normalizeEmailAddress(input)).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@ import { readSheet } from 'read-excel-file/browser';
 
 export type SmsContactInput = {
   phone: string;
+  email?: string;
   contactName?: string;
   businessName?: string;
   city?: string;
@@ -13,6 +14,15 @@ export type SmsContactInput = {
 
 export type ParsedRecipient = SmsContactInput & {
   normalized: string | null;
+  validity: 'valid' | 'invalid' | 'duplicate';
+};
+
+export type EmailContactInput = Omit<SmsContactInput, 'phone' | 'email'> & {
+  email: string;
+};
+
+export type ParsedEmailRecipient = EmailContactInput & {
+  normalizedEmail: string | null;
   validity: 'valid' | 'invalid' | 'duplicate';
 };
 
@@ -32,6 +42,10 @@ const PHONE_HEADERS = new Set([
   'phone', 'phonenumber', 'mobile', 'mobilenumber', 'contact', 'contactnumber',
   'telephone', 'tel', 'number', 'smsnumber', 'whatsapp', 'publiccontact',
   'businesscontact', 'contactphone', 'primaryphone',
+]);
+const EMAIL_HEADERS = new Set([
+  'email', 'emailaddress', 'businessemail', 'contactemail', 'companyemail',
+  'publicemail', 'mail', 'emailid',
 ]);
 const NAME_HEADERS = new Set(['name', 'contactname', 'fullname', 'customername', 'ownername']);
 const BUSINESS_HEADERS = new Set(['business', 'businessname', 'company', 'companyname', 'shopname']);
@@ -61,6 +75,15 @@ function splitSpreadsheetPhones(value: unknown): string[] {
   return phones.length > 0 ? phones : [phone];
 }
 
+function splitSpreadsheetEmails(value: unknown): string[] {
+  const email = String(value ?? '').trim();
+  if (!email) return [];
+  return email
+    .split(/[;,|\n\r\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function normalizeSmsPhone(raw: unknown): string | null {
   const input = String(raw ?? '').trim();
   if (!input || /[a-z]/i.test(input)) return null;
@@ -76,6 +99,12 @@ export function normalizeSmsPhone(raw: unknown): string | null {
   else if (!compact.startsWith('+')) compact = `+${compact}`;
 
   return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
+}
+
+export function normalizeEmailAddress(raw: unknown): string | null {
+  const email = String(raw ?? '').trim().toLowerCase();
+  if (!email || email.length > 254 || email.includes('..')) return null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? email : null;
 }
 
 export function smsCountryCode(normalized: string): string | null {
@@ -106,6 +135,29 @@ export function analyzeRecipients(rows: SmsContactInput[]): ParsedRecipient[] {
     if (seen.has(normalized)) return { ...row, normalized, validity: 'duplicate' as const };
     seen.add(normalized);
     return { ...row, normalized, validity: 'valid' as const };
+  });
+}
+
+export function extractEmailContacts(rows: SmsContactInput[]): EmailContactInput[] {
+  return rows.flatMap((row) => splitSpreadsheetEmails(row.email).map((email) => ({
+    email,
+    contactName: row.contactName,
+    businessName: row.businessName,
+    city: row.city,
+    region: row.region,
+    category: row.category,
+    notes: row.notes,
+  })));
+}
+
+export function analyzeEmailRecipients(rows: SmsContactInput[]): ParsedEmailRecipient[] {
+  const seen = new Set<string>();
+  return extractEmailContacts(rows).map((row) => {
+    const normalizedEmail = normalizeEmailAddress(row.email);
+    if (!normalizedEmail) return { ...row, normalizedEmail: null, validity: 'invalid' as const };
+    if (seen.has(normalizedEmail)) return { ...row, normalizedEmail, validity: 'duplicate' as const };
+    seen.add(normalizedEmail);
+    return { ...row, normalizedEmail, validity: 'valid' as const };
   });
 }
 
@@ -152,13 +204,15 @@ export function matrixToContacts(input: unknown): SmsContactInput[] {
   if (matrix.length < 2) throw new Error('The file must include a header row and at least one contact.');
   const headers = matrix[0].map(canonicalHeader);
   const phoneIndex = headers.findIndex((header) => PHONE_HEADERS.has(header));
-  if (phoneIndex < 0) {
-    throw new Error('No phone column was found. Use a heading such as phone, phone_number, mobile, or contact.');
+  const emailIndex = headers.findIndex((header) => EMAIL_HEADERS.has(header));
+  if (phoneIndex < 0 && emailIndex < 0) {
+    throw new Error('No phone or email column was found. Use a heading such as phone, mobile, contact, or email.');
   }
 
   return matrix.slice(1).flatMap((row) => {
-    const phoneCell = String(row[phoneIndex] ?? '').trim();
-    if (!phoneCell && row.every((cell) => String(cell ?? '').trim() === '')) return [];
+    const phoneCell = phoneIndex >= 0 ? String(row[phoneIndex] ?? '').trim() : '';
+    const emailCell = emailIndex >= 0 ? String(row[emailIndex] ?? '').trim() : '';
+    if (!phoneCell && !emailCell && row.every((cell) => String(cell ?? '').trim() === '')) return [];
 
     const notes = [
       valueAt(row, headers, FIT_HEADERS),
@@ -171,9 +225,11 @@ export function matrixToContacts(input: unknown): SmsContactInput[] {
       region: valueAt(row, headers, REGION_HEADERS) || undefined,
       category: valueAt(row, headers, CATEGORY_HEADERS) || undefined,
       notes: notes || undefined,
+      email: emailCell || undefined,
     };
 
-    return splitSpreadsheetPhones(phoneCell).map((phone) => ({ phone, ...metadata }));
+    const phones = phoneCell ? splitSpreadsheetPhones(phoneCell) : [''];
+    return phones.map((phone) => ({ phone, ...metadata }));
   });
 }
 

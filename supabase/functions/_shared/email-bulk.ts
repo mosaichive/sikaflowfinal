@@ -80,11 +80,13 @@ export type AudienceType =
   | "active"
   | "canceled"
   | "specific_businesses"
-  | "specific_emails";
+  | "specific_emails"
+  | "external_email_list";
 
 export interface AudienceFilter {
   business_ids?: string[];
   emails?: string[];
+  list_id?: string;
 }
 
 /**
@@ -129,7 +131,35 @@ export async function resolveAudience(
     }
   };
 
-  if (audienceType === "specific_emails") {
+  if (audienceType === "external_email_list") {
+    const listId = String(filter.list_id ?? "").trim();
+    if (!listId) return [];
+    const { data: contacts, error } = await admin
+      .from("external_email_contacts")
+      .select("normalized_email_address, business_name, contact_name")
+      .eq("list_id", listId)
+      .eq("email_opt_out", false)
+      .limit(50000);
+    if (error) throw error;
+
+    for (const contact of contacts ?? []) {
+      const email = String(contact.normalized_email_address ?? "").trim().toLowerCase();
+      if (!email) continue;
+      const contactName = String(contact.contact_name ?? "").trim();
+      results.push({
+        email,
+        user_id: null,
+        merge_data: {
+          business_name: contact.business_name ?? "",
+          owner_name: contactName,
+          first_name: contactName.split(" ")[0] ?? "",
+          subscription_plan: "",
+          expiry_date: "",
+          store_link: "",
+        },
+      });
+    }
+  } else if (audienceType === "specific_emails") {
     for (const raw of filter.emails ?? []) {
       const email = String(raw).trim().toLowerCase();
       if (!email) continue;
@@ -190,6 +220,7 @@ export async function resolveAudience(
 
   // Exclude marketing unsubscribes
   const emails = Array.from(new Set(results.map((r) => r.email)));
+  if (emails.length === 0) return [];
   const { data: unsubs } = await admin
     .from("email_marketing_unsubscribes")
     .select("email")
@@ -256,7 +287,7 @@ export function wrapHtmlForTracking(
     `<img src="${trackBase}/email-track-open?c=${campaignId}&r=${recipientId}" alt="" width="1" height="1" style="display:none;border:0;outline:none;" />`;
   const footer = `
     <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center;font-family:sans-serif;">
-      <p>You received this because you are a KudiTrack user.</p>
+      <p>You received this message from KudiTrack.</p>
       <p><a href="${unsubscribeUrl}" style="color:#6b7280;">Unsubscribe from marketing emails</a></p>
     </div>${pixel}`;
 

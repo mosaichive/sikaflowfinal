@@ -12,12 +12,13 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { analyzeRecipients, normalizeSmsPhone, parseContactFile, smsCountryCode, SmsContactInput, suggestedContactListName } from '@/lib/bulk-sms';
+import { analyzeEmailRecipients, analyzeRecipients, normalizeSmsPhone, parseContactFile, smsCountryCode, SmsContactInput, suggestedContactListName } from '@/lib/bulk-sms';
 import { logPlatformAction } from '@/lib/platform-audit';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, FileUp, ListPlus, Loader2, Pencil, PhoneCall, Plus, Trash2, Upload } from 'lucide-react';
 
 type ContactList = { id: string; name: string; description: string | null; created_at: string };
+type EmailContactList = { id: string; name: string };
 type Contact = {
   id: string;
   list_id: string;
@@ -35,6 +36,7 @@ type Contact = {
 
 const PAGE_SIZE = 50;
 const NEW_LIST_VALUE = '__new_contact_list__';
+const NEW_EMAIL_LIST_VALUE = '__new_email_contact_list__';
 
 type ExternalContactsRouteState = {
   importRows?: SmsContactInput[];
@@ -51,6 +53,7 @@ export default function ExternalContactsPage() {
   const location = useLocation();
   const handledRouteImport = useRef(false);
   const [lists, setLists] = useState<ContactList[]>([]);
+  const [emailLists, setEmailLists] = useState<EmailContactList[]>([]);
   const [selectedListId, setSelectedListId] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactCount, setContactCount] = useState(0);
@@ -66,6 +69,8 @@ export default function ExternalContactsPage() {
   const [importFile, setImportFile] = useState('');
   const [importTargetId, setImportTargetId] = useState(NEW_LIST_VALUE);
   const [importNewListName, setImportNewListName] = useState('');
+  const [importEmailTargetId, setImportEmailTargetId] = useState(NEW_EMAIL_LIST_VALUE);
+  const [importEmailNewListName, setImportEmailNewListName] = useState('');
   const [importDialog, setImportDialog] = useState(false);
   const [deleteListOpen, setDeleteListOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -76,6 +81,12 @@ export default function ExternalContactsPage() {
     const next = (data ?? []) as ContactList[];
     setLists(next);
     setSelectedListId((current) => current && next.some((list) => list.id === current) ? current : next[0]?.id ?? '');
+  }, [toast]);
+
+  const loadEmailLists = useCallback(async () => {
+    const { data, error } = await supabase.from('external_email_contact_lists').select('id, name').order('name');
+    if (error) return toast({ title: 'Could not load external email lists', description: error.message, variant: 'destructive' });
+    setEmailLists((data ?? []) as EmailContactList[]);
   }, [toast]);
 
   const loadContacts = useCallback(async () => {
@@ -97,7 +108,7 @@ export default function ExternalContactsPage() {
     setLoading(false);
   }, [page, search, selectedListId, toast]);
 
-  useEffect(() => { void loadLists(); }, [loadLists]);
+  useEffect(() => { void loadLists(); void loadEmailLists(); }, [loadEmailLists, loadLists]);
   useEffect(() => { void loadContacts(); }, [loadContacts]);
   useEffect(() => { setPage(0); }, [selectedListId, search]);
   useEffect(() => {
@@ -109,18 +120,27 @@ export default function ExternalContactsPage() {
     setImportFile(fileName);
     setImportTargetId(NEW_LIST_VALUE);
     setImportNewListName(suggestedContactListName(fileName));
+    setImportEmailTargetId(NEW_EMAIL_LIST_VALUE);
+    setImportEmailNewListName(suggestedContactListName(fileName));
     setImportDialog(true);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
   const selectedList = lists.find((list) => list.id === selectedListId);
   const importAnalysis = useMemo(() => analyzeRecipients(importRows), [importRows]);
+  const emailImportAnalysis = useMemo(() => analyzeEmailRecipients(importRows), [importRows]);
   const importStats = useMemo(() => ({
     total: importAnalysis.length,
     valid: importAnalysis.filter((row) => row.validity === 'valid').length,
     invalid: importAnalysis.filter((row) => row.validity === 'invalid').length,
     duplicates: importAnalysis.filter((row) => row.validity === 'duplicate').length,
   }), [importAnalysis]);
+  const emailImportStats = useMemo(() => ({
+    total: emailImportAnalysis.length,
+    valid: emailImportAnalysis.filter((row) => row.validity === 'valid').length,
+    invalid: emailImportAnalysis.filter((row) => row.validity === 'invalid').length,
+    duplicates: emailImportAnalysis.filter((row) => row.validity === 'duplicate').length,
+  }), [emailImportAnalysis]);
 
   async function createList() {
     if (!listName.trim()) return;
@@ -195,6 +215,8 @@ export default function ExternalContactsPage() {
       setImportFile(file.name);
       setImportTargetId(selectedListId || NEW_LIST_VALUE);
       setImportNewListName(suggestedContactListName(file.name));
+      setImportEmailTargetId(NEW_EMAIL_LIST_VALUE);
+      setImportEmailNewListName(suggestedContactListName(file.name));
       setImportDialog(true);
     } catch (error) {
       toast({ title: 'Could not read contact file', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
@@ -202,11 +224,18 @@ export default function ExternalContactsPage() {
   }
 
   async function importContacts() {
-    const valid = importAnalysis.filter((row) => row.validity === 'valid' && row.normalized);
-    if (!valid.length) return toast({ title: 'No valid contacts to import', variant: 'destructive' });
-    const createNewList = importTargetId === NEW_LIST_VALUE;
+    const validPhones = importAnalysis.filter((row) => row.validity === 'valid' && row.normalized);
+    const validEmails = emailImportAnalysis.filter((row) => row.validity === 'valid' && row.normalizedEmail);
+    if (!validPhones.length && !validEmails.length) {
+      return toast({ title: 'No valid phone numbers or email addresses to import', variant: 'destructive' });
+    }
+    const createNewList = validPhones.length > 0 && importTargetId === NEW_LIST_VALUE;
+    const createNewEmailList = validEmails.length > 0 && importEmailTargetId === NEW_EMAIL_LIST_VALUE;
     if (createNewList && !importNewListName.trim()) {
       return toast({ title: 'Enter a name for the new contact list', variant: 'destructive' });
+    }
+    if (createNewEmailList && !importEmailNewListName.trim()) {
+      return toast({ title: 'Enter a name for the new email list', variant: 'destructive' });
     }
     setBusy('import');
     const { data: userData } = await supabase.auth.getUser();
@@ -215,6 +244,7 @@ export default function ExternalContactsPage() {
       return toast({ title: 'Your session has expired', description: 'Sign in again before importing contacts.', variant: 'destructive' });
     }
     let targetListId = importTargetId;
+    let targetEmailListId = importEmailTargetId;
     try {
       if (createNewList) {
         const { data: newList, error: listError } = await supabase.from('external_contact_lists').insert({
@@ -230,32 +260,101 @@ export default function ExternalContactsPage() {
           source: 'contact_import',
         });
       }
-      if (!targetListId || targetListId === NEW_LIST_VALUE) throw new Error('Choose a contact list.');
-
-      const rows = valid.map((row) => ({
-        list_id: targetListId,
-        business_name: row.businessName?.trim() || null,
-        contact_name: row.contactName?.trim() || null,
-        phone_number: row.phone.trim(),
-        normalized_phone_number: row.normalized!,
-        country_code: smsCountryCode(row.normalized!),
-        city: row.city?.trim() || null,
-        region: row.region?.trim() || null,
-        category: row.category?.trim() || null,
-        notes: row.notes?.trim() || null,
-        source: 'import',
-        created_by: userData.user.id,
-      }));
-      for (let index = 0; index < rows.length; index += 500) {
-        const { error } = await supabase.from('external_contacts').upsert(rows.slice(index, index + 500), { onConflict: 'list_id,normalized_phone_number' });
-        if (error) throw error;
+      if (createNewEmailList) {
+        const { data: newEmailList, error: emailListError } = await supabase.from('external_email_contact_lists').insert({
+          name: importEmailNewListName.trim(),
+          description: `Imported from ${importFile}`,
+          created_by: userData.user.id,
+        }).select('id').single();
+        if (emailListError) throw emailListError;
+        targetEmailListId = newEmailList.id;
+        await logPlatformAction('external_email_contact_list_created', {
+          list_id: targetEmailListId,
+          name: importEmailNewListName.trim(),
+          source: 'combined_contact_import',
+        });
       }
-      await logPlatformAction('external_contacts_imported', { list_id: targetListId, imported: rows.length, invalid: importStats.invalid, duplicates: importStats.duplicates });
-      toast({ title: 'Contacts imported', description: `${rows.length.toLocaleString()} valid contacts were added or updated.` });
-      setImportDialog(false); setImportRows([]); setImportFile(''); setImportNewListName('');
+
+      if (validPhones.length > 0) {
+        if (!targetListId || targetListId === NEW_LIST_VALUE) throw new Error('Choose an SMS contact list.');
+        const existingOptOut = new Map<string, boolean>();
+        const normalizedPhones = validPhones.map((row) => row.normalized!);
+        for (let index = 0; index < normalizedPhones.length; index += 200) {
+          const { data, error } = await supabase.from('external_contacts')
+            .select('normalized_phone_number,sms_opt_out')
+            .eq('list_id', targetListId)
+            .in('normalized_phone_number', normalizedPhones.slice(index, index + 200));
+          if (error) throw error;
+          for (const contact of data ?? []) existingOptOut.set(contact.normalized_phone_number, Boolean(contact.sms_opt_out));
+        }
+        const phoneRows = validPhones.map((row) => ({
+          list_id: targetListId,
+          business_name: row.businessName?.trim() || null,
+          contact_name: row.contactName?.trim() || null,
+          phone_number: row.phone.trim(),
+          normalized_phone_number: row.normalized!,
+          country_code: smsCountryCode(row.normalized!),
+          city: row.city?.trim() || null,
+          region: row.region?.trim() || null,
+          category: row.category?.trim() || null,
+          notes: row.notes?.trim() || null,
+          source: 'import',
+          sms_opt_out: existingOptOut.get(row.normalized!) ?? false,
+          created_by: userData.user.id,
+        }));
+        for (let index = 0; index < phoneRows.length; index += 500) {
+          const { error } = await supabase.from('external_contacts').upsert(phoneRows.slice(index, index + 500), { onConflict: 'list_id,normalized_phone_number' });
+          if (error) throw error;
+        }
+        await logPlatformAction('external_contacts_imported', {
+          list_id: targetListId, imported: phoneRows.length, invalid: importStats.invalid, duplicates: importStats.duplicates,
+        });
+      }
+
+      if (validEmails.length > 0) {
+        if (!targetEmailListId || targetEmailListId === NEW_EMAIL_LIST_VALUE) throw new Error('Choose an external email list.');
+        const existingOptOut = new Map<string, boolean>();
+        const normalizedEmails = validEmails.map((row) => row.normalizedEmail!);
+        for (let index = 0; index < normalizedEmails.length; index += 200) {
+          const { data, error } = await supabase.from('external_email_contacts')
+            .select('normalized_email_address,email_opt_out')
+            .eq('list_id', targetEmailListId)
+            .in('normalized_email_address', normalizedEmails.slice(index, index + 200));
+          if (error) throw error;
+          for (const contact of data ?? []) existingOptOut.set(contact.normalized_email_address, Boolean(contact.email_opt_out));
+        }
+        const emailRows = validEmails.map((row) => ({
+          list_id: targetEmailListId,
+          business_name: row.businessName?.trim() || null,
+          contact_name: row.contactName?.trim() || null,
+          email_address: row.email.trim(),
+          normalized_email_address: row.normalizedEmail!,
+          city: row.city?.trim() || null,
+          region: row.region?.trim() || null,
+          category: row.category?.trim() || null,
+          notes: row.notes?.trim() || null,
+          source: 'import',
+          email_opt_out: existingOptOut.get(row.normalizedEmail!) ?? false,
+          created_by: userData.user.id,
+        }));
+        for (let index = 0; index < emailRows.length; index += 500) {
+          const { error } = await supabase.from('external_email_contacts').upsert(emailRows.slice(index, index + 500), { onConflict: 'list_id,normalized_email_address' });
+          if (error) throw error;
+        }
+        await logPlatformAction('external_email_contacts_imported', {
+          list_id: targetEmailListId, imported: emailRows.length, invalid: emailImportStats.invalid, duplicates: emailImportStats.duplicates,
+        });
+      }
+
+      const summary = [
+        validPhones.length ? `${validPhones.length.toLocaleString()} phone contact${validPhones.length === 1 ? '' : 's'}` : '',
+        validEmails.length ? `${validEmails.length.toLocaleString()} email contact${validEmails.length === 1 ? '' : 's'}` : '',
+      ].filter(Boolean).join(' and ');
+      toast({ title: 'Prospect contacts imported', description: `${summary} were added or updated in their separate lists.` });
+      setImportDialog(false); setImportRows([]); setImportFile(''); setImportNewListName(''); setImportEmailNewListName('');
       setSearch(''); setPage(0);
-      await loadLists();
-      setSelectedListId(targetListId);
+      await Promise.all([loadLists(), loadEmailLists()]);
+      if (validPhones.length > 0) setSelectedListId(targetListId);
     } catch (error) {
       toast({ title: 'Import failed', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     } finally { setBusy(null); }
@@ -273,7 +372,7 @@ export default function ExternalContactsPage() {
 
   return <div className="space-y-6 max-w-7xl">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><PhoneCall className="h-6 w-6" /> External Contacts</h1><p className="text-sm text-muted-foreground">Prospect lists remain separate from registered KudiTrack users.</p></div>
+      <div><h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><PhoneCall className="h-6 w-6" /> External SMS Contacts</h1><p className="text-sm text-muted-foreground">Phone prospect lists remain separate from registered KudiTrack users and external email lists.</p></div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => setListDialog(true)}><ListPlus className="mr-2 h-4 w-4" /> New list</Button>
         <label><Button variant="outline" asChild disabled={busy === 'read'}><span><FileUp className="mr-2 h-4 w-4" /> Import contacts</span></Button><input type="file" accept=".csv,.xlsx" className="sr-only" disabled={busy === 'read'} onChange={readImport} /></label>
@@ -310,7 +409,36 @@ export default function ExternalContactsPage() {
       <label className="flex items-center gap-3 text-sm sm:col-span-2"><Switch checked={Boolean(contactEditor.sms_opt_out)} onCheckedChange={(checked) => setContactEditor((current) => ({ ...current, sms_opt_out: checked }))} /> Do Not SMS</label>
     </div><DialogFooter><Button variant="outline" onClick={() => setContactDialog(false)}>Cancel</Button><Button onClick={saveContact} disabled={busy === 'contact'}>Save contact</Button></DialogFooter></DialogContent></Dialog>
 
-    <Dialog open={importDialog} onOpenChange={setImportDialog}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Import preview</DialogTitle></DialogHeader><p className="text-sm font-medium flex items-center gap-2"><Upload className="h-4 w-4" /> {importFile}</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><MiniStat label="Total rows" value={importStats.total} /><MiniStat label="Valid" value={importStats.valid} /><MiniStat label="Invalid" value={importStats.invalid} /><MiniStat label="Duplicates" value={importStats.duplicates} /></div><div className="space-y-2"><Label>Save to contact list</Label><Select value={importTargetId} onValueChange={setImportTargetId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_LIST_VALUE}>Create a new list</SelectItem>{lists.map((list) => <SelectItem value={list.id} key={list.id}>{list.name}</SelectItem>)}</SelectContent></Select></div>{importTargetId === NEW_LIST_VALUE && <div className="space-y-2"><Label htmlFor="import-list-name">New list name</Label><Input id="import-list-name" value={importNewListName} onChange={(event) => setImportNewListName(event.target.value)} maxLength={120} placeholder="Ghana Prospect Contacts" /></div>}<p className="text-xs text-muted-foreground">Only valid, unique phone numbers will be saved. Existing numbers in the selected list will be updated without duplicating them.</p><DialogFooter><Button variant="outline" onClick={() => setImportDialog(false)}>Cancel</Button><Button onClick={importContacts} disabled={busy === 'import' || !importStats.valid || (importTargetId === NEW_LIST_VALUE && !importNewListName.trim())}>{busy === 'import' ? 'Importing…' : `Import ${importStats.valid.toLocaleString()} contacts`}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={importDialog} onOpenChange={setImportDialog}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Phone and email import preview</DialogTitle></DialogHeader>
+        <p className="text-sm font-medium flex items-center gap-2"><Upload className="h-4 w-4" /> {importFile}</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MiniStat label="Valid phones" value={importStats.valid} />
+          <MiniStat label="Phone duplicates" value={importStats.duplicates} />
+          <MiniStat label="Valid emails" value={emailImportStats.valid} />
+          <MiniStat label="Email duplicates" value={emailImportStats.duplicates} />
+        </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-3 rounded-md border border-border p-4">
+            <div><p className="font-medium">SMS contacts</p><p className="text-xs text-muted-foreground">{importStats.invalid.toLocaleString()} invalid phone entries excluded</p></div>
+            {importStats.valid > 0 ? <>
+              <div className="space-y-2"><Label>Save phones to</Label><Select value={importTargetId} onValueChange={setImportTargetId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_LIST_VALUE}>Create a new SMS list</SelectItem>{lists.map((list) => <SelectItem value={list.id} key={list.id}>{list.name}</SelectItem>)}</SelectContent></Select></div>
+              {importTargetId === NEW_LIST_VALUE && <div className="space-y-2"><Label htmlFor="import-list-name">New SMS list name</Label><Input id="import-list-name" value={importNewListName} onChange={(event) => setImportNewListName(event.target.value)} maxLength={120} /></div>}
+            </> : <p className="text-sm text-muted-foreground">No valid phone numbers were found, so no SMS list will be changed.</p>}
+          </div>
+          <div className="space-y-3 rounded-md border border-border p-4">
+            <div><p className="font-medium">Email contacts</p><p className="text-xs text-muted-foreground">{emailImportStats.invalid.toLocaleString()} invalid email entries excluded</p></div>
+            {emailImportStats.valid > 0 ? <>
+              <div className="space-y-2"><Label>Save emails to</Label><Select value={importEmailTargetId} onValueChange={setImportEmailTargetId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_EMAIL_LIST_VALUE}>Create a new email list</SelectItem>{emailLists.map((list) => <SelectItem value={list.id} key={list.id}>{list.name}</SelectItem>)}</SelectContent></Select></div>
+              {importEmailTargetId === NEW_EMAIL_LIST_VALUE && <div className="space-y-2"><Label htmlFor="import-email-list-name">New email list name</Label><Input id="import-email-list-name" value={importEmailNewListName} onChange={(event) => setImportEmailNewListName(event.target.value)} maxLength={120} /></div>}
+            </> : <p className="text-sm text-muted-foreground">No valid email addresses were found, so no email list will be changed.</p>}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Phone numbers and email addresses are saved in separate external prospect databases. Existing entries are updated without duplication, and registered KudiTrack users are never modified.</p>
+        <DialogFooter><Button variant="outline" onClick={() => setImportDialog(false)}>Cancel</Button><Button onClick={importContacts} disabled={busy === 'import' || (!importStats.valid && !emailImportStats.valid) || (importStats.valid > 0 && importTargetId === NEW_LIST_VALUE && !importNewListName.trim()) || (emailImportStats.valid > 0 && importEmailTargetId === NEW_EMAIL_LIST_VALUE && !importEmailNewListName.trim())}>{busy === 'import' ? 'Importing…' : `Import ${importStats.valid.toLocaleString()} phones + ${emailImportStats.valid.toLocaleString()} emails`}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <AlertDialog open={deleteListOpen} onOpenChange={setDeleteListOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete {selectedList?.name}?</AlertDialogTitle><AlertDialogDescription>This removes the list and its external contacts. Campaign history remains intact.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={deleteList}>Delete list</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;

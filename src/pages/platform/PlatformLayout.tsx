@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, Coins, ContactRound, FileText, History, MessagesSquare, Menu } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Receipt, Megaphone, ShieldAlert, ShieldCheck, LogOut, Wallet, ImagePlus, LifeBuoy, Gift, MessageSquare, Sparkles, Star, Send, UserCircle2, Activity, ClipboardList, Mail, MailPlus, Coins, ContactRound, FileText, History, MessagesSquare, Menu } from 'lucide-react';
 import { BrandLoader } from '@/components/BrandLoader';
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
@@ -23,10 +23,11 @@ const NAV = [
   { to: '/super-admin/ad-applications', label: 'Ad Applications', icon: Sparkles },
   { to: '/super-admin/reviews', label: 'Reviews', icon: Star },
   { to: '/super-admin/currencies', label: 'Currencies', icon: Coins },
-  { to: '/super-admin/email', label: 'Email & Newsletter', icon: Mail, section: 'Communications' },
+  { to: '/super-admin/email', label: 'Bulk Email & Newsletter', icon: Mail, section: 'Communications' },
   { to: '/super-admin/sms', label: 'Registered User SMS', icon: Send },
   { to: '/super-admin/bulk-sms', label: 'Bulk SMS', icon: MessagesSquare, end: true },
-  { to: '/super-admin/external-contacts', label: 'External Contacts', icon: ContactRound },
+  { to: '/super-admin/external-contacts', label: 'External SMS Contacts', icon: ContactRound },
+  { to: '/super-admin/external-email-contacts', label: 'External Email Contacts', icon: MailPlus },
   { to: '/super-admin/bulk-sms/templates', label: 'SMS Templates', icon: FileText },
   { to: '/super-admin/bulk-sms/history', label: 'Campaign History', icon: History },
   { to: '/super-admin/surveys', label: 'Surveys', icon: ClipboardList },
