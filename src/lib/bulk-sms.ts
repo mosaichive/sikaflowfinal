@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import readXlsxFile from 'read-excel-file/browser';
+import { readSheet } from 'read-excel-file/browser';
 
 export type SmsContactInput = {
   phone: string;
@@ -30,10 +30,16 @@ const GSM_EXTENSION = new Set(Array.from('\f^{}\\[~]|€'));
 
 const PHONE_HEADERS = new Set([
   'phone', 'phonenumber', 'mobile', 'mobilenumber', 'contact', 'contactnumber',
-  'telephone', 'tel', 'number', 'smsnumber', 'whatsapp',
+  'telephone', 'tel', 'number', 'smsnumber', 'whatsapp', 'publiccontact',
+  'businesscontact', 'contactphone', 'primaryphone',
 ]);
 const NAME_HEADERS = new Set(['name', 'contactname', 'fullname', 'customername', 'ownername']);
 const BUSINESS_HEADERS = new Set(['business', 'businessname', 'company', 'companyname', 'shopname']);
+const CITY_HEADERS = new Set(['city', 'town', 'area', 'cityarea']);
+const REGION_HEADERS = new Set(['region', 'state', 'province']);
+const CATEGORY_HEADERS = new Set(['category', 'type', 'segment', 'businesstype']);
+const NOTES_HEADERS = new Set(['notes', 'note', 'comments']);
+const FIT_HEADERS = new Set(['fit', 'kuditrackfit']);
 
 function canonicalHeader(value: unknown) {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -42,6 +48,17 @@ function canonicalHeader(value: unknown) {
 function valueAt(row: unknown[], headers: string[], accepted: Set<string>) {
   const index = headers.findIndex((header) => accepted.has(header));
   return index >= 0 ? String(row[index] ?? '').trim() : '';
+}
+
+function splitSpreadsheetPhones(value: unknown): string[] {
+  const phone = String(value ?? '').trim();
+  if (!phone) return [''];
+
+  const phones = phone
+    .split(/[;/|\n\r]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return phones.length > 0 ? phones : [phone];
 }
 
 export function normalizeSmsPhone(raw: unknown): string | null {
@@ -120,7 +137,12 @@ export function getSmsMetrics(message: string): SmsMetrics {
   };
 }
 
-export function matrixToContacts(matrix: unknown[][]): SmsContactInput[] {
+export function matrixToContacts(input: unknown): SmsContactInput[] {
+  if (!Array.isArray(input) || !input.every(Array.isArray)) {
+    throw new Error('The spreadsheet does not contain a readable row table.');
+  }
+
+  const matrix = input as unknown[][];
   if (matrix.length < 2) throw new Error('The file must include a header row and at least one contact.');
   const headers = matrix[0].map(canonicalHeader);
   const phoneIndex = headers.findIndex((header) => PHONE_HEADERS.has(header));
@@ -129,28 +151,34 @@ export function matrixToContacts(matrix: unknown[][]): SmsContactInput[] {
   }
 
   return matrix.slice(1).flatMap((row) => {
-    const phone = String(row[phoneIndex] ?? '').trim();
-    if (!phone && row.every((cell) => String(cell ?? '').trim() === '')) return [];
-    return [{
-      phone,
+    const phoneCell = String(row[phoneIndex] ?? '').trim();
+    if (!phoneCell && row.every((cell) => String(cell ?? '').trim() === '')) return [];
+
+    const notes = [
+      valueAt(row, headers, FIT_HEADERS),
+      valueAt(row, headers, NOTES_HEADERS),
+    ].filter(Boolean).join(' - ');
+    const metadata = {
       contactName: valueAt(row, headers, NAME_HEADERS) || undefined,
       businessName: valueAt(row, headers, BUSINESS_HEADERS) || undefined,
-      city: valueAt(row, headers, new Set(['city', 'town'])) || undefined,
-      region: valueAt(row, headers, new Set(['region', 'state', 'province'])) || undefined,
-      category: valueAt(row, headers, new Set(['category', 'type', 'segment'])) || undefined,
-      notes: valueAt(row, headers, new Set(['notes', 'note', 'comments'])) || undefined,
-    }];
+      city: valueAt(row, headers, CITY_HEADERS) || undefined,
+      region: valueAt(row, headers, REGION_HEADERS) || undefined,
+      category: valueAt(row, headers, CATEGORY_HEADERS) || undefined,
+      notes: notes || undefined,
+    };
+
+    return splitSpreadsheetPhones(phoneCell).map((phone) => ({ phone, ...metadata }));
   });
 }
 
 export async function parseContactFile(file: File): Promise<SmsContactInput[]> {
   if (file.size > 8 * 1024 * 1024) throw new Error('Contact files are limited to 8 MB.');
   const extension = file.name.split('.').pop()?.toLowerCase();
-  if (extension === 'xlsx' || extension === 'xls') {
-    const rows = await readXlsxFile(file);
-    return matrixToContacts(rows as unknown[][]);
+  if (extension === 'xlsx') {
+    const rows = await readSheet(file);
+    return matrixToContacts(rows);
   }
-  if (extension !== 'csv') throw new Error('Upload a CSV, XLS, or XLSX file.');
+  if (extension !== 'csv') throw new Error('Upload a CSV or XLSX file.');
 
   const text = await file.text();
   const result = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' });

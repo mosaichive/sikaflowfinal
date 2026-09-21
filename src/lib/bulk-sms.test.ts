@@ -35,9 +35,38 @@ describe('recipient parsing', () => {
     }]);
   });
 
+  it('supports KudiTrack prospect workbook headers and multiple numbers in one cell', () => {
+    expect(matrixToContacts([
+      ['Business Name', 'Business Type', 'City / Area', 'Region', 'Public Contact', 'KudiTrack Fit', 'Notes'],
+      ['Kojo Stores', 'Retail', 'Osu', 'Greater Accra', '0241234567 / +233551234567', 'Strong fit', 'Call mornings'],
+    ])).toEqual([
+      {
+        phone: '0241234567',
+        businessName: 'Kojo Stores',
+        city: 'Osu',
+        region: 'Greater Accra',
+        category: 'Retail',
+        notes: 'Strong fit - Call mornings',
+      },
+      {
+        phone: '+233551234567',
+        businessName: 'Kojo Stores',
+        city: 'Osu',
+        region: 'Greater Accra',
+        category: 'Retail',
+        notes: 'Strong fit - Call mornings',
+      },
+    ]);
+  });
+
   it('requires a recognizable phone column', () => {
     expect(() => matrixToContacts([['Name', 'Email'], ['Ama', 'ama@example.com']]))
       .toThrow(/No phone column/);
+  });
+
+  it('rejects workbook-shaped data with a readable error', () => {
+    expect(() => matrixToContacts([{ sheet: 'Contacts', data: [['Phone'], ['0241234567']] }]))
+      .toThrow(/readable row table/);
   });
 });
 
