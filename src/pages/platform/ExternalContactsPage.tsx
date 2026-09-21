@@ -41,6 +41,8 @@ const NEW_EMAIL_LIST_VALUE = '__new_email_contact_list__';
 type ExternalContactsRouteState = {
   importRows?: SmsContactInput[];
   importFile?: string;
+  importEmailTargetId?: string;
+  returnToEmailContacts?: boolean;
 };
 
 const emptyContact = (): Partial<Contact> => ({
@@ -71,6 +73,7 @@ export default function ExternalContactsPage() {
   const [importNewListName, setImportNewListName] = useState('');
   const [importEmailTargetId, setImportEmailTargetId] = useState(NEW_EMAIL_LIST_VALUE);
   const [importEmailNewListName, setImportEmailNewListName] = useState('');
+  const [returnToEmailContacts, setReturnToEmailContacts] = useState(false);
   const [importDialog, setImportDialog] = useState(false);
   const [deleteListOpen, setDeleteListOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -120,8 +123,9 @@ export default function ExternalContactsPage() {
     setImportFile(fileName);
     setImportTargetId(NEW_LIST_VALUE);
     setImportNewListName(suggestedContactListName(fileName));
-    setImportEmailTargetId(NEW_EMAIL_LIST_VALUE);
+    setImportEmailTargetId(routeState.importEmailTargetId || NEW_EMAIL_LIST_VALUE);
     setImportEmailNewListName(suggestedContactListName(fileName));
+    setReturnToEmailContacts(Boolean(routeState.returnToEmailContacts));
     setImportDialog(true);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
@@ -217,6 +221,7 @@ export default function ExternalContactsPage() {
       setImportNewListName(suggestedContactListName(file.name));
       setImportEmailTargetId(NEW_EMAIL_LIST_VALUE);
       setImportEmailNewListName(suggestedContactListName(file.name));
+      setReturnToEmailContacts(false);
       setImportDialog(true);
     } catch (error) {
       toast({ title: 'Could not read contact file', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
@@ -355,6 +360,9 @@ export default function ExternalContactsPage() {
       setSearch(''); setPage(0);
       await Promise.all([loadLists(), loadEmailLists()]);
       if (validPhones.length > 0) setSelectedListId(targetListId);
+      if (returnToEmailContacts && validEmails.length > 0) {
+        navigate('/super-admin/external-email-contacts', { state: { selectedListId: targetEmailListId } });
+      }
     } catch (error) {
       toast({ title: 'Import failed', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     } finally { setBusy(null); }
