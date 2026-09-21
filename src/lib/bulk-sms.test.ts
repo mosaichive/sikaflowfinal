@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeRecipients, getSmsMetrics, matrixToContacts, normalizeSmsPhone, splitManualRecipients } from './bulk-sms';
+import { analyzeRecipients, getSmsMetrics, matrixToContacts, normalizeSmsPhone, splitManualRecipients, suggestedContactListName } from './bulk-sms';
 
 describe('normalizeSmsPhone', () => {
   it.each([
@@ -67,6 +67,12 @@ describe('recipient parsing', () => {
   it('rejects workbook-shaped data with a readable error', () => {
     expect(() => matrixToContacts([{ sheet: 'Contacts', data: [['Phone'], ['0241234567']] }]))
       .toThrow(/readable row table/);
+  });
+
+  it('creates a readable contact-list name from an uploaded filename', () => {
+    expect(suggestedContactListName('KudiTrack_Ghana_Prospect_Contacts.xlsx'))
+      .toBe('KudiTrack Ghana Prospect Contacts');
+    expect(suggestedContactListName('contacts.csv')).toBe('contacts');
   });
 });
 

@@ -92,6 +92,12 @@ export function splitManualRecipients(value: string): SmsContactInput[] {
     .map((phone) => ({ phone }));
 }
 
+export function suggestedContactListName(fileName: string): string {
+  const withoutExtension = fileName.replace(/\.(csv|xlsx)$/i, '');
+  const normalized = withoutExtension.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return normalized || 'Imported Contacts';
+}
+
 export function analyzeRecipients(rows: SmsContactInput[]): ParsedRecipient[] {
   const seen = new Set<string>();
   return rows.map((row) => {

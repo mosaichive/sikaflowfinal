@@ -106,7 +106,10 @@ export default function BulkSmsPage() {
       if (rows.length > MAX_RECIPIENTS) throw new Error(`A campaign can contain at most ${MAX_RECIPIENTS.toLocaleString()} rows.`);
       setUploadedRows(rows);
       setUploadedFileName(file.name);
-      toast({ title: 'Contact file loaded', description: `${rows.length.toLocaleString()} rows are ready for review.` });
+      toast({
+        title: 'Contact file loaded',
+        description: `${rows.length.toLocaleString()} rows are ready. Save them to a contact list if you want to reuse them.`,
+      });
     } catch (error) {
       toast({ title: 'Could not read contact file', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     } finally {
@@ -215,6 +218,23 @@ export default function BulkSmsPage() {
               <Stat label="Valid" value={localStats.valid} tone="success" />
               <Stat label="Invalid" value={localStats.invalid} tone={localStats.invalid ? 'danger' : undefined} />
               <Stat label="Duplicates" value={localStats.duplicate} tone={localStats.duplicate ? 'warning' : undefined} />
+            </div>
+          )}
+          {source === 'upload' && uploadedRows.length > 0 && (
+            <div className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Keep these contacts for future campaigns</p>
+                <p className="text-xs text-muted-foreground">Uploaded recipients stay in this campaign only until you save them to External Contacts.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/super-admin/external-contacts', {
+                  state: { importRows: uploadedRows, importFile: uploadedFileName },
+                })}
+              >
+                Save to contact list
+              </Button>
             </div>
           )}
         </CardContent>

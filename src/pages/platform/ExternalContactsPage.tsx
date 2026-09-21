@@ -1,4 +1,5 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { analyzeRecipients, normalizeSmsPhone, parseContactFile, smsCountryCode, SmsContactInput } from '@/lib/bulk-sms';
+import { analyzeRecipients, normalizeSmsPhone, parseContactFile, smsCountryCode, SmsContactInput, suggestedContactListName } from '@/lib/bulk-sms';
 import { logPlatformAction } from '@/lib/platform-audit';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, FileUp, ListPlus, Loader2, Pencil, PhoneCall, Plus, Trash2, Upload } from 'lucide-react';
@@ -33,6 +34,12 @@ type Contact = {
 };
 
 const PAGE_SIZE = 50;
+const NEW_LIST_VALUE = '__new_contact_list__';
+
+type ExternalContactsRouteState = {
+  importRows?: SmsContactInput[];
+  importFile?: string;
+};
 
 const emptyContact = (): Partial<Contact> => ({
   business_name: '', contact_name: '', phone_number: '', city: '', region: '', category: '', notes: '', sms_opt_out: false,
@@ -40,6 +47,9 @@ const emptyContact = (): Partial<Contact> => ({
 
 export default function ExternalContactsPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const handledRouteImport = useRef(false);
   const [lists, setLists] = useState<ContactList[]>([]);
   const [selectedListId, setSelectedListId] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -54,6 +64,8 @@ export default function ExternalContactsPage() {
   const [contactEditor, setContactEditor] = useState<Partial<Contact>>(emptyContact());
   const [importRows, setImportRows] = useState<SmsContactInput[]>([]);
   const [importFile, setImportFile] = useState('');
+  const [importTargetId, setImportTargetId] = useState(NEW_LIST_VALUE);
+  const [importNewListName, setImportNewListName] = useState('');
   const [importDialog, setImportDialog] = useState(false);
   const [deleteListOpen, setDeleteListOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -88,6 +100,18 @@ export default function ExternalContactsPage() {
   useEffect(() => { void loadLists(); }, [loadLists]);
   useEffect(() => { void loadContacts(); }, [loadContacts]);
   useEffect(() => { setPage(0); }, [selectedListId, search]);
+  useEffect(() => {
+    const routeState = location.state as ExternalContactsRouteState | null;
+    if (handledRouteImport.current || !routeState?.importRows?.length) return;
+    handledRouteImport.current = true;
+    const fileName = routeState.importFile || 'Imported Contacts.xlsx';
+    setImportRows(routeState.importRows);
+    setImportFile(fileName);
+    setImportTargetId(NEW_LIST_VALUE);
+    setImportNewListName(suggestedContactListName(fileName));
+    setImportDialog(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   const selectedList = lists.find((list) => list.id === selectedListId);
   const importAnalysis = useMemo(() => analyzeRecipients(importRows), [importRows]);
@@ -169,6 +193,8 @@ export default function ExternalContactsPage() {
       if (rows.length > 10000) throw new Error('A single import is limited to 10,000 rows.');
       setImportRows(rows);
       setImportFile(file.name);
+      setImportTargetId(selectedListId || NEW_LIST_VALUE);
+      setImportNewListName(suggestedContactListName(file.name));
       setImportDialog(true);
     } catch (error) {
       toast({ title: 'Could not read contact file', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
@@ -176,14 +202,38 @@ export default function ExternalContactsPage() {
   }
 
   async function importContacts() {
-    if (!selectedListId) return;
     const valid = importAnalysis.filter((row) => row.validity === 'valid' && row.normalized);
     if (!valid.length) return toast({ title: 'No valid contacts to import', variant: 'destructive' });
+    const createNewList = importTargetId === NEW_LIST_VALUE;
+    if (createNewList && !importNewListName.trim()) {
+      return toast({ title: 'Enter a name for the new contact list', variant: 'destructive' });
+    }
     setBusy('import');
     const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setBusy(null);
+      return toast({ title: 'Your session has expired', description: 'Sign in again before importing contacts.', variant: 'destructive' });
+    }
+    let targetListId = importTargetId;
     try {
+      if (createNewList) {
+        const { data: newList, error: listError } = await supabase.from('external_contact_lists').insert({
+          name: importNewListName.trim(),
+          description: `Imported from ${importFile}`,
+          created_by: userData.user.id,
+        }).select('id').single();
+        if (listError) throw listError;
+        targetListId = newList.id;
+        await logPlatformAction('external_contact_list_created', {
+          list_id: targetListId,
+          name: importNewListName.trim(),
+          source: 'contact_import',
+        });
+      }
+      if (!targetListId || targetListId === NEW_LIST_VALUE) throw new Error('Choose a contact list.');
+
       const rows = valid.map((row) => ({
-        list_id: selectedListId,
+        list_id: targetListId,
         business_name: row.businessName?.trim() || null,
         contact_name: row.contactName?.trim() || null,
         phone_number: row.phone.trim(),
@@ -194,16 +244,18 @@ export default function ExternalContactsPage() {
         category: row.category?.trim() || null,
         notes: row.notes?.trim() || null,
         source: 'import',
-        created_by: userData.user!.id,
+        created_by: userData.user.id,
       }));
       for (let index = 0; index < rows.length; index += 500) {
         const { error } = await supabase.from('external_contacts').upsert(rows.slice(index, index + 500), { onConflict: 'list_id,normalized_phone_number' });
         if (error) throw error;
       }
-      await logPlatformAction('external_contacts_imported', { list_id: selectedListId, imported: rows.length, invalid: importStats.invalid, duplicates: importStats.duplicates });
+      await logPlatformAction('external_contacts_imported', { list_id: targetListId, imported: rows.length, invalid: importStats.invalid, duplicates: importStats.duplicates });
       toast({ title: 'Contacts imported', description: `${rows.length.toLocaleString()} valid contacts were added or updated.` });
-      setImportDialog(false); setImportRows([]); setImportFile('');
-      await loadContacts();
+      setImportDialog(false); setImportRows([]); setImportFile(''); setImportNewListName('');
+      setSearch(''); setPage(0);
+      await loadLists();
+      setSelectedListId(targetListId);
     } catch (error) {
       toast({ title: 'Import failed', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     } finally { setBusy(null); }
@@ -224,7 +276,7 @@ export default function ExternalContactsPage() {
       <div><h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><PhoneCall className="h-6 w-6" /> External Contacts</h1><p className="text-sm text-muted-foreground">Prospect lists remain separate from registered KudiTrack users.</p></div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => setListDialog(true)}><ListPlus className="mr-2 h-4 w-4" /> New list</Button>
-        <label><Button variant="outline" asChild disabled={!selectedListId || busy === 'read'}><span><FileUp className="mr-2 h-4 w-4" /> Import contacts</span></Button><input type="file" accept=".csv,.xlsx" className="sr-only" disabled={!selectedListId} onChange={readImport} /></label>
+        <label><Button variant="outline" asChild disabled={busy === 'read'}><span><FileUp className="mr-2 h-4 w-4" /> Import contacts</span></Button><input type="file" accept=".csv,.xlsx" className="sr-only" disabled={busy === 'read'} onChange={readImport} /></label>
         <Button disabled={!selectedListId} onClick={() => { setContactEditor(emptyContact()); setContactDialog(true); }}><Plus className="mr-2 h-4 w-4" /> Add contact</Button>
       </div>
     </div>
@@ -258,7 +310,7 @@ export default function ExternalContactsPage() {
       <label className="flex items-center gap-3 text-sm sm:col-span-2"><Switch checked={Boolean(contactEditor.sms_opt_out)} onCheckedChange={(checked) => setContactEditor((current) => ({ ...current, sms_opt_out: checked }))} /> Do Not SMS</label>
     </div><DialogFooter><Button variant="outline" onClick={() => setContactDialog(false)}>Cancel</Button><Button onClick={saveContact} disabled={busy === 'contact'}>Save contact</Button></DialogFooter></DialogContent></Dialog>
 
-    <Dialog open={importDialog} onOpenChange={setImportDialog}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Import preview</DialogTitle></DialogHeader><p className="text-sm font-medium flex items-center gap-2"><Upload className="h-4 w-4" /> {importFile}</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><MiniStat label="Total rows" value={importStats.total} /><MiniStat label="Valid" value={importStats.valid} /><MiniStat label="Invalid" value={importStats.invalid} /><MiniStat label="Duplicates" value={importStats.duplicates} /></div><DialogFooter><Button variant="outline" onClick={() => setImportDialog(false)}>Cancel</Button><Button onClick={importContacts} disabled={busy === 'import' || !importStats.valid}>{busy === 'import' ? 'Importing…' : `Import ${importStats.valid.toLocaleString()} contacts`}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={importDialog} onOpenChange={setImportDialog}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Import preview</DialogTitle></DialogHeader><p className="text-sm font-medium flex items-center gap-2"><Upload className="h-4 w-4" /> {importFile}</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><MiniStat label="Total rows" value={importStats.total} /><MiniStat label="Valid" value={importStats.valid} /><MiniStat label="Invalid" value={importStats.invalid} /><MiniStat label="Duplicates" value={importStats.duplicates} /></div><div className="space-y-2"><Label>Save to contact list</Label><Select value={importTargetId} onValueChange={setImportTargetId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_LIST_VALUE}>Create a new list</SelectItem>{lists.map((list) => <SelectItem value={list.id} key={list.id}>{list.name}</SelectItem>)}</SelectContent></Select></div>{importTargetId === NEW_LIST_VALUE && <div className="space-y-2"><Label htmlFor="import-list-name">New list name</Label><Input id="import-list-name" value={importNewListName} onChange={(event) => setImportNewListName(event.target.value)} maxLength={120} placeholder="Ghana Prospect Contacts" /></div>}<p className="text-xs text-muted-foreground">Only valid, unique phone numbers will be saved. Existing numbers in the selected list will be updated without duplicating them.</p><DialogFooter><Button variant="outline" onClick={() => setImportDialog(false)}>Cancel</Button><Button onClick={importContacts} disabled={busy === 'import' || !importStats.valid || (importTargetId === NEW_LIST_VALUE && !importNewListName.trim())}>{busy === 'import' ? 'Importing…' : `Import ${importStats.valid.toLocaleString()} contacts`}</Button></DialogFooter></DialogContent></Dialog>
 
     <AlertDialog open={deleteListOpen} onOpenChange={setDeleteListOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete {selectedList?.name}?</AlertDialogTitle><AlertDialogDescription>This removes the list and its external contacts. Campaign history remains intact.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={deleteList}>Delete list</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
