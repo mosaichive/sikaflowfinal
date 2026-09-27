@@ -892,6 +892,9 @@ export async function updateProductRecord(
     optionalColumns: [
       'user_id',
       'business_id',
+      'cost',
+      'price',
+      'stock',
       'low_stock_threshold',
       'reorder_level',
       'category',

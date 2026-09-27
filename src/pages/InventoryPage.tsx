@@ -154,8 +154,10 @@ export default function InventoryPage() {
   const [damagedGoods, setDamagedGoods] = useState<DamagedGoodsRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [stockDialogOpen, setStockDialogOpen] = useState(false);
   const [damageDialogOpen, setDamageDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stockSaving, setStockSaving] = useState(false);
   const [damageSaving, setDamageSaving] = useState(false);
   const [editingRestock, setEditingRestock] = useState<RestockRow | null>(null);
   const [deletingRestockId, setDeletingRestockId] = useState<string | null>(null);
@@ -176,6 +178,11 @@ export default function InventoryPage() {
     damage_date: new Date().toISOString().slice(0, 10),
     notes: '',
   });
+  const [stockEditor, setStockEditor] = useState<{
+    product: ProductRow | null;
+    quantity: string;
+    reason: string;
+  }>({ product: null, quantity: '0', reason: '' });
   const [damageProductFilter, setDamageProductFilter] = useState('all');
   const [damageReasonFilter, setDamageReasonFilter] = useState('all');
   const [damageDateFrom, setDamageDateFrom] = useState('');
@@ -559,6 +566,57 @@ export default function InventoryPage() {
     setDamageDialogOpen(true);
   };
 
+  const openStockAdjustment = (product: ProductRow) => {
+    setStockEditor({
+      product,
+      quantity: String(Math.max(0, Math.trunc(toNumber(product.quantity)))),
+      reason: '',
+    });
+    setStockDialogOpen(true);
+  };
+
+  const saveStockAdjustment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const product = stockEditor.product;
+    if (!product || !businessId || !canManage) return;
+
+    const nextQuantity = Number(stockEditor.quantity);
+    if (!Number.isInteger(nextQuantity) || nextQuantity < 0) {
+      toast({ title: 'Quantity must be a whole number of zero or more', variant: 'destructive' });
+      return;
+    }
+
+    setStockSaving(true);
+    try {
+      const { error } = await supabase.rpc('adjust_product_stock' as any, {
+        p_product_id: product.id,
+        p_quantity: nextQuantity,
+        p_reason: stockEditor.reason.trim() || null,
+      });
+      if (error) throw error;
+
+      const updatedProduct = { ...product, quantity: nextQuantity };
+      setProducts((current) => current.map((row) => row.id === product.id ? updatedProduct : row));
+      rememberCachedProduct(businessId, { ...updatedProduct, business_id: businessId });
+      setStockDialogOpen(false);
+      setStockEditor({ product: null, quantity: '0', reason: '' });
+      toast({
+        title: 'Current stock updated',
+        description: `${product.name} now has ${nextQuantity.toLocaleString()} item(s). Dashboard totals will refresh automatically.`,
+      });
+      await load();
+    } catch (error) {
+      logSupabaseError('inventory.adjustCurrentStock', error, { businessId, productId: product.id });
+      toast({
+        title: 'Could not update current stock',
+        description: getErrorMessage(error, 'Please try again.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setStockSaving(false);
+    }
+  };
+
   const openEditRestock = (restock: RestockRow) => {
     const product = products.find((row) => row.id === restock.product_id);
     setEditingRestock(restock);
@@ -712,14 +770,10 @@ export default function InventoryPage() {
       // DB trigger `trg_sync_restock_to_expense` keeps the linked expense row in sync.
 
 
-      const { error: productError } = await supabase
-        .from('products')
-        .update({
-          cost: unitCost,
-          price: sellingPrice,
-        } as never)
-        .eq('id', selectedProduct.id);
-      if (productError) throw productError;
+      await updateProductRecord(selectedProduct.id, {
+        cost_price: unitCost,
+        selling_price: sellingPrice,
+      });
 
       await recomputeProductStock();
 
@@ -1083,6 +1137,71 @@ export default function InventoryPage() {
           </DialogContent>
         </Dialog>
 
+        <Dialog
+          open={stockDialogOpen}
+          onOpenChange={(open) => {
+            setStockDialogOpen(open);
+            if (!open && !stockSaving) {
+              setStockEditor({ product: null, quantity: '0', reason: '' });
+            }
+          }}
+        >
+          <DialogContent className="w-[95vw] max-w-lg p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>Adjust Current Stock</DialogTitle>
+              <DialogDescription>
+                Set the verified on-hand quantity for {stockEditor.product?.name || 'this product'}. The change is recorded in stock movement history.
+              </DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={saveStockAdjustment}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Current quantity</Label>
+                  <Input value={Math.max(0, Math.trunc(toNumber(stockEditor.product?.quantity)))} readOnly />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="current-stock-quantity">New quantity</Label>
+                  <Input
+                    id="current-stock-quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    autoFocus
+                    value={stockEditor.quantity}
+                    onChange={(event) => setStockEditor((current) => ({ ...current, quantity: event.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-muted/25 px-4 py-3 text-sm">
+                <span className="text-muted-foreground">Quantity change: </span>
+                <span className="font-medium">
+                  {(() => {
+                    const previous = Math.max(0, Math.trunc(toNumber(stockEditor.product?.quantity)));
+                    const next = Number(stockEditor.quantity);
+                    if (!Number.isFinite(next)) return '—';
+                    const change = next - previous;
+                    return `${change > 0 ? '+' : ''}${change.toLocaleString()}`;
+                  })()}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="current-stock-reason">Reason / reference (optional)</Label>
+                <Textarea
+                  id="current-stock-reason"
+                  rows={3}
+                  value={stockEditor.reason}
+                  onChange={(event) => setStockEditor((current) => ({ ...current, reason: event.target.value }))}
+                  placeholder="For example: Physical stock count correction"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={stockSaving || !stockEditor.product}>
+                {stockSaving ? 'Updating...' : 'Update Current Stock'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={damageDialogOpen} onOpenChange={setDamageDialogOpen}>
           <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
@@ -1234,6 +1353,7 @@ export default function InventoryPage() {
                         <TableHead>Status</TableHead>
                         <TableHead>Low Stock</TableHead>
                         <TableHead>Stock Value (Cost)</TableHead>
+                        {canManage ? <TableHead className="text-right">Actions</TableHead> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1256,6 +1376,24 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell>{product.low_stock_threshold ?? product.reorder_level ?? 0}</TableCell>
                             <TableCell>{formatCurrency(quantity * Number(product.cost_price || 0))}</TableCell>
+                            {canManage ? (
+                              <TableCell className="text-right">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      aria-label={`Edit current stock for ${product.name}`}
+                                      onClick={() => openStockAdjustment(product)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit current stock</TooltipContent>
+                                </Tooltip>
+                              </TableCell>
+                            ) : null}
                           </TableRow>
                         );
                       })}
