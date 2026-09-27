@@ -770,10 +770,15 @@ export default function InventoryPage() {
       // DB trigger `trg_sync_restock_to_expense` keeps the linked expense row in sync.
 
 
-      await updateProductRecord(selectedProduct.id, {
-        cost_price: unitCost,
-        selling_price: sellingPrice,
-      });
+      const { error: productError } = await supabase
+        .from('products')
+        .update({
+          cost_price: unitCost,
+          selling_price: sellingPrice,
+        } as never)
+        .eq('id', selectedProduct.id)
+        .eq('business_id', businessId);
+      if (productError) throw productError;
 
       await recomputeProductStock();
 

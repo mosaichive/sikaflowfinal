@@ -6,6 +6,15 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { registerSW } from "virtual:pwa-register";
 
+let reloadingForServiceWorkerUpdate = false;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForServiceWorkerUpdate) return;
+    reloadingForServiceWorkerUpdate = true;
+    window.location.reload();
+  });
+}
+
 registerSW({
   immediate: true,
   onRegisteredSW(_url, registration) {
