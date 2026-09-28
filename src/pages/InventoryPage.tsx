@@ -31,15 +31,12 @@ import {
   type DamageReason,
 } from '@/lib/damaged-goods';
 import {
-  insertRestockRecord,
-  insertStockMovementCompat,
   loadProductsCompat,
   loadRowsForBusinessCompat,
   loadStockMovementsCompat,
   logSupabaseError,
   rememberCachedProduct,
   updateProductRecord,
-  updateRestockRecord,
 } from '@/lib/workspace';
 
 type ProductRow = {
@@ -146,7 +143,7 @@ function inDateFilter(value: string | null | undefined, from: string, to: string
 export default function InventoryPage() {
   const { user, displayName, isAdmin, isManager, effectiveBusinessOwnerId, hasModule } = useAuth();
   const { businessId } = useBusiness();
-  const { financials, loading: financialsLoading } = useBusinessFinancials();
+  const { financials, loading: financialsLoading, refresh: refreshFinancials } = useBusinessFinancials();
   const { toast } = useToast();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [movements, setMovements] = useState<StockMovementRow[]>([]);
@@ -160,6 +157,7 @@ export default function InventoryPage() {
   const [stockSaving, setStockSaving] = useState(false);
   const [damageSaving, setDamageSaving] = useState(false);
   const [editingRestock, setEditingRestock] = useState<RestockRow | null>(null);
+  const [restockRequestId, setRestockRequestId] = useState(() => crypto.randomUUID());
   const [deletingRestockId, setDeletingRestockId] = useState<string | null>(null);
   const [form, setForm] = useState({
     product_id: '',
@@ -304,11 +302,11 @@ export default function InventoryPage() {
         title: 'Stock recalculated',
         description: `${result.updated.length} product(s) updated from stock movements.`,
       });
-      await load();
+      await Promise.all([load(), refreshFinancials()]);
     } finally {
       setRecomputing(false);
     }
-  }, [toast, load]);
+  }, [toast, load, refreshFinancials]);
 
   useEffect(() => {
     void load();
@@ -533,6 +531,7 @@ export default function InventoryPage() {
   }, []);
 
   const resetForm = () => {
+    setRestockRequestId(crypto.randomUUID());
     setForm({
       product_id: '',
       movement_date: new Date().toISOString().slice(0, 10),
@@ -604,7 +603,7 @@ export default function InventoryPage() {
         title: 'Current stock updated',
         description: `${product.name} now has ${nextQuantity.toLocaleString()} item(s). Dashboard totals will refresh automatically.`,
       });
-      await load();
+      await Promise.all([load(), refreshFinancials()]);
     } catch (error) {
       logSupabaseError('inventory.adjustCurrentStock', error, { businessId, productId: product.id });
       toast({
@@ -633,154 +632,38 @@ export default function InventoryPage() {
     setDialogOpen(true);
   };
 
-  // Restock ↔ Expense linkage is now maintained by the `trg_sync_restock_to_expense`
-  // database trigger. The client no longer needs to delete or recreate matching
-  // expense rows — inserting / updating / deleting a restock automatically keeps
-  // its "Restock" expense in sync.
-
-
-  const upsertRestockMovement = async ({
-    restockId,
-    productId,
-    quantityAdded,
-    quantityAfter,
-    unitCost,
-    sellingPrice,
-    note,
-    movementDate,
-  }: {
-    restockId: string;
-    productId: string;
-    quantityAdded: number;
-    quantityAfter: number;
-    unitCost: number;
-    sellingPrice: number;
-    note: string;
-    movementDate: string;
-  }) => {
-    try {
-      const { data: existingRows, error: selectError } = await supabase
-        .from('stock_movements' as any)
-        .select('id')
-        .eq('source_table', 'restocks')
-        .eq('source_id', restockId)
-        .limit(1);
-      if (selectError) throw selectError;
-
-      const payload = {
-        business_id: businessId,
-        product_id: productId,
-        movement_type: 'restock',
-        quantity_change: quantityAdded,
-        quantity_after: quantityAfter,
-        unit_cost: unitCost,
-        unit_price: sellingPrice,
-        note,
-        created_by: user?.id,
-        created_by_name: displayName || user?.email || '',
-        movement_date: movementDate,
-        source_table: 'restocks',
-        source_id: restockId,
-      };
-
-      const existingMovement = (existingRows || [])[0] as { id: string } | undefined;
-      if (existingMovement?.id) {
-        const { error: updateError } = await supabase
-          .from('stock_movements' as any)
-          .update(payload)
-          .eq('id', existingMovement.id);
-        if (updateError) throw updateError;
-        return;
-      }
-
-      const movementResult = await insertStockMovementCompat(payload);
-      if (movementResult.skipped) {
-        logSupabaseError('inventory.upsertRestockMovement.skipped', new Error('stock_movements table unavailable'), {
-          restockId,
-          productId,
-        });
-      }
-    } catch (error) {
-      logSupabaseError('inventory.upsertRestockMovement', error, {
-        restockId,
-        productId,
-      });
-    }
-  };
-
-  const deleteRestockMovement = async (restockId: string) => {
-    try {
-      const { error } = await supabase
-        .from('stock_movements' as any)
-        .delete()
-        .eq('source_table', 'restocks')
-        .eq('source_id', restockId);
-      if (error) throw error;
-    } catch (error) {
-      logSupabaseError('inventory.deleteRestockMovement', error, { restockId });
-    }
-  };
-
   const saveRestock = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || !businessId || !selectedProduct || !canManage) return;
 
-    const quantity = Math.max(0, Number(form.quantity || 0));
+    const quantity = Number(form.quantity || 0);
     const unitCost = Number(form.unit_cost || 0);
     const sellingPrice = Number(form.selling_price || selectedProduct?.selling_price || 0);
-    if (quantity <= 0) {
-      toast({ title: 'Quantity must be at least 1', variant: 'destructive' });
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      toast({ title: 'Quantity must be a whole number of at least 1', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isFinite(unitCost) || unitCost < 0 || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+      toast({ title: 'Prices must be valid numbers of zero or more', variant: 'destructive' });
       return;
     }
 
     setSaving(true);
     try {
-      const totalCost = unitCost * quantity;
       const movementDate = new Date(`${form.movement_date}T00:00:00`).toISOString();
-
-      const restockPayload = {
-        user_id: effectiveBusinessOwnerId ?? user.id,
-        business_id: businessId,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        sku: '',
-        category: selectedProduct.category || '',
-        supplier: selectedProduct.supplier || '',
-        quantity_added: quantity,
-        cost_price_per_unit: unitCost,
-        total_cost: totalCost,
-        restock_date: movementDate,
-        recorded_by: user.id,
-        recorded_by_name: displayName || user.email || '',
-        payment_method: form.payment_method,
-        note: form.description,
-        reference: form.description || null,
-        status: 'active',
-        is_opening_stock: form.is_opening_stock,
-      };
-
-      const savedRestock = editingRestock
-        ? (await updateRestockRecord(editingRestock.id, restockPayload), {
-            ...editingRestock,
-            ...restockPayload,
-            id: editingRestock.id,
-          } as RestockRow)
-        : ((await insertRestockRecord(restockPayload)) as unknown as RestockRow);
-
-      // DB trigger `trg_sync_restock_to_expense` keeps the linked expense row in sync.
-
-
-      const { error: productError } = await supabase
-        .from('products')
-        .update({
-          cost_price: unitCost,
-          selling_price: sellingPrice,
-        } as never)
-        .eq('id', selectedProduct.id)
-        .eq('business_id', businessId);
-      if (productError) throw productError;
-
-      await recomputeProductStock();
+      const { error } = await supabase.rpc('save_inventory_restock' as any, {
+        p_restock_id: editingRestock?.id ?? restockRequestId,
+        p_is_update: Boolean(editingRestock),
+        p_product_id: selectedProduct.id,
+        p_quantity: quantity,
+        p_unit_cost: unitCost,
+        p_selling_price: sellingPrice,
+        p_movement_date: movementDate,
+        p_payment_method: form.payment_method,
+        p_note: form.description.trim() || null,
+        p_is_opening_stock: form.is_opening_stock,
+      });
+      if (error) throw error;
 
       setDialogOpen(false);
       resetForm();
@@ -788,7 +671,7 @@ export default function InventoryPage() {
         title: editingRestock ? 'Restock updated' : 'Restock saved',
         description: 'Stock, stock value, and available business money were recalculated.',
       });
-      void load();
+      await Promise.all([load(), refreshFinancials()]);
     } catch (error) {
       logSupabaseError('inventory.saveRestock', error, {
         businessId,
@@ -955,13 +838,11 @@ export default function InventoryPage() {
     if (!confirmed) return;
     setDeletingRestockId(restock.id);
     try {
-      // DB trigger removes the linked expense automatically when the restock is deleted.
-
-
       const { error: restockError } = await supabase.from('restocks').delete().eq('id', restock.id);
       if (restockError) throw restockError;
 
       await recomputeProductStock();
+      await refreshFinancials();
 
       toast({ title: 'Restock deleted', description: 'Stock and available business money were recalculated.' });
       void load();
